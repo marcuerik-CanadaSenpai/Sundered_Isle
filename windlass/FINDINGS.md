@@ -6,7 +6,7 @@ The 1 critical and 7 high-severity confirmed findings have all been fixed in thi
 
 ## CRITICAL (1)
 
-### Saving silently stops working after roughly 40 turns: a 10-turn chunk document outgrows the 256 KiB db limit
+### Saving silently stops working after roughly 40 turns: a 10-turn chunk document outgrows the 256 KiB db limit — **Fixed**
 
 - **File/lines:** index.html : 1538-1546 (turn record), 1753-1768 (persist), 1702-1704 (advDoc); 1016-1017 (tf tracks cloned into snapshots)
 - **Category:** data-loss
