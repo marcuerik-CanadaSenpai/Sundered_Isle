@@ -50,11 +50,14 @@ async function boot(o) {
     window, document, mock, dom, errors, logs, sleep, $,
     click: (sel) => { const el = typeof sel === 'string' ? $(sel) : sel; if (!el) throw new Error('no element ' + sel); el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })); return el; },
     type: (sel, text) => { const el = $(sel); el.value = text; el.dispatchEvent(new window.Event('input', { bubbles: true })); el.dispatchEvent(new window.Event('change', { bubbles: true })); return el; },
-    // wait until the mock runtime is idle (no sample/db calls pending) for `quiet` ms, or `max` ms
-    settle: async (quiet = 60, max = 8000) => { const t0 = Date.now(); let last = -1, stable = 0; while (Date.now() - t0 < max) { const n = mock.calls.db + mock.calls.sample + (mock.sampleCalls.filter((c) => c.outcome === 'pending').length * 1000); if (n === last) { stable += 10; if (stable >= quiet) return true; } else { stable = 0; last = n; } await sleep(10); } return false; },
+    // settle(): wait until no sample or db call is in flight and no new call has started for `quiet` ms, or `max` ms.
+    settle: async (quiet = 60, max = 8000) => { const t0 = Date.now(); let last = -1, stable = 0; while (Date.now() - t0 < max) { const n = mock.calls.db + mock.calls.sample; const inFlight = mock.pending > 0 || mock.sampleCalls.some((c) => c.outcome === 'pending'); if (n === last && !inFlight) { stable += 10; if (stable >= quiet) return true; } else { stable = 0; last = n; } await sleep(10); } return false; },
 
-    // idle(): wait until no turn/roommate call is running and the runtime has no pending calls, then let db writes drain.
-    idle: async (max = 20000) => { const t0 = Date.now(); const busyNow = () => !(document.querySelector('#stop') || {hidden:true}).hidden || mock.sampleCalls.some((c) => c.outcome === 'pending'); while (Date.now() - t0 < max && busyNow()) await sleep(10); let last = -1, stable = 0; while (Date.now() - t0 < max) { const n = mock.calls.db; if (n === last) { stable += 10; if (stable >= 60 && !busyNow()) return true; } else { stable = 0; last = n; } await sleep(10); } return false; },
+    // idle(): wait until no turn or roommate call is running, every db operation has settled (mock.pending is 0) and none has
+    // started for 60 ms. Returns false if that does not happen within `max` ms.
+    idle: async (max = 20000) => { const t0 = Date.now(); const busyNow = () => !(document.querySelector('#stop') || {hidden:true}).hidden || mock.sampleCalls.some((c) => c.outcome === 'pending') || mock.pending > 0; let last = -1, stable = 0; while (Date.now() - t0 < max) { const n = mock.calls.db; if (n === last && !busyNow()) { stable += 10; if (stable >= 60) return true; } else { stable = 0; last = n; } await sleep(10); } return false; },
+    // diagnostics(): everything a scenario should treat as a failure.
+    diagnostics: () => ({ errors: errors.slice(), violations: mock.violations.slice() }),
     // turn(text, {max, director}): type an action, press Take turn, wait for the whole turn (model calls, fit, fold, save) to finish.
     turn: async (text, o2 = {}) => { const before = mock.sampleCalls.length; $('#action').value = text; if (o2.director != null) $('#director').value = o2.director; api.click('#send'); const t0 = Date.now(); while (Date.now() - t0 < 600 && mock.sampleCalls.length === before) await sleep(10); return api.idle(o2.max || 20000); },
     close: () => window.close(),

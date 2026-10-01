@@ -2,8 +2,8 @@ const { boot } = require('./boot');
 (async () => {
   const h = await boot({});
   await h.settle(150, 6000);
-  h.click('#cBegin'); await h.settle(200, 15000);
-  for (let i = 1; i <= 25; i++) { h.type('#action', 'Action ' + i); h.click('#send'); await h.settle(30, 15000); }
+  h.click('#cBegin'); await h.idle(15000);
+  for (let i = 1; i <= 25; i++) { if (!(await h.turn('Action ' + i))) throw new Error('turn ' + i + ' did not finish'); }
   const origId = [...h.mock.store.keys()].find(k => /^adventures\/[^/]+$/.test(k)).split('/')[1];
   console.log('turns on page:', h.document.querySelectorAll('#feed .turn').length, 'store chunks for original:', [...h.mock.store.keys()].filter(k => k.startsWith('adventures/' + origId + '/turns/')).length);
   // export
