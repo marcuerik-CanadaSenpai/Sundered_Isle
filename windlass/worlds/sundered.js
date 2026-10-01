@@ -632,7 +632,7 @@ window.WINDLASS_WORLDS.sundered = {
     { time: '15:30', name: 'free hours', slot: 'free' },
     { time: '18:00', name: 'dinner, dining hall', slot: 'dinner' },
     { time: '19:00', name: 'goblin night market and Artificers\' Guild', slot: 'evening', days: ['Monday'], notable: true },
-    { time: '19:00', name: 'cross-species mixer on the quad (Day 1 only)', slot: 'mixer', days: ['Monday'], day: 1, notable: true },
+    { time: '19:00', name: 'cross-species mixer on the quad (Day 1 only)', slot: 'evening', days: ['Monday'], day: 1, notable: true },
     { time: '19:30', name: 'Moonrunners dusk run, Moon Field; Sigil Circle, practice yard', slot: 'evening', days: ['Tuesday'], notable: true },
     { time: '19:30', name: 'Aerie choir; Alchemy Society, Alchemy labs', slot: 'evening', days: ['Wednesday'], notable: true },
     { time: '19:30', name: 'lake night swim; Human Society tea in Kettle Hall common room', slot: 'evening', days: ['Thursday'], notable: true },
