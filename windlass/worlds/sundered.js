@@ -61,7 +61,7 @@ window.WINDLASS_WORLDS.sundered = {
     playerRole: 'the player, nineteen, just invited to the university after seeing through a glamour in the world below.',
     backgroundShape: 'From <a kind of town>. Three weeks ago <where> {first} saw <one non-human thing showing through a human disguise>, and <what nobody else saw or did>. Four days later the letter came.',
     backgrounds: [
-      { key: 'bus', label: 'The night bus: antlers under a hat', text: 'From a mid-sized town. Three weeks ago on the night bus {first} saw the antlers under the other passenger\'s hat, and the way the hat sat on them, when nobody else on the bus saw anything. Four days later the letter came.' },
+      { key: 'bus', label: 'The night bus: a dryad beneath a hat', text: 'From a mid-sized town. Three weeks ago on the night bus {first} saw the fine bark at the other passenger\'s wrists and a little crown of leaves beneath their hat, when nobody else on the bus saw anything. Four days later the letter came.' },
       { key: 'shop', label: 'The corner shop: the shopkeeper\'s ears', text: 'From the city. Three weeks ago {first} saw the corner shopkeeper\'s ears, long and green and folded under her headscarf, and a second row of teeth in her smile, and said nothing. Four days later the letter came.' },
       { key: 'hospital', label: 'The hospital: bark at the wrists', text: 'From a small town with one hospital. Three weeks ago, waiting for a relative, {first} saw the bark at a nurse\'s wrists and the leaves in her hair, and she saw {them} see. Four days later the letter came.' },
       { key: 'river', label: 'The river: a girl with gills', text: 'From a river town. Three weeks ago {first} saw a girl surface under the bridge with gills open at her throat; she laughed and went under. Four days later the letter came.' }
@@ -624,7 +624,6 @@ window.WINDLASS_WORLDS.sundered = {
     { time: '09:00', name: 'Glamour Theory, Glamour studio (Prof. {npc_glamour_prof_last})', slot: 'class1', days: ['Monday', 'Wednesday', 'Friday'], notable: true },
     { time: '09:00', name: 'Applied Alchemy lab, Alchemy labs ({npc_alchemy_prof})', slot: 'class1', days: ['Tuesday', 'Thursday'], notable: true },
     { time: '09:00', name: 'morning free', slot: 'morning', days: ['Saturday', 'Sunday'] },
-    { time: '10:00', name: 'orientation (no classes on Day 1)', slot: 'morning', days: ['Monday'] },
     { time: '12:00', name: 'lunch, dining hall', slot: 'lunch' },
     { time: '13:00', name: 'Artificing workshop, Artificers\' workshop ({npc_artificing_master})', slot: 'class2', days: ['Monday', 'Wednesday'], notable: true },
     { time: '13:00', name: 'Wardcraft and Sigils, practice yard (Prof. {npc_wardcraft_prof_last})', slot: 'class2', days: ['Tuesday', 'Thursday'], notable: true },
@@ -632,7 +631,8 @@ window.WINDLASS_WORLDS.sundered = {
     { time: '14:30', name: 'Beastcraft, the Mews ({npc_beastcraft_keeper})', slot: 'class3', days: ['Tuesday', 'Thursday'], notable: true },
     { time: '15:30', name: 'free hours', slot: 'free' },
     { time: '18:00', name: 'dinner, dining hall', slot: 'dinner' },
-    { time: '19:00', name: 'the mixer on the quad (orientation Monday); goblin night market and Artificers\' Guild (other Mondays)', slot: 'evening', days: ['Monday'], notable: true },
+    { time: '19:00', name: 'goblin night market and Artificers\' Guild', slot: 'evening', days: ['Monday'], notable: true },
+    { time: '19:00', name: 'cross-species mixer on the quad (Day 1 only)', slot: 'mixer', days: ['Monday'], day: 1, notable: true },
     { time: '19:30', name: 'Moonrunners dusk run, Moon Field; Sigil Circle, practice yard', slot: 'evening', days: ['Tuesday'], notable: true },
     { time: '19:30', name: 'Aerie choir; Alchemy Society, Alchemy labs', slot: 'evening', days: ['Wednesday'], notable: true },
     { time: '19:30', name: 'lake night swim; Human Society tea in Kettle Hall common room', slot: 'evening', days: ['Thursday'], notable: true },
@@ -707,7 +707,7 @@ window.WINDLASS_WORLDS.sundered = {
 
   // ---- Hidden lore. GM-only: released to the narrator by the engine as the player discovers things; never stated by anyone. ----
   secrets: {
-    rule: 'This section is for the narrator alone. No character knows any of it except as noted under partial; the narration never states it, and {first} never knows it until it is found. It exists so the world stays consistent and so an oddity, at most one every few turns, can be placed for the player to notice or ignore.',
+    rule: 'This section is for the narrator alone. No character knows any of it except the keeper named below; the narration never states it, and {first} never knows it until it is found. It exists so the world stays consistent and so an oddity, at most one every few turns, can be placed for the player to notice or ignore.',
     hints: [
       'The bell in the tower rings once, some nights, with nobody at the rope.',
       'The old wall has seven doors bricked up and an eighth that is not bricked, only forgotten behind ivy.',
@@ -769,7 +769,7 @@ window.WINDLASS_WORLDS.sundered = {
       opens: 'on a night the Isle wants everyone asleep (a fog comes up from the cloud and the whole hall drowses): the door is there for anyone still awake at three.',
       trial: 'Rooms of beds, each warmer and softer than the last, a cat on every one, and a corridor that lengthens for anyone who hurries and shortens for anyone who lies down for a moment. The trial is to reach the end without resting.',
       guardian: 'the Sleeper: a descendant who took the cat and stopped bothering, warm and vast and purring, deadly to lie beside; it wants company and will take it forever. It cannot be fought lying down.',
-      fragment: 'The seventh door opens the Keel. What is chosen there is chosen for everyone, human and mythkin, and cannot be chosen twice.' }
+      fragment: 'When all seven places have been passed, the stair from the Bell Cellar leads to the Keel. What is chosen there is chosen for everyone, human and mythkin, and cannot be chosen twice.' }
   ],
 
   choice: {
@@ -778,10 +778,10 @@ window.WINDLASS_WORLDS.sundered = {
 
   // Style examples: density and register only; the narrator must not reuse their content.
   exemplars: [
-    'The dining hall at eight is a noise you can lean on: a harpy on the rafters passing bread down to a goblin and two humans at the table beneath, a werewolf and a fairy arguing over a crossword, three fox tails and a set of antlers sharing the window table. Somebody\'s glamour has turned the porridge blue and nobody has fixed it. Heads turn as you come in, not unkindly, the way a room turns for weather, and a girl with gills stops chewing to look. {rm_first} steers you by the elbow toward {rm_their} usual table, where there is always room.',
+    'The dining hall at eight is a noise you can lean on: a harpy on the rafters passing bread down to a goblin and two humans at the table beneath, a werewolf and a fairy arguing over a crossword, three fox tails and a dryad crown of leaves sharing the window table. Somebody\'s glamour has turned the porridge blue and nobody has fixed it. Heads turn as you come in, not unkindly, the way a room turns for weather, and a girl with gills stops chewing to look. {rm_first} steers you by the elbow toward {rm_their} usual table, where there is always room.',
     'The cliff path has a rail because someone once decided it should, and the rail is cold and the cloud below it is not. It moves the way water moves, slowly, and now and then something under it brightens and goes out. "Don\'t," says the goblin behind you, not looking up from her ledger, when you lean. "Everyone leans. Nobody knows why. Walk on the wall side." You walk on the wall side, and the wall, when your hand brushes it, is warm.',
     'The Glamour studio has mirrors on three walls and every one of them is a liar; the fairy at the front tells you so in her first sentence and then makes you find out which one is telling the truth about your own face. It takes you eleven minutes. The werewolf beside you takes four, and then spends the rest of the hour trying to see through yours, muttering, ears back, and you let her, because it is the first time anyone here has looked at you as a problem rather than an event.',
-    'The Creamery smells of warm milk and the cocoa is the colour of a horse. It is also, you realise on the second mouthful, the best thing you have ever drunk, and {npc_creamery_first} watches you realise it from behind the counter with the patience of someone who has watched a great many people realise it. "There\'s more," {npc_creamery_first} says, which is not a question either.',
+    'The Creamery smells of warm milk and the cocoa is the colour of a horse. It is also, you realise on the second mouthful, the best thing you have ever drunk, and {npc_creamery_first} watches you realise it from behind the counter with the patience of someone who has watched a great many people realise it. "There\'s more," {npc_creamery_first} says, which is not a question.',
     'She is close enough now that you can smell her, and it is not what you expected: warm dust, feathers in sun, something dry and clean like a stone that has been in the oven. The talons are the thing you cannot stop looking at, grey and ridged and gripping the chair rail the way a hand grips a rail, and you look at her face instead, which is a face, and then at the talons again. You have never been this near to anything that was not a person, and she is a person, and both of those are true at once, and you say nothing about any of it.',
     'Your hand goes to the base of your spine before you have decided to send it there. It is an ache like the one you get from a bad chair, low and centred, except you have been standing for an hour. Under the shirt there is nothing. You know there is nothing, because you check twice, and then you stop checking, in the middle of the corridor, and notice yourself stopping, and go down to breakfast with your hand in your pocket.',
     'The feather sits on your pillow all through the mixer and is still there when you come back, small and copper and pointing at the door. You do not pick it up. You do not move it, either, which you notice yourself not doing, and lie down with it six inches from your ear like something that might say a word if you fell asleep first.'
@@ -833,7 +833,7 @@ window.WINDLASS_WORLDS.sundered = {
   opening: {
     narrative: 'Room 4B is at the top of Kettle Hall where the stairs give up and become a ladder with ambitions, and the door is already open. The first thing you see is the view, because the window takes up most of the back wall and the lake is in it, flat and bright and enormous, and past the far shore the Isle simply stops, and there is cloud where the rest of the world should be, lit from below. The second thing you see is the other side of the room.\n\n{rm_intro}\n\nOutside, three floors below, somebody is stringing lanterns up the bell tower, and a harpy on the top ledge is holding the other end of the string in her foot and singing to herself.',
     suggestions: ['Say yes to whatever {rm_first} just offered.', 'Ask {rm_first} what to expect at the mixer.', 'Unpack first and ask what {rm_their} classes are like.'],
-    events: ['Day 1 17:45 {rm_first} offers to walk {first} to the mixer at seven.'],
+    events: ['Day 1 17:40 {rm_first} offers to walk {first} to the mixer at seven.'],
     beats: ['{first} reached room 4B and met {rm_name} ({rm_species}, second-year), who offered to walk {them} to the mixer at seven.']
   }
 };

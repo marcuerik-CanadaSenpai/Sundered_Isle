@@ -312,7 +312,7 @@
     <div class="dlg">
       <div class="dlg-head"><h3>Adventures</h3><button class="close quiet" data-close="dlgAdventures">Close</button></div>
       <div id="dbNotice" class="notice" hidden></div>
-      <p class="small">Every turn is saved automatically to the same store on every device; open the page anywhere and it starts from the most recent save. A page left open checks for newer saves on its own.</p>
+      <p class="small" id="saveInfo">Every turn is saved automatically to the same store on every device; open the page anywhere and it starts from the most recent save. A page left open checks for newer saves on its own.</p>
       <div class="advlist" id="advlist"></div>
       <div class="row">
         <select id="newWorld" title="World"></select>
@@ -324,7 +324,11 @@
           <span>Import</span><input type="file" id="importFile" accept=".json,application/json">
         </label>
       </div>
-      <pre class="debug" id="exportFallback" hidden></pre>
+      <div id="exportFallback" class="notice" hidden>
+        <p>Downloads are unavailable in this view. Copy the save JSON below and keep it in a file ending in <code>.json</code>.</p>
+        <textarea id="exportText" rows="8" readonly aria-label="Exported Windlass save JSON"></textarea>
+        <button type="button" id="exportCopy">Copy save JSON</button>
+      </div>
     </div>
   </dialog>
 
@@ -341,8 +345,8 @@
         <div class="field"><label for="cGender">Gender</label><div class="row"><select id="cGender" style="flex:1"></select><button type="button" class="quiet" data-rand="gender">Random</button></div></div>
         <div class="field" style="grid-column:1/-1"><label for="cBackground">Where you come from</label><div class="row"><input type="text" id="cBackground" style="flex:1;min-width:200px" placeholder="Your own words, or pick a suggestion" autocomplete="off"><button type="button" class="quiet combo-btn" data-combo="cBackground" title="Suggestions" aria-label="Background suggestions">▾</button><button type="button" class="quiet" data-rand="background">Random</button></div></div>
       </div>
-      <div class="field"><label for="cPersonality">Personality and history, in your own words</label><textarea id="cPersonality" rows="3" placeholder="How you carry yourself, what you want here, what you are afraid of, anything the narrator should know about who you are."></textarea><div class="row"><button type="button" class="quiet combo-btn" data-combo="cPersonality" title="Suggestions" aria-label="Personality suggestions">▾ Suggestions</button><button type="button" class="quiet" data-rand="personality">Random</button></div></div>
-      <div class="field"><label>Two things you are good at <button type="button" class="quiet" data-rand="traits">Random</button></label><div class="checks" id="cStrengths"></div></div>
+      <div class="field"><label for="cPersonality">Personality and history, in your own words</label><textarea id="cPersonality" rows="3" placeholder="How you carry yourself, what you want here, what you are afraid of, anything the narrator should know about who you are."></textarea><div class="row"><button type="button" class="quiet combo-btn" data-combo="cPersonality" title="Suggestions" aria-label="Personality suggestions">▾ Suggestions</button><button type="button" class="quiet" data-rand="personality">Random</button><button type="button" class="quiet" id="cInventPlayer">Invent these with Claude</button></div></div>
+      <div class="field"><div class="row"><span id="cStrengthsLabel" class="small">Two things you are good at</span><button type="button" class="quiet" data-rand="traits">Random</button></div><div class="checks" id="cStrengths" role="group" aria-labelledby="cStrengthsLabel"></div></div>
       <div class="grid2">
         <div class="field"><label for="cWeakness">One thing you are not</label><select id="cWeakness"></select></div>
         <div class="field"><label>Your stats</label><div class="stats" id="cStats"></div></div>
@@ -496,6 +500,16 @@
   const DEFAULT_WORLD = WORLDS.sundered ? 'sundered' : (WORLDS.mythaven ? 'mythaven' : WORLD_IDS[0]);
   let W = null;              // the current adventure's world
   const DEFAULT_SETTINGS = { narrTier: 'complex', utilTier: 'quick', density: 'standard', window: 3, autoFit: true, loreBudget: 6000, testNote: '', pace: 'standard', thoughts: true, inventTier: 'quick' };
+  function normaliseSettings(input) {
+    const s = Object.assign({}, DEFAULT_SETTINGS, input || {}), tiers = ['quick', 'default', 'complex'];
+    for (const k of ['narrTier', 'utilTier', 'inventTier']) if (!tiers.includes(s[k])) s[k] = DEFAULT_SETTINGS[k];
+    if (!['terse', 'standard', 'rich'].includes(s.density)) s.density = DEFAULT_SETTINGS.density;
+    if (!['slow', 'standard', 'fast', 'unbounded'].includes(s.pace)) s.pace = DEFAULT_SETTINGS.pace;
+    s.window = Math.max(1, Math.min(10, Math.round(Number(s.window) || DEFAULT_SETTINGS.window)));
+    s.autoFit = s.autoFit !== false; s.thoughts = s.thoughts !== false;
+    s.loreBudget = Math.max(500, Math.min(12000, Math.round(Number(s.loreBudget) || DEFAULT_SETTINGS.loreBudget)));
+    return s;
+  }
   // Pace of change: the most influence one species can gain in one story day (turns are minutes; days are what a slow burn is measured in).
   const PACE_PER_DAY = { slow: 5, standard: 10, fast: 20, unbounded: 0 };
   const TURN_KEYS = ['evaluation', 'narrative', 'suggested_actions', 'secret_info', 'state_updates', 'time_advance_minutes', 'events', 'beats', 'facts'];
@@ -504,6 +518,7 @@
   let sample = null, db = null, downloads = null;
   let adv = null;            // current adventure
   let busy = false, ctl = null;
+  let saveError = null, summaryDirty = false, summarySavePromise = null;
   let showHidden = false; try { showHidden = localStorage.getItem('windlass.spoilers') === '1'; } catch (e) {}
   let lastDebug = null;
 
@@ -539,7 +554,11 @@
   function matchRoommateSpecies(text) {
     const t = String(text || '').trim().toLowerCase(); if (!t) return null;
     const keys = roommateSpeciesKeys(W);
-    for (const k of keys) { const nm = (W.transformation && W.transformation.species[k] ? W.transformation.species[k].name : k).toLowerCase(); const sh = (W.transformation && W.transformation.species[k] ? W.transformation.species[k].short : k).toLowerCase(); if (t === k || t === nm || t === sh || nm.includes(t) || t.includes(sh) || t.includes(k)) return k; }
+    for (const k of keys) {
+      const sp = W.transformation && W.transformation.species[k];
+      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].filter(Boolean).map((x) => String(x).trim().toLowerCase());
+      if (names.includes(t)) return k;
+    }
     return null;
   }
   // ---------- generated people (worlds with genPools) ----------
@@ -629,7 +648,9 @@
   function composeIntro(r) {
     const g = r.gen; const pr = r.pronouns;
     const room = g.room || 'The left-hand side of the room is already lived in, in the way of your roommate\'s kind: you cannot say exactly what is different about it, only that it is arranged for a body that is not yours.';
-    return room + ' Your own bed is made, with a card on the pillow that says your name.\n\n' + r.name + ' comes in behind you and stops in the doorway' + (g.looks ? ': ' + g.looks : ', ' + r.race.toLowerCase() + ' from the first glance, and plainly') + '. "' + r.first + '," ' + pr.they + ' says. "' + (r.last || r.first) + '. Second-year, ' + g.course + '. They told me the human was mine; I said I\'d try not to hold it against you." ' + (g.hello ? cap(pr.they) + ' reaches out, stops, and folds the hand back in, the way people do when a greeting is on offer and optional. ' : '') + '"Mixer\'s at seven. I\'ll walk you down, if you like. It\'s loud."';
+    const says = pr.they === 'they' ? 'say' : 'says';
+    const appearance = g.looks ? ': ' + g.looks : (g.senses ? ': close up, ' + g.senses : ': ' + String(r.race || 'a stranger').toLowerCase() + ', unfamiliar in the doorway');
+    return room + ' Your own bed is made, with a card on the pillow that says your name.\n\n' + r.name + ' comes in behind you and stops in the doorway' + appearance + '. "' + r.first + '," ' + pr.they + ' ' + says + '. "' + (r.last || r.first) + '. Second-year, ' + g.course + '. They told me the human was mine; I said I\'d try not to hold it against you." ' + (g.hello ? cap(pr.they) + ' reaches out, stops, and folds the hand back in, the way people do when a greeting is on offer and optional. ' : '') + '"Mixer\'s at seven. I\'ll walk you down, if you like. It\'s loud."';
   }
   // The structural draws for a cast (the kind, the gender and the variant of every role), made once so that the invention
   // call and the build that follows agree on who each person is.
@@ -668,12 +689,13 @@
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
   const wordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^a-z])' + escRe(String(name).toLowerCase()) + '([^a-z]|$)').test(hay);
+  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)').test(hay);
   // Minor figures: one line each, and their looks only when they are on the page or were just mentioned.
   function minorCharactersText(mentioned) {
     const gen = adv && adv.cast && adv.cast.generated;
     if (gen && gen.minors && gen.minors.length) return 'Minor characters who may be mentioned and may speak a line, but should not be given speeches: ' + gen.minors.map((m) => {
       const near = mentioned && [m.first, m.last].some((n) => wordIn(mentioned, n));
-      return m.name + ' (' + m.race.toLowerCase() + ', ' + fill(m.text) + (near && m.looks ? '; looks: ' + fill(m.looks) + (m.senses ? '; close up: ' + fill(m.senses) : '') : '') + ')';
+      return m.name + ' (' + m.race.toLowerCase() + (m.pronouns ? ', pronouns ' + m.pronouns.they + '/' + m.pronouns.them : '') + ', ' + fill(m.text) + (near && m.looks ? '; looks: ' + fill(m.looks) + (m.senses ? '; close up: ' + fill(m.senses) : '') : '') + ')';
     }).join('; ') + '.';
     return fill(W.minorCharacters || '');
   }
@@ -743,7 +765,7 @@
     else Object.assign(v, { rm_name: 'your roommate', rm_Name: 'Your roommate', rm_first: 'your roommate', rm_First: 'Your roommate', rm_last: 'your roommate', rm_Last: 'Your roommate', rm_species: 'unknown', rm_they: 'they', rm_them: 'them', rm_their: 'their', rm_theirs: 'theirs', rm_They: 'They', rm_Their: 'Their', rm_intro: '' });
     // {npc_<key>}, {npc_<key>_first}, {npc_<key>_last}, {npc_<key>_they} resolve to the cast: generated people, or the world's authored ones.
     const gen = adv && adv.cast && adv.cast.generated;
-    const people = gen ? gen.characters.concat(gen.minors || []) : (W.characters || []);
+    const people = activeCharacters().concat(gen ? (gen.minors || []) : []);
     const sub = (t) => String(t || '').replace(/\{([a-zA-Z_]+)\}/g, (m, k) => (k in v ? v[k] : m));
     for (const c of people) { const pr = c.pronouns || NB; v['npc_' + c.key] = c.name; v['npc_' + c.key + '_first'] = c.first || c.name.split(' ')[0]; v['npc_' + c.key + '_last'] = c.last || c.name.split(' ').slice(-1)[0]; v['npc_' + c.key + '_they'] = pr.they; v['npc_' + c.key + '_them'] = pr.them; v['npc_' + c.key + '_their'] = pr.their; v['npc_' + c.key + '_race'] = String(c.race || '').toLowerCase(); }
     // _looks and _text (a minor figure's line) after every name is known, so a line that names another person resolves.
@@ -779,15 +801,15 @@
 
   // ---------- clock and schedule ----------
   const nextWeekday = (d) => { const wd = W.calendar.weekdays; return wd[(wd.indexOf(d) + 1) % wd.length]; };
-  function daySchedule(weekday) {
-    return W.schedule.filter((e) => !e.days || e.days.includes(weekday)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
+  function daySchedule(weekday, day) {
+    return W.schedule.filter((e) => (!e.days || e.days.includes(weekday)) && (e.day == null || e.day === day)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
   }
   function slotInfo(state) {
-    const sch = daySchedule(state.weekday), now = timeToMin(state.time);
+    const sch = daySchedule(state.weekday, state.day), now = timeToMin(state.time);
     let cur = null, next = null;
     for (const e of sch) { if (timeToMin(e.time) <= now) cur = e; else { next = e; break; } }
     if (!cur) cur = { slot: 'night', name: 'night, before the first bell', time: '00:00' };
-    if (!next) { const t = daySchedule(nextWeekday(state.weekday))[0]; if (t) next = Object.assign({}, t, { tomorrow: true }); }
+    if (!next) { const t = daySchedule(nextWeekday(state.weekday), state.day + 1)[0]; if (t) next = Object.assign({}, t, { tomorrow: true }); }
     return { cur, next };
   }
   function advanceClock(state, minutes) {
@@ -803,7 +825,7 @@
     const out = []; let wd = state.weekday;
     for (let i = 1; i <= 6; i++) {
       wd = nextWeekday(wd);
-      const fixtures = daySchedule(wd).filter((e) => e.notable).map((e) => fill(e.name).split(',')[0].split(' (')[0] + ' ' + e.time);
+      const fixtures = daySchedule(wd, state.day + i).filter((e) => e.notable).map((e) => fill(e.name).replace(/\s+\([^)]*\)$/, '') + ' ' + e.time);
       out.push('Day ' + (state.day + i) + ' ' + wd + (fixtures.length ? ' (' + fixtures.join('; ') + ')' : ''));
     }
     return 'Coming days: ' + out.join('; ') + '.';
@@ -836,6 +858,7 @@
     const progKey = W.progression && W.progression.progressKey;
     for (const u of updates) {
       const path = normaliseKey(u.key); const op = String(u.op || 'set').toLowerCase(); const val = u.value;
+      if (!['set', 'inc', 'append', 'remove'].includes(op)) { notes.push('ignored unknown operation "' + op + '" for ' + u.key); continue; }
       if (!path) { notes.push('ignored unknown key "' + u.key + '"'); continue; }
       if (path === 'time' || path === 'day' || path === 'weekday') { notes.push('ignored ' + path + ' (clock is code-owned)'); continue; }
       if (path === 'location') { if (typeof val === 'string' && val.trim()) { rec('location', state.location, val.trim()); state.location = val.trim().slice(0, 120); } continue; }
@@ -845,7 +868,9 @@
         if (op === 'append') next = next.concat(arr.filter((x) => !next.includes(x)));
         else if (op === 'remove') next = next.filter((x) => !arr.includes(x));
         else next = arr;
-        rec('present', state.present, next); state.present = next.slice(0, 12); continue;
+        next = Array.from(new Set(next));
+        if (next.length > 12) { notes.push('present list capped at 12; oldest entries dropped'); next = next.slice(-12); }
+        rec('present', state.present, next); state.present = next; continue;
       }
       const group = path.split('.')[0], key = path.split('.').slice(1).join('.');
       if (group === 'items') {
@@ -865,8 +890,10 @@
         } else if (def.type === 'bool') { const b = !!val && val !== 'false'; rec(path, cur, b); state.items[key] = b; }
         else if (def.type === 'list') {
           const arr = Array.isArray(val) ? val.map(String) : [String(val)]; let next = Array.isArray(cur) ? cur.slice() : [];
-          if (op === 'append') next = next.concat(arr); else if (op === 'remove') next = next.filter((x) => !arr.some((r) => x.toLowerCase().includes(r.toLowerCase()))); else next = arr;
-          next = next.slice(0, def.maxItems || 30); rec(path, cur, next); state.items[key] = next;
+          if (op === 'append') next = next.concat(arr.filter((x) => !next.some((old) => old.toLowerCase() === x.toLowerCase()))); else if (op === 'remove') next = next.filter((x) => !arr.some((r) => x.toLowerCase().includes(r.toLowerCase()))); else next = arr;
+          const maxItems = def.maxItems || 30;
+          if (next.length > maxItems) { notes.push(key + ' list capped at ' + maxItems + '; oldest entries dropped'); next = next.slice(-maxItems); }
+          rec(path, cur, next); state.items[key] = next;
         } else { const lim = def.maxChars || 200; let s = String(val == null ? '' : val); if (s.length > lim) { s = s.slice(0, lim); const cut = s.lastIndexOf(' '); if (cut > lim * 0.6) s = s.slice(0, cut); s = s.replace(/[,;:\s]+$/, '') + '…'; } rec(path, cur, s); state.items[key] = s; }
       } else if (group === 'attitudes') {
         if (!(key in state.attitudes)) { notes.push('ignored unknown attitude "' + key + '"'); continue; }
@@ -894,6 +921,7 @@
       const from = st[pk]; st[pk] = Math.min(100, (Number(st[pk]) || 0) + (cf.saltProgress || 35)); rec('items.' + pk, from, st[pk]);
       const ff = st.fever; st.fever = true; rec('items.fever', ff, true);
       const fd = st.fever_days_remaining; st.fever_days_remaining = cf.feverDays || 3; rec('items.fever_days_remaining', fd, st.fever_days_remaining);
+      st.salt_fever = true;
       state.flags[cf.saltTaken] = false; notes.push('reach-salt taken: progress +' + (cf.saltProgress || 35) + ', fever for ' + (cf.feverDays || 3) + ' days');
       next.push(who + ' took reach-salt last turn: the fever is starting (day 1 of ' + (cf.feverDays || 3) + '), with vivid shared dreams; the Attunement is being forced forward.');
     }
@@ -901,13 +929,14 @@
       if ((Number(st[sk]) || 0) >= 1 && !st.fever) { const from = st[pk]; st[pk] = Math.min(100, (Number(st[pk]) || 0) + 1); rec('items.' + pk, from, st[pk]); notes.push('night with kin: progress +1'); }
       if (st.fever && st.fever_days_remaining > 0) {
         st.fever_days_remaining -= 1;
-        if (st.fever_days_remaining === 0) { st.fever = false; rec('items.fever', true, false); next.push('The fever has broken this morning. Describe the new Stage ' + st[sk] + ' marks (' + (P.stages[st[sk]] || {}).text + ') as ' + who + ' discovers them.'); notes.push('fever broke'); }
+        if (st.fever_days_remaining === 0) { st.fever = false; rec('items.fever', true, false); next.push('The fever has broken this morning.' + (st.salt_fever ? ' The salt-fever has not changed the stage; no new marks appear.' : ' Describe the new Stage ' + st[sk] + ' marks (' + (P.stages[st[sk]] || {}).text + ') as ' + who + ' discovers them.')); st.salt_fever = false; notes.push('fever broke'); }
         else next.push(who + ' is feverish (day ' + ((cf.feverDays || 3) - st.fever_days_remaining + 1) + ' of ' + (cf.feverDays || 3) + '), sleeping badly, dreaming as the kin.');
       }
     }
     if ((Number(st[pk]) || 0) >= 100 && (Number(st[sk]) || 0) < P.stages.length - 1) {
       const from = st[sk]; st[sk] = from + 1; rec('items.' + sk, from, st[sk]);
       const fp = st[pk]; st[pk] = 0; rec('items.' + pk, fp, 0);
+      st.salt_fever = false;
       if (!st.fever) { st.fever = true; rec('items.fever', false, true); st.fever_days_remaining = cf.feverDays || 3; }
       notes.push('Attunement crossed into Stage ' + st[sk]);
       next.push('The Attunement has crossed into Stage ' + st[sk] + ' (' + P.stages[st[sk]].name + '): the fever begins tonight; the new marks appear only when it breaks. Do not describe new marks yet.');
@@ -1011,8 +1040,10 @@
         const rung = sp.ladder[r]; tf.rungs[k] = r + 1;
         if (hasSteps(rung)) {
           if (!tf.paths[k]) {
-            const sc = (T.sexChange || {})[k]; const roll = !!(sc && sc.to && p.gender !== sc.to && Math.random() < (sc.chance == null ? 0.5 : sc.chance));
-            tf.paths[k] = { sex: roll ? sc.to : null, day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
+            const sc = (T.sexChange || {})[k];
+            const sexPathExists = !!tf.sex || Object.values(tf.paths || {}).some((path) => path && path.sex) || (tf.tracks || []).some((track) => track.kind === 'sex');
+            const roll = !!(!sexPathExists && sc && sc.to && p.gender !== sc.to && Math.random() < (sc.chance == null ? 0.5 : sc.chance));
+            tf.paths[k] = { sex: roll ? sc.to : null, sexTold: [], day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
             if (roll) notes.push(k + ' path drawn: the body will also go toward a ' + (sc.to === 'female' ? 'woman' : 'man') + '\'s');
             if (tf.paths[k].eye) notes.push(k + ' path drawn: the eyes will go ' + eyeColour(tf.paths[k].eye));
             if (tf.paths[k].order.some((c, i) => c !== i)) notes.push(k + ' path drawn: the changes come in the order ' + tf.paths[k].order.map((c) => c + 1).join(' '));
@@ -1081,10 +1112,14 @@
     const due = tf.tracks.filter((t) => t.nextAt <= now).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
     for (const t of due) {
       out.push(stepNote(t, tf, t.steps[t.i]));
+      if (t.kind === 'sex') {
+        const path = tf.paths[t.species];
+        if (path) { path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]); }
+      }
       const last = t.i === t.steps.length - 1; t.i += 1; t.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
       if (!last) continue;
       if (t.kind === 'body') { const tr = tf.traits.find((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (tr) tr.settled = true; notes.push('change complete: ' + t.species + ' rung ' + t.rung); }
-      else if (t.rung >= lastSexRung(T.species[t.species])) { tf.sex = { to: t.to, species: t.species, rung: t.rung, day: state.day }; notes.push('the body is ' + (t.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now (' + t.species + ' path)'); }
+      else if (t.rung >= lastSexRung(T.species[t.species])) { if (!tf.sex) tf.sex = { to: t.to, species: t.species, rung: t.rung, day: state.day }; notes.push('the body is ' + (t.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now (' + t.species + ' path)'); }
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
@@ -1139,8 +1174,16 @@
       const parts = [];
       const path = (tf.paths || {})[k];
       const pf = (x) => pathFill(tf, k, x);
-      for (let i = (n >= 5 ? 4 : 0); i < n; i++) { const c = rungContent(sp, path, i); const a = c && c.anatomy; if (a && !/^(Nothing shows|As above)/.test(a)) parts.push(pf(a)); }
-      if (path && path.sex && !(tf.sex && tf.sex.species === k)) { const told = []; for (let i = 0; i < n; i++) for (const x of (sp.ladder[i] && sp.ladder[i].sex) || []) told.push(pf(x)); const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex'); if (st) told.push(...st.steps.slice(0, st.i).map(pf)); if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.join('; ') + '.'); }
+      for (let i = n - 1; i >= 0; i--) { const c = rungContent(sp, path, i); const a = c && c.anatomy; if (a && !/^(Nothing shows|As above)/.test(a)) { parts.push('Settled shape: ' + pf(a)); break; } }
+      if (path && path.sex && !(tf.sex && tf.sex.species === k)) {
+        let told = Array.isArray(path.sexTold) ? path.sexTold.slice() : [];
+        if (!Array.isArray(path.sexTold)) {
+          for (let i = 0; i < n; i++) { const c = rungContent(sp, path, i); for (const x of (c && c.sex) || []) told.push(x); }
+          const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex');
+          if (st) told.push(...st.steps.slice(0, st.i));
+        }
+        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.map(pf).join('; ') + '.');
+      }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
       if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + bt.steps.slice(0, bt.i).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
@@ -1190,7 +1233,7 @@
       if (!hit) for (const k of e.keys) {
         const kk = k.toLowerCase();
         if (kk.endsWith('*')) { if (new RegExp('\\b' + escRe(kk.slice(0, -1)) + '\\w*').test(hay)) { hit = true; break; } }
-        else if (hay.includes(kk)) { hit = true; break; }
+        else if (new RegExp('\\b' + escRe(kk) + '\\b').test(hay)) { hit = true; break; }
       }
       if (hit) hits.push(e);
     }
@@ -1231,7 +1274,7 @@
   }
   // The world's premise in two parts: the setting (shown when creating) and the personal part from "You are …" on, which opens
   // the story once the player has a name. The narrator gets the whole premise in <world> as before.
-  function premiseParts(Wc) { const t = String((Wc || W).premise || ''); const i = t.indexOf('. You are '); return i < 0 ? { setting: t, personal: '' } : { setting: t.slice(0, i + 1), personal: t.slice(i + 2) }; }
+  function premiseParts(Wc) { const t = String((Wc || W).premise || ''); const i = t.indexOf('. You are '); if (i >= 0) return { setting: t.slice(0, i + 1), personal: t.slice(i + 2) }; return /^\s*You are /.test(t) ? { setting: '', personal: t.trim() } : { setting: t, personal: '' }; }
   function openingNarrative(rmIntro) { const pp = premiseParts(W); return (pp.personal ? fill(pp.personal) + '\n\n' : '') + fill(W.opening.narrative, { rm_intro: rmIntro }); }
   // Turn 0 for the prompt: the opening without its prologue, which <world> already carries as the premise.
   function openingTurn() {
@@ -1267,11 +1310,11 @@
   }
   // The cast members an action names, by first name, surname or alias as whole words, so the prompt can hold the scene to them.
   function focusNames(action) {
-    const hay = String(action || '').toLowerCase(); if (!hay) return [];
+    const hay = String(action || ''); if (!hay) return [];
     const out = [];
     for (const c of activeCharacters()) {
-      const handles = [c.first || '', c.name.split(' ').length > 1 ? c.name.split(' ').pop() : c.name].concat(c.aliases || []).filter((h) => h && h.length > 2).map((h) => h.toLowerCase());
-      if (handles.some((h) => wordIn(hay, h))) out.push(c.first || (c.aliases && c.aliases[0]) || c.name);
+      const handles = [c.first || '', c.name].concat(c.aliases || []).filter((h) => h && h.length > 2 && h !== c.last);
+      if (handles.some((h) => properWordIn(hay, h))) out.push(c.first || (c.aliases && c.aliases[0]) || c.name);
     }
     return out.slice(0, 3);
   }
@@ -1307,9 +1350,9 @@
       const names = [c.name.split(' ').pop()].concat(c.aliases || []).map((n) => n.toLowerCase());
       const full = names.some((n) => S.present.some((pp) => pp.toLowerCase().includes(n)) || wordIn(mentioned, n));
       const where = (c.where && (c.where[slot] || c.where.default)) || 'unknown';
-      const aim = (c.aims && (c.aims[slot] || c.aims.default)) || '';
+      const aim = (c.aims && ((slot === 'evening' && S.day > 1 && /mixer/i.test(c.aims[slot] || '') ? '' : c.aims[slot]) || c.aims.default)) || '';
       const att = S.attitudes[c.key];
-      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']. ' + fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet)) + (c.looks && (full || !c.gen) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
+      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet)) + (c.looks && (full || !c.gen) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
     parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
@@ -1426,10 +1469,12 @@
     return repairJson(t);
   }
   // A reply that could not be used is kept for diagnosis: the last one in this browser, and each one in the store.
+  let failureSeq = 0;
   function logFailure(code, input, raw, extra) {
     const rec = Object.assign({ ts: new Date().toISOString(), code, action: String((input && input.action) || '').slice(0, 300), tier: adv && adv.settings ? adv.settings.narrTier : '', density: adv && adv.settings ? adv.settings.density : '', raw: String(raw || '').slice(0, 30000) }, extra || {});
     try { localStorage.setItem('windlass.lastFailure', JSON.stringify(rec)); } catch (e) {}
-    try { if (db && adv && adv.id) db.doc('adventures/' + adv.id + '/failures/' + Date.now().toString(36)).set(rec).catch(() => {}); } catch (e) {}
+    const hiddenFailure = ['not_granted', 'sampling_disabled', 'not_declared', 'rate_limited'].includes(code);
+    try { if (!hiddenFailure && db && adv && adv.id && adv.rev > 0) db.doc('adventures/' + adv.id + '/failures/' + Date.now().toString(36) + '-' + (++failureSeq).toString(36) + '-' + Math.random().toString(36).slice(2, 7)).set(rec).catch(() => {}); } catch (e) {}
   }
   function partialNarrative(text) {
     const m = /"narrative"\s*:\s*"/.exec(text); if (!m) return '';
@@ -1443,6 +1488,7 @@
     return out;
   }
   function normaliseReply(d) {
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return { out: { narrative: '' }, notes: ['reply was not a JSON object'] };
     const notes = []; const out = {};
     out.evaluation = (d.evaluation && typeof d.evaluation === 'object') ? d.evaluation : {};
     out.narrative = typeof d.narrative === 'string' ? d.narrative.trim() : '';
@@ -1475,6 +1521,7 @@
     for (const k of TURN_KEYS) if (!(k in d)) notes.push('missing field ' + k);
     return { out, notes };
   }
+  const usableReply = (d) => !!(d && typeof d === 'object' && !Array.isArray(d) && typeof d.narrative === 'string' && d.narrative.trim());
   function resolveRoll(ev, roll) {
     const notes = []; const stats = Object.assign({}, playerStats()); const D = W.difficulty;
     if (W.skills && adv.state.skills) for (const k of Object.keys(W.skills)) stats[k] = skillLevel(adv.state.skills[k]);
@@ -1497,6 +1544,7 @@
     const n = wc(narrative);
     const prompt = 'Here is a passage of ' + n + ' words from an interactive story, second person present tense. Rewrite it to between ' + band[0] + ' and ' + band[1] + ' words. Keep every event, fact, name and line of dialogue (meaning intact), the tense and person, and end at the same moment. Only cut or expand description. Return only the passage, no preamble.\n\n' + narrative;
     const res = await sample(prompt, { label: 'length fit', modelTier: adv.settings.utilTier, cache: false, signal: ctl ? ctl.signal : undefined });
+    if (res.truncated) throw { code: 'truncated', message: 'length fit was truncated' };
     return res.text.trim();
   }
   async function foldBeats() {
@@ -1506,8 +1554,9 @@
     const oldestBeats = foldBeatsNow ? M.beats.slice(0, 18) : [];
     const oldestFacts = foldFactsNow ? M.facts.slice(0, 20) : [];
     const prompt = 'You maintain the long-term memory of an interactive story. Merge the following material (oldest first) into the existing summary. Keep the result under 300 words, plain past tense, no adjectives. Keep every name, day number, place and standing arrangement that could matter later; drop repetition. Return only the new summary.\n\n<existing_summary>\n' + (M.summary || '(empty)') + '\n</existing_summary>\n\n<beats>\n' + (oldestBeats.join('\n') || '(none)') + '\n</beats>\n\n<facts>\n' + (oldestFacts.join('\n') || '(none)') + '\n</facts>';
-    const res = await sample(prompt, { label: 'memory fold', modelTier: adv.settings.utilTier, cache: false });
-    const s = res.text.trim(); if (!s) return null;
+    const res = await sample(prompt, { label: 'memory fold', modelTier: adv.settings.utilTier, cache: false, signal: ctl ? ctl.signal : undefined });
+    const s = res.text.trim();
+    if (res.truncated || wc(s) < 20 || wc(s) > 400 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s)) throw { code: 'invalid_summary', message: 'memory fold returned an unusable summary' };
     M.summary = s; if (foldBeatsNow) M.beats = M.beats.slice(18); if (foldFactsNow) M.facts = M.facts.slice(20);
     return 'folded ' + (foldBeatsNow ? '18 beats' : '') + (foldBeatsNow && foldFactsNow ? ' and ' : '') + (foldFactsNow ? '20 facts' : '') + ' into the summary';
   }
@@ -1525,8 +1574,8 @@
     // The band's top is a ceiling; the bottom is only a guide. A short turn that stops at a choice is right, so only overlong turns are fitted.
     if (allowFit && adv.settings.autoFit && sample && words > band[1] * 1.12) {
       setStatus('fitting length (' + words + ' words)…');
-      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) > 50) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } }
-      catch (e) { notes.push('length fit failed: ' + (e && e.code)); }
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= 50 && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
     const state = clone(adv.state);
@@ -1549,7 +1598,7 @@
       tierAsked: ctx.tierAsked, tierApplied: tierApplied || '',
       evaluation: out.evaluation, narrative: out.narrative, suggestions: out.suggestions, secret: out.secret,
       events: out.events, beats: out.beats, facts: out.facts, exposures: out.exposures, spaReset: out.spaReset, updates: out.updates, diff: applied.diff,
-      stateBefore, stateAfter: clone(state), memBefore, pendingBefore,
+      stateBefore, stateAfter: clone(state), memBefore, pendingBefore, pendingAfter: clone(adv.pendingNotes),
       words, band, timing: timing || { first: 0, total: 0 }, notes, alts: []
     };
     if (regen) { turn.alts = (regen.alts || []).concat([stripAlts(regen)]); turn.n = regen.n; }
@@ -1558,7 +1607,7 @@
     // the turn that is about to stop being last is what keeps a long adventure's stored turns from growing without bound.
     if (adv.turns.length) trimTurnHistory(adv.turns[adv.turns.length - 1]);
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     return turn;
   }
   async function takeTurn(input, opts) {
@@ -1568,6 +1617,7 @@
     const mine = adv;   // guards against a different adventure being loaded while this turn's model calls are in flight
     busy = true; ctl = new AbortController(); setBusyUI(true);
     let stateBefore = null, memBefore = null, pendingBefore = null, built = null;
+    const turnsBefore = adv.turns.length;
     const notes = []; const t0 = performance.now(); let first = null; let raw = '';
     startTimer(t0);
     try {
@@ -1599,6 +1649,7 @@
       });
       let res = await ask(); raw = res.text;
       let data = res.truncated ? null : tolerantJson(raw);
+      if (!usableReply(data)) data = null;
       // An unusable or cut-off reply is asked for once more before giving up; the bad one is kept for diagnosis.
       if (!data) {
         logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '' });
@@ -1606,36 +1657,37 @@
         setStatus(res.truncated ? 'The reply was cut off; asking once more…' : 'The reply was not usable; asking once more…'); first = null;
         res = await ask(); raw = res.text;
         data = tolerantJson(raw);
-        if (data && res.truncated) notes.push('second reply was cut off by the runtime; used what could be repaired');
+        if (res.truncated) data = null;
+        if (!usableReply(data)) data = null;
       }
       if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
       if (adv !== mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
       const turn = await commitReply(data, input, { stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: adv.settings.narrTier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
       lastDebug = { prompt: built.prompt, raw, notes, meta: 'Turn ' + turn.n + ' · asked ' + turn.tierAsked + ', answered ' + (turn.tierApplied || '?') + ' · first word ' + (turn.timing.first / 1000).toFixed(1) + ' s, total ' + (turn.timing.total / 1000).toFixed(1) + ' s · ' + turn.words + ' words (band ' + input.band.join('–') + ') · prompt ' + built.prompt.length.toLocaleString() + ' chars (~' + Math.round(built.prompt.length / 4).toLocaleString() + ' tokens) · lore: ' + (built.lore.join(', ') || 'none') };
-      hideDraft(); renderAll(); $('#action').value = ''; $('#director').value = '';
+      hideDraft(); renderAll(); if (!regen) { $('#action').value = ''; $('#director').value = ''; }
       setStatus('');
       await persist();
       return true;
     } catch (e) {
       hideDraft();
       const code = (e && e.code) || ((e instanceof Error) ? 'page_error' : 'error');
-      let msg;
+      let msg, statusAction = null;
       if (code === 'cancelled') msg = 'Stopped.';
       else if (code === 'stale') msg = 'A different adventure was loaded while this turn was running; the reply was discarded.';
       else if (code === 'refused') msg = 'Claude declined this turn. Change the action and try again.';
       else if (code === 'rate_limited') msg = 'Usage limit reached or too many calls. Wait a while and try again.';
-      else if (code === 'invalid_json') msg = 'The reply was not usable, twice. Try the turn again, or see Debug.';
-      else if (code === 'truncated') msg = 'The reply was cut off before it finished, twice. Try again; if it keeps happening, choose a shorter length in Settings.';
-      else if (code === 'not_granted' || code === 'sampling_disabled') msg = 'This page is not allowed to use Claude in this view.';
+      else if (code === 'invalid_json') msg = 'The reply was unusable after two attempts. Try the turn again, or see Debug.';
+      else if (code === 'truncated') msg = 'The reply was cut off after two attempts. Try again; if it keeps happening, choose a shorter length in Settings.';
+      else if (code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared' || /^capability_/.test(code)) { sample = null; setConn('bad', 'Claude unavailable'); msg = 'This page is not allowed to use Claude in this view.'; statusAction = { label: 'Retry connection', run: connectSample }; }
       else if (code === 'prompt_too_large') msg = 'Prompt too large for the runtime; lower the verbatim window in Settings.';
       else if (code === 'upstream_error') msg = 'The service failed mid-turn. Try again.';
       else if (code === 'page_error') msg = 'Page error: ' + (e.message || 'unknown') + ' (see Debug).';
       else msg = 'Error: ' + code + (e && e.message ? ' — ' + e.message : '');
-      setStatus(msg, true);
+      setStatus(msg, true, statusAction);
       lastDebug = { prompt: built ? built.prompt : '(prompt was not built)', raw: (e && e.text) || raw || '', notes: notes.concat(['failed: ' + code + (e && e.message ? ' — ' + e.message : ''), (e && e.stack) ? String(e.stack).slice(0, 600) : '']), meta: 'Failed turn · asked ' + adv.settings.narrTier };
       // Only roll back this turn's own stateBefore if this is still the adventure it belongs to; a different, already-loaded
       // adventure's live state must never be clobbered with a stale snapshot from the turn that just failed.
-      if (adv === mine && stateBefore) { adv.state = stateBefore; adv.memory = memBefore; adv.pendingNotes = pendingBefore; }
+      if (adv === mine && stateBefore) { adv.turns.length = turnsBefore; adv.state = stateBefore; adv.memory = memBefore; adv.pendingNotes = pendingBefore; }
       return false;
     } finally {
       busy = false; ctl = null; stopTimer(); setBusyUI(false);
@@ -1645,19 +1697,21 @@
   // Override: run a pasted reply through the same pipeline with no model call.
   async function applyManualReply(action, replyText) {
     if (busy) { return 'A turn is already running.'; }
-    const data = tolerantJson(replyText); if (!data) return 'That is not valid JSON.';
+    const data = tolerantJson(replyText); if (!usableReply(data)) return 'That must be a JSON object with a non-empty narrative.';
     busy = true; setBusyUI(true);
     const notes = ['applied from Override, no model call'];
     const stateBefore = clone(adv.state), memBefore = clone(adv.memory), pendingBefore = (adv.pendingNotes || []).slice();
+    const turnsBefore = adv.turns.length;
     try {
       const input = { action: action || '(override)', director: '', roll: { d6: Number(data.evaluation && data.evaluation.d6) || (1 + Math.floor(Math.random() * 6)) } };
       const turn = await commitReply(data, input, { stateBefore, memBefore, pendingBefore, notes, regen: null, raw: replyText, tierAsked: 'manual', tierApplied: 'manual', timing: { first: 0, total: 0 }, truncated: false, allowFit: false });
       lastDebug = { prompt: '(no prompt: reply applied from Override)', raw: replyText, notes, meta: 'Turn ' + turn.n + ' · applied manually' };
-      renderAll(); await persist(); return 'Applied as turn ' + turn.n + '.';
+      renderAll(); setStatus(''); const saved = await persist(); return saved ? 'Applied as turn ' + turn.n + '.' : 'Applied as turn ' + turn.n + ', but it is not saved yet.';
     } catch (e) {
+      adv.turns.length = turnsBefore;
       adv.state = stateBefore; adv.memory = memBefore; adv.pendingNotes = pendingBefore;
       return 'Could not apply: ' + ((e && e.message) || (e && e.code) || 'error');
-    } finally { busy = false; setBusyUI(false); renderAll(); }
+    } finally { busy = false; setBusyUI(false); renderAll(); setStatus(''); }
   }
   function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; return c; }
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
@@ -1680,21 +1734,22 @@
     const r = adv.roommate; if (!r || !r.gen || !sample || !adv.opening || adv.opening.introWritten || busy) return false;
     const p = adv.player; const g = r.gen; const t0 = performance.now();
     const mine = adv;   // guards against a different adventure being loaded while the model call is in flight
-    busy = true; setBusyUI(true); setStatus('Writing your roommate on the ' + adv.settings.narrTier + ' tier…');
+    busy = true; ctl = new AbortController(); setBusyUI(true); setStatus('Writing your roommate on the ' + adv.settings.narrTier + ' tier…');
     try {
       const porter = ((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).find((m) => m.key === 'porter');
       const porterBit = porter ? (porter.race === 'Human' ? 'the porter, who is human, across a desk an hour ago' : porter.name + ' the porter (' + porter.race.toLowerCase() + ') across a desk an hour ago, which was startling enough') : 'the porter across a desk an hour ago';
       const kind = r.race.toLowerCase();
+      const kindArticle = /^[aeiou]/i.test(kind) ? 'an' : 'a';
       const prompt = [
         xml('task', 'Write the roommate\'s first appearance for the opening of an interactive story: 220 to 340 words, second person present tense addressed to ' + p.first + ', plain prose in two to four paragraphs, no heading and no preamble. It drops into the middle of the opening scene: ' + p.first + ' has just walked into room 4B of Kettle Hall at Mythaven University at 17:40 on orientation Monday and looked out of the window; a closing paragraph about lanterns outside follows your text. Do not describe the window or the lanterns.'),
         xml('setting', fill(W.premise)),
         xml('room', 'What ' + p.first + ' sees of the roommate\'s side of the room: ' + (g.room || 'it is already lived in, in the way of the roommate\'s kind')),
-        xml('roommate', 'Name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '. Looks: ' + g.looks + '.' + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
-        xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen of mythkin so far: one glamour slipping in the world below three weeks ago, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of a ' + kind + ' with no glamour on, and nothing about it is ordinary to ' + p.pronouns.them + ' yet.'),
+        xml('roommate', 'Name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks + '.' : '') + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
+        xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen of mythkin so far: one glamour slipping in the world below three weeks ago, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ' with no glamour on, and nothing about it is ordinary to ' + p.pronouns.them + ' yet.'),
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
         xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range, and ' + p.first + '\'s inward reaction (a stare managed or not, a thought not said, the urge to touch or to step back), which is never blasé. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].join('\n\n');
-      const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false });
+      const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
@@ -1702,39 +1757,54 @@
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
       renderAll(); setStatus(''); await persist(); return true;
     } catch (e) {
-      setStatus('The narrator could not write your roommate\'s introduction (' + ((e && e.code) || (e && e.message) || 'error') + '); a plain one stands in. Play on.', true);
+      if (e && e.code === 'cancelled') setStatus('Stopped. The plain roommate introduction stands in.');
+      else setStatus('The narrator could not write your roommate\'s introduction (' + ((e && e.code) || (e && e.message) || 'error') + '); a plain one stands in. Play on.', true);
       return false;
-    } finally { busy = false; setBusyUI(false); renderRail(); }
+    } finally { busy = false; ctl = null; setBusyUI(false); renderRail(); }
   }
+  let actionDispatching = false;
   async function onSend() {
-    const input = currentInput();
-    if (!input.action) { setStatus('Write an action first.', true); return; }
-    if (await syncFromStore()) return;   // a newer save was loaded (or a conflict offered): let the player look before acting
-    await takeTurn(input);
+    if (actionDispatching) return;
+    actionDispatching = true;
+    try {
+      const input = currentInput();
+      if (!input.action) { setStatus('Write an action first.', true); return; }
+      if (summaryDirty && !(await saveSummary())) return;
+      if (await syncFromStore()) return;
+      await takeTurn(input);
+    } finally { actionDispatching = false; }
   }
   async function onRegenerate(rewrite) {
-    if (!adv.turns.length || busy) return;
-    if (await syncFromStore()) return;
-    const old = adv.turns.pop();
-    const restore = { state: clone(adv.state), memory: clone(adv.memory), pending: (adv.pendingNotes || []).slice() };
-    adv.state = clone(old.stateBefore); adv.memory = clone(old.memBefore); adv.pendingNotes = (old.pendingBefore || []).slice();
-    const ok = await takeTurn({ action: old.action, director: old.director, rewrite: rewrite || '', roll: { d6: (old.roll && old.roll.d6) || (1 + Math.floor(Math.random() * 6)) } }, { regen: old });
-    if (!ok) { adv.turns.push(old); adv.state = restore.state; adv.memory = restore.memory; adv.pendingNotes = restore.pending; renderAll(); }
+    if (actionDispatching || !adv.turns.length || busy) return;
+    actionDispatching = true;
+    try {
+      if (summaryDirty && !(await saveSummary())) return;
+      if (await syncFromStore()) return;
+      const old = adv.turns.pop();
+      const restore = { state: clone(adv.state), memory: clone(adv.memory), pending: (adv.pendingNotes || []).slice() };
+      adv.state = clone(old.stateBefore); adv.memory = clone(old.memBefore); adv.pendingNotes = (old.pendingBefore || []).slice();
+      const ok = await takeTurn({ action: old.action, director: old.director, rewrite: rewrite || '', roll: { d6: (old.roll && old.roll.d6) || (1 + Math.floor(Math.random() * 6)) } }, { regen: old });
+      if (!ok) { adv.turns.push(old); adv.state = restore.state; adv.memory = restore.memory; adv.pendingNotes = restore.pending; renderAll(); }
+    } finally { actionDispatching = false; }
   }
   async function onUndo() {
-    if (!adv.turns.length || busy) return;
-    if (await syncFromStore()) return;
-    const last = adv.turns.pop();
-    adv.state = clone(last.stateBefore); adv.memory = clone(last.memBefore); adv.pendingNotes = (last.pendingBefore || []).slice();
-    renderAll(); await persist({ removedTurn: true });
+    if (actionDispatching || !adv.turns.length || busy) return;
+    actionDispatching = true;
+    try {
+      if (summaryDirty && !(await saveSummary())) return;
+      if (await syncFromStore()) return;
+      const last = adv.turns.pop();
+      adv.state = clone(last.stateBefore); adv.memory = clone(last.memBefore); adv.pendingNotes = (last.pendingBefore || []).slice();
+      renderAll(); await persist({ removedTurn: true });
+    } finally { actionDispatching = false; }
   }
   async function usePreviousVersion(turnId) {
-    const t = adv.turns[adv.turns.length - 1]; if (!t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
+    const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
     if (await syncFromStore()) return;
     const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = t.alts.concat([cur]);
     adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
     adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...prev.events); adv.memory.beats.push(...prev.beats); adv.memory.facts.push(...(prev.facts || []));
-    adv.pendingNotes = [];
+    adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
     renderAll(); await persist();
   }
 
@@ -1750,20 +1820,21 @@
   let syncing = false, dirty = false;   // dirty: this page holds a change the store does not (a refused or failed save)
   async function newerInStore() {
     if (!db || !adv || !adv.id) return null;
-    try {
-      const snap = await db.doc('adventures/' + adv.id).get(); if (!snap.exists) return null;
-      const d = snap.data();
-      const newer = (d.rev != null || adv.rev != null) ? (d.rev || 0) > (adv.rev || 0) : !!(d.updatedAt && adv.updatedAt && d.updatedAt > adv.updatedAt);
-      return newer ? { turnCount: d.turnCount || 0, rev: d.rev || 0, updatedAt: d.updatedAt } : null;
-    } catch (e) { return null; }
+    const snap = await db.doc('adventures/' + adv.id).get();
+    if (!snap.exists) return adv.rev > 0 ? { deleted: true, turnCount: 0, rev: 0 } : null;
+    const d = snap.data();
+    const newer = (d.rev != null || adv.rev != null) ? (d.rev || 0) > (adv.rev || 0) : !!(d.updatedAt && adv.updatedAt && d.updatedAt > adv.updatedAt);
+    return newer ? { turnCount: d.turnCount || 0, rev: d.rev || 0, updatedAt: d.updatedAt } : null;
   }
   // Called when the page comes back into view and before a turn. A clean page reloads a newer save on its own;
   // a page with unsaved changes gets the choice instead. Returns true when the caller should stop and let the player look.
   async function syncFromStore() {
-    if (busy || syncing || !db || !adv || !adv.id) return false;
+    if (syncing) return true;
+    if (busy || !db || !adv || !adv.id) return false;
     syncing = true;
     try {
       const n = await newerInStore(); if (!n) return false;
+      if (n.deleted) { setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true); return true; }
       if (dirty) { offerConflict(n); return true; }
       const was = adv.turns.length; await loadAdventure(adv.id);
       setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). Carry on from here.');
@@ -1780,21 +1851,26 @@
   async function overwriteStore() {
     if (!db) return;
     try {
-      let storeTurns = 0, storeRev = 0; try { const s = await db.doc('adventures/' + adv.id).get(); if (s.exists) { storeTurns = s.data().turnCount || 0; storeRev = s.data().rev || 0; } } catch (e) {}
+      let storeTurns = 0, storeRev = 0; const s = await db.doc('adventures/' + adv.id).get(); if (s.exists) { storeTurns = s.data().turnCount || 0; storeRev = s.data().rev || 0; }
       adv.rev = Math.max(adv.rev || 0, storeRev);
       await persistAll(adv.id);
       for (let i = Math.ceil(adv.turns.length / CHUNK); i < Math.ceil(storeTurns / CHUNK); i++) await db.doc('adventures/' + adv.id + '/turns/' + String(i).padStart(4, '0')).delete();
-      dirty = false; setStatus('Saved: this page\'s version now replaces the other one.'); setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      dirty = false; saveError = null; setStatus('Saved: this page\'s version now replaces the other one.'); setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (e) { setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus('Overwrite failed: ' + ((e && e.code) || (e && e.message) || 'unknown'), true); }
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncFromStore(); });
   window.addEventListener('focus', () => syncFromStore());
   setInterval(() => { if (document.visibilityState === 'visible') syncFromStore(); }, 60000);
   async function persist(opts) {
-    if (!db) return;
+    if (!db) { dirty = true; saveError = 'Saving is unavailable in this view; export a copy to keep your progress.'; setSaveNote('save unavailable', true); setStatus(saveError, true); return false; }
     try {
       const newer = await newerInStore();
-      if (newer) { dirty = true; offerConflict(newer); return; }
+      if (newer) {
+        dirty = true;
+        if (newer.deleted) setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true);
+        else offerConflict(newer);
+        return false;
+      }
       const n = adv.turns.length; const chunkIdx = Math.floor(Math.max(0, n - 1) / CHUNK);
       const chunkRef = (i) => db.doc('adventures/' + adv.id + '/turns/' + String(i).padStart(4, '0'));
       // Chunks are written before the adventure doc, and any earlier chunk a previous persist() failed to write is
@@ -1805,42 +1881,77 @@
       const start = chunkIdx * CHUNK; const slice = adv.turns.slice(start, start + CHUNK);
       if (slice.length) { await chunkRef(chunkIdx).set({ c: chunkIdx, turns: slice }); if (slice.length === CHUNK) adv._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { await chunkRef(n / CHUNK).delete(); if ((adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk) >= n / CHUNK) adv._savedUpToChunk = n / CHUNK - 1; }
-      const doc = advDoc(); adv.updatedAt = doc.updatedAt; adv.rev = doc.rev;
+      const doc = advDoc();
       await db.doc('adventures/' + adv.id).set(doc);
+      adv.updatedAt = doc.updatedAt; adv.rev = doc.rev;
       dirty = false;
+      const hadSaveError = !!saveError;
+      saveError = null;
       setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } catch (e) { dirty = true; setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); }
+      if (hadSaveError) setStatus('');
+      return true;
+    } catch (e) { dirty = true; saveError = 'Save failed (' + ((e && e.code) || (e && e.message) || 'unknown') + '). Your changes remain here; retry by saving again.'; setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, { label: 'Retry save', run: () => persist() }); return false; }
   }
-  async function persistAll(id) {
+  async function persistAll(id, opts) {
     // Writes every chunk, then the adventure document (used when copying an adventure and when overwriting a save).
-    for (let i = 0; i * CHUNK < adv.turns.length; i++) await db.doc('adventures/' + id + '/turns/' + String(i).padStart(4, '0')).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) });
-    const doc = advDoc(); doc.id = id;
-    if (id === adv.id) { adv.updatedAt = doc.updatedAt; adv.rev = doc.rev; adv._savedUpToChunk = Math.floor(adv.turns.length / CHUNK) - 1; }
-    await db.doc('adventures/' + id).set(doc);
+    const written = [];
+    try {
+      for (let i = 0; i * CHUNK < adv.turns.length; i++) {
+        const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
+        await db.doc(path).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); written.push(path);
+      }
+      const doc = advDoc(); doc.id = id;
+      if (opts && opts.title != null) doc.title = opts.title;
+      if (opts && opts.updatedAt != null) doc.updatedAt = opts.updatedAt;
+      await db.doc('adventures/' + id).set(doc);
+      if (id === adv.id) { adv.updatedAt = doc.updatedAt; adv.rev = doc.rev; adv._savedUpToChunk = Math.floor(adv.turns.length / CHUNK) - 1; dirty = false; saveError = null; }
+      return true;
+    } catch (e) {
+      if (opts && opts.cleanupOnFailure) {
+        for (const path of written) { try { await db.doc(path).delete(); } catch (cleanupError) {} }
+        try { await db.doc('adventures/' + id).delete(); } catch (cleanupError) {}
+      }
+      throw e;
+    }
   }
   async function loadAdventure(id) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
     const d = snap.data();
-    if (!WORLDS[d.worldId || 'halloway']) throw new Error('world ' + d.worldId + ' is not loaded');
+    const wid = d && d.worldId;
+    if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
+    if (d.id && d.id !== id) throw new Error('save id does not match its document path');
+    const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+    const validPlayer = (p) => record(p) && typeof p.name === 'string' && typeof p.first === 'string' && record(p.pronouns) && record(p.stats);
+    if (!record(d.state) || !record(d.state.items) || !record(d.state.attitudes) || !record(d.state.flags) || !Array.isArray(d.state.present) || !Number.isFinite(Number(d.state.day)) || typeof d.state.time !== 'string' || typeof d.state.location !== 'string' || !record(d.memory) || !Array.isArray(d.memory.events) || !Array.isArray(d.memory.beats) || (d.memory.facts != null && !Array.isArray(d.memory.facts)) || (d.memory.summary != null && typeof d.memory.summary !== 'string') || (d.settings != null && !record(d.settings)) || (d.player != null && !validPlayer(d.player)) || (d.roommate != null && (!record(d.roommate) || !record(d.roommate.pronouns))) || (d.opening != null && !record(d.opening)) || (d.cast != null && !record(d.cast)) || (d.turnCount != null && (!Number.isInteger(d.turnCount) || d.turnCount < 0))) throw new Error('save data is incomplete');
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
     const turns = []; chunks.docs.forEach((c) => { const b = c.data(); if (b && Array.isArray(b.turns)) turns.push(...clone(b.turns)); });
+    if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     turns.sort((a, b) => a.n - b.n);
-    // setWorld swaps the global W used everywhere else; it only happens once the chunk query above has actually
-    // succeeded, so a failed load never leaves W pointing at a different world than the adv it was paired with.
-    setWorld(d.worldId || 'halloway');
+    if (new Set(turns.map((t) => t.n)).size !== turns.length) throw new Error('save contains duplicate turn numbers');
+    // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const turnCountMismatch = (d.turnCount || 0) !== turns.length;
-    adv = { id: d.id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: Object.assign({}, DEFAULT_SETTINGS, clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory || { summary: '', events: [], beats: [] }), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: Math.floor(turns.length / CHUNK) - 1 };
-    if (!adv.player) adv.player = defaultPlayer();
-    adv.memory.facts = adv.memory.facts || [];
-    ensureTf(adv.state); ensureSkills(adv.state); migrateAdv();
+    const previousAdv = adv, previousWorld = W.id;
+    setWorld(wid);
+    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: Math.floor(turns.length / CHUNK) - 1 };
+    try {
+      if (!adv.player) adv.player = defaultPlayer();
+      adv.memory.facts = adv.memory.facts || [];
+      ensureTf(adv.state); ensureSkills(adv.state); migrateAdv();
+      summaryDirty = false;
+      renderAll();
+    } catch (e) {
+      adv = previousAdv; setWorld(previousWorld); renderAll(); throw e;
+    }
+    dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
-    renderAll();
-    if (turnCountMismatch) setStatus('Loaded ' + turns.length + ' turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + ' (an earlier save may have been interrupted); the loaded turns are the complete, correct set and future saves will repair the record.');
+    if (turnCountMismatch) setStatus('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
   }
   function newAdventure(choices, worldId, prep) {
     setWorld(worldId || (W && W.id) || DEFAULT_WORLD);
+    summaryDirty = false;
+    dirty = false;
     const c = choices || {};
-    adv = { id: uid('adv'), title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), settings: Object.assign({}, DEFAULT_SETTINGS, loadLocalSettings()), player: null, roommate: null, opening: null, creation: c, cast: { overrides: {}, added: [], hidden: [] }, state: null, memory: null, pendingNotes: [], turns: [] };
+    adv = { id: uid('adv'), title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), settings: normaliseSettings(loadLocalSettings()), player: null, roommate: null, opening: null, creation: c, cast: { overrides: {}, added: [], hidden: [] }, state: null, memory: null, pendingNotes: [], turns: [] };
     prep = prep || {}; const given = prep.given || {};
     adv.player = buildPlayer(c); adv.roommate = buildRoommate(c, prep.roommate || null, given.roommate || null);
     const generated = generateCast(prep.cast || null, given); if (generated) { adv.cast.generated = generated; if (prep.notes) generated.invention = { notes: prep.notes, at: new Date().toISOString() }; }
@@ -1853,12 +1964,13 @@
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
     renderAll();
   }
-  function loadLocalSettings() { try { const s = JSON.parse(localStorage.getItem('windlass.settings') || '{}'); delete s.testNote; return s; } catch (e) { return {}; } }
+  function loadLocalSettings() { try { const s = JSON.parse(localStorage.getItem('windlass.settings') || '{}'); if (!s || typeof s !== 'object' || Array.isArray(s)) return {}; delete s.testNote; return s; } catch (e) { return {}; } }
   function saveLocalSettings() { try { localStorage.setItem('windlass.settings', JSON.stringify(adv.settings)); } catch (e) {} }
 
   async function listAdventures() {
     const el = $('#advlist'); el.innerHTML = '';
-    if (!db) { $('#dbNotice').hidden = false; $('#dbNotice').textContent = 'Saving is not available in this view. You can still play; use Export to keep a copy.'; return; }
+    if (!db) { $('#dbNotice').hidden = false; $('#dbNotice').textContent = 'Saving is not available in this view. You can still play; use Export to keep a copy.'; $('#saveInfo').textContent = 'Saving is unavailable in this view. Export your adventure regularly to keep a copy.'; return; }
+    $('#dbNotice').hidden = true; $('#saveInfo').textContent = 'Every turn is saved automatically to the same store on every device; open the page anywhere and it starts from the most recent save. A page left open checks for newer saves on its own.';
     try {
       const snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
       if (snap.empty) { el.innerHTML = '<div class="small">No saved adventures yet.</div>'; return; }
@@ -1869,8 +1981,23 @@
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
           '<span class="acts"><button data-act="open"' + (WORLDS[a.worldId] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
         row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus('A turn is already running.', true); return; } setStatus('loading…'); try { await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(''); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); } };
-        row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => { if (!t) return; if (isCur) { adv.title = t; await persist(); } else { const s = await db.doc('adventures/' + a.id).get(); if (s.exists) { const body = clone(s.data()); body.title = t; await db.doc('adventures/' + a.id).set(body); } } listAdventures(); });
-        row.querySelector('[data-act="copy"]').onclick = () => inlineConfirm(row, 'Title for the copy', a.title + ' (copy)', async (t) => { if (!t) return; const newId = uid('adv'); const oldId = adv.id, oldTitle = adv.title; adv.title = t; try { await persistAll(newId); } finally { adv.title = oldTitle; } setStatus('Saved a copy: ' + t); listAdventures(); });
+        row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
+          if (!t) return;
+          if (isCur) { adv.title = t; const saved = await persist(); if (saved) setStatus('Adventure renamed.'); }
+          else {
+            const ref = db.doc('adventures/' + a.id), s = await ref.get();
+            if (!s.exists) throw new Error('adventure no longer exists');
+            const body = clone(s.data()); body.title = t; body.updatedAt = new Date().toISOString(); body.rev = (body.rev || 0) + 1; await ref.set(body);
+          }
+          listAdventures();
+        });
+        row.querySelector('[data-act="copy"]').onclick = () => inlineConfirm(row, 'Title for the copy', a.title + ' (copy)', async (t) => {
+          if (!t) return;
+          const newId = uid('adv'); const stamp = Date.parse(adv.updatedAt || new Date().toISOString());
+          const updatedAt = new Date((Number.isFinite(stamp) ? stamp : Date.now()) - 1).toISOString();
+          await persistAll(newId, { title: t, updatedAt, cleanupOnFailure: true });
+          setStatus('Saved a copy: ' + t); listAdventures();
+        });
         row.querySelector('[data-act="delete"]').onclick = () => inlineConfirm(row, 'Remove "' + a.title + '" for good?', null, async () => {
           if (isCur && busy) { setStatus('A turn is already running.', true); return; }
           const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
@@ -1894,36 +2021,64 @@
     const c = document.createElement('div'); c.className = 'confirm'; const withInput = value != null;
     c.innerHTML = '<span>' + esc(label) + '</span>' + (withInput ? '<input type="text" style="flex:1;min-width:160px">' : '') + '<button class="' + (withInput ? 'primary' : 'danger') + '">' + (withInput ? 'OK' : 'Delete') + '</button><button class="quiet">Cancel</button>';
     const input = withInput ? c.querySelector('input') : null; if (input) input.value = value;
-    c.querySelectorAll('button')[0].onclick = async () => { try { await onOk(input ? input.value.trim() : ''); } catch (e) { setStatus('That did not work: ' + ((e && e.code) || (e && e.message) || 'error'), true); } c.remove(); };
+    c.querySelectorAll('button')[0].onclick = async (e) => { const ok = e.currentTarget; if (ok.disabled) return; ok.disabled = true; c.querySelectorAll('button')[1].disabled = true; try { await onOk(input ? input.value.trim() : ''); } catch (e2) { setStatus('That did not work: ' + ((e2 && e2.code) || (e2 && e2.message) || 'error'), true); } finally { c.remove(); } };
     c.querySelectorAll('button')[1].onclick = () => c.remove();
     row.appendChild(c); if (input) input.focus(); else c.querySelectorAll('button')[0].focus();
   }
   async function exportAdventure() {
-    const payload = { format: 'windlass-save-1', exportedAt: new Date().toISOString(), world: { id: W.id, version: W.version, title: W.title }, adventure: advDoc(), turns: adv.turns };
-    const text = JSON.stringify(payload, null, 1); const filename = (W.id + '-' + adv.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.json').slice(0, 80);
-    if (downloads) { try { await downloads.save({ filename, data: text }); setSaveNote('exported'); return; } catch (e) { if (e && e.code === 'declined') return; } }
-    const fb = $('#exportFallback'); fb.hidden = false; fb.textContent = text; setSaveNote('download unavailable; copy the text below', true);
+    if (busy || $('#exportAdv').disabled) return;
+    $('#exportAdv').disabled = true;
+    try {
+      const payload = { format: 'windlass-save-1', exportedAt: new Date().toISOString(), world: { id: W.id, version: W.version, title: W.title }, adventure: advDoc(), turns: adv.turns };
+      const text = JSON.stringify(payload, null, 1);
+      const slug = adv.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-|-$/g, '').slice(0, 60) || 'adventure';
+      const filename = (W.id + '-' + slug).slice(0, 76) + '.json';
+      const fb = $('#exportFallback');
+      if (downloads) {
+        try { await downloads.save({ filename, data: text }); fb.hidden = true; setStatus('Adventure exported as ' + filename + '.'); setSaveNote('exported'); return; }
+        catch (e) {
+          if (e && e.code === 'declined') return;
+          if (!['not_granted', 'sampling_disabled', 'not_declared', 'unavailable'].includes(e && e.code) && !/^capability_/.test((e && e.code) || '')) { setStatus('Export failed (' + ((e && e.code) || (e && e.message) || 'error') + '). Try again.', true); return; }
+        }
+      }
+      $('#exportText').value = text; fb.hidden = false; $('#exportText').focus(); $('#exportText').select();
+      setStatus('Copy the save JSON from the Adventures dialog to keep a backup.', true);
+    } finally { $('#exportAdv').disabled = false; }
   }
   async function importFile(file) {
     if (busy) { setStatus('A turn is already running.', true); return; }
+    const oldAdv = adv, oldWorldId = W.id;
     try {
       const text = await file.text(); const p = JSON.parse(text);
       if (!p || p.format !== 'windlass-save-1' || !p.adventure) throw new Error('not a Windlass save');
-      const a = p.adventure; const wid = a.worldId || (p.world && p.world.id) || 'halloway';
-      if (!WORLDS[wid]) throw new Error('this save needs a world that is not loaded');
-      setWorld(wid);
-      adv = { id: uid('adv'), title: (a.title || 'Imported') + ' (imported)', createdAt: a.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), settings: Object.assign({}, DEFAULT_SETTINGS, a.settings || {}), player: a.player || null, roommate: a.roommate || null, opening: a.opening || null, creation: a.creation || null, cast: a.cast || null, state: a.state, memory: a.memory, pendingNotes: a.pendingNotes || [], turns: Array.isArray(p.turns) ? p.turns : [] };
-      if (!adv.player) adv.player = defaultPlayer();
-      adv.memory.facts = adv.memory.facts || []; ensureTf(adv.state); migrateAdv();
+      const a = p.adventure, record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+      const wid = a.worldId || (p.world && p.world.id);
+      if (!Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('this save needs a world that is not loaded');
+      const validPlayer = (x) => record(x) && typeof x.name === 'string' && typeof x.first === 'string' && record(x.pronouns) && record(x.stats);
+      if (!record(a.state) || !record(a.state.items) || !record(a.state.attitudes) || !record(a.state.flags) || !Array.isArray(a.state.present) || !Number.isFinite(Number(a.state.day)) || typeof a.state.time !== 'string' || typeof a.state.location !== 'string') throw new Error('save state is incomplete');
+      if (!record(a.memory) || (a.memory.events != null && !Array.isArray(a.memory.events)) || (a.memory.beats != null && !Array.isArray(a.memory.beats)) || (a.memory.facts != null && !Array.isArray(a.memory.facts))) throw new Error('save memory is incomplete');
+      if ((a.player != null && !validPlayer(a.player)) || (a.roommate != null && (!record(a.roommate) || !record(a.roommate.pronouns))) || (a.opening != null && !record(a.opening)) || (a.cast != null && !record(a.cast))) throw new Error('save character data is invalid');
+      if (a.settings != null && !record(a.settings)) throw new Error('save settings are invalid');
+      const turns = p.turns == null ? [] : p.turns;
+      if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
+      if (new Set(turns.map((t) => t.n)).size !== turns.length) throw new Error('save contains duplicate turn numbers');
+      const settings = normaliseSettings(clone(a.settings || {}));
+      const next = { id: uid('adv'), title: (typeof a.title === 'string' ? a.title : 'Imported') + ' (imported)', createdAt: a.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), settings, player: record(a.player) ? clone(a.player) : null, roommate: record(a.roommate) ? clone(a.roommate) : null, opening: record(a.opening) ? clone(a.opening) : null, creation: record(a.creation) ? clone(a.creation) : null, cast: record(a.cast) ? clone(a.cast) : null, state: clone(a.state), memory: Object.assign({ summary: '', events: [], beats: [], facts: [] }, clone(a.memory)), pendingNotes: Array.isArray(a.pendingNotes) ? clone(a.pendingNotes) : [], turns: clone(turns) };
+      if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
+      next.memory.facts = next.memory.facts || [];
       // Imported turns may predate the history-trimming fix (every turn still carrying its full memBefore/pendingBefore/alts);
       // trim everything but the last turn now so the import does not reintroduce the same unbounded growth.
-      for (let i = 0; i < adv.turns.length - 1; i++) trimTurnHistory(adv.turns[i]);
+      for (let i = 0; i < next.turns.length - 1; i++) trimTurnHistory(next.turns[i]);
+      setWorld(wid); adv = next; summaryDirty = false; ensureTf(adv.state); migrateAdv();
       renderAll();
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
-      if (db) await persistAll(adv.id);
-      closeDlg('dlgAdventures'); setStatus('Imported ' + adv.title + '.');
-    } catch (e) { setStatus('Import failed: ' + (e && e.message), true); }
+      if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
+      closeDlg('dlgAdventures'); setStatus(db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.');
+    } catch (e) {
+      adv = oldAdv; setWorld(oldWorldId); renderAll();
+      setStatus('Import failed: ' + ((e && e.message) || 'invalid save'), true);
+    }
   }
 
   // ---------- invention: the model writes the people, the code keeps the dice ----------
@@ -1944,11 +2099,13 @@
   function inventPrompt(Wc, slots, avoid) {
     const G = Wc.genPools || {}; const plain = (t) => String(t || '').replace(/\{rm_(\w+)\}/g, (m, k) => ({ they: 'they', them: 'them', their: 'their', theirs: 'theirs' })[k] || m).replace(/\{npc_\w+\}/g, 'another of the cast').replace(/\{first\}/g, 'the human').replace(/\{[a-z_]+\}/g, '');
     const ex = (arr, n) => (arr || []).slice(0, n).map((t) => plain(t).replace(/\.$/, '')).join(' | ');
-    const setting = fill(Wc.premise || '').split(/\. You are /)[0].replace(/\.?$/, '.');
+    const premise = String(Wc.premise || '').replace(/\{name\}/g, (Wc.player && Wc.player.name) || 'the student');
+    const splitAt = premise.indexOf('. You are ');
+    const setting = (splitAt >= 0 ? premise.slice(0, splitAt + 1) : premise).replace(/\.?$/, '.');
     const lines = slots.map((sl) => '- ' + sl.key + ': ' + sl.race + ', ' + genderWord(sl.gender) + (sl.year ? ', ' + sl.year : '') + (sl.course ? ', studies ' + sl.course + ' (fixed)' : '') + '. ' + (sl.role ? 'Role: ' + plain(sl.role).replace(/\.?$/, '.') + ' ' : '') + 'Name: first name starting with ' + sl.initials[0] + ', ' + sl.syllables + ' syllable' + (sl.syllables > 1 ? 's' : '') + '; surname starting with ' + sl.initials[1] + (sl.style ? '; ' + sl.style : '') + '.' + (sl.fields.includes('detail') ? ' Detail seed: ' + sl.seed + '.' : '') + ' Fields: ' + sl.fields.join(', ') + '.');
     const rules = [
       'Names: the initial letters and the syllable count of the first name are binding. Names are pronounceable and may come from anywhere in the world, in the fashion given for the kind; no two people share a first name or a surname; none of these, which are taken: ' + (avoid.names.length ? avoid.names.join(', ') : 'none yet') + '; and never these overused ones: ' + OVERUSED_NAMES.join(', ') + '.',
-      'course: what they study, three words at most. The university teaches Glamour, Applied Alchemy, Artificing, Wardcraft and Sigils, Beastcraft and Comparative Mythkin Anatomy alongside ordinary subjects (' + ex(G.courses, 10) + '); range widely, invent plausible ones in the same vein, no two people the same unless the role fixes it, and not: ' + (avoid.courses.join(', ') || 'none yet') + '.',
+      G.courses && G.courses.length ? 'course: what they study, three words at most. The university teaches ordinary subjects and (' + ex(G.courses, 10) + '); range widely, invent plausible ones in the same vein, no two people the same unless the role fixes it, and not: ' + (avoid.courses.join(', ') || 'none yet') + '.' : '',
       'temperament: up to eight plain words, in the manner of: ' + ex(G.temperaments, 3) + '.',
       'quirk: one habit, up to twelve words, third person present, in the manner of: ' + ex(G.quirks, 3) + '; not: ' + (avoid.quirks.join('; ') || 'none yet') + '.',
       'want: what they want this term, up to twelve words, in the manner of: ' + ex(G.castWants || G.wants, 3) + '.',
@@ -1963,7 +2120,7 @@
       xml('task', 'Invent the people listed in <people> for an interactive story. Setting: ' + setting + ' Reply with only one JSON object and nothing else, no code fence: {"people": [{"key": "…", "first": "…", …}]}, one object per person with its key and exactly the fields asked for, every field a plain string.'),
       xml('rules', rules.map((r) => '- ' + r).join('\n')),
       xml('people', lines.join('\n'))
-    ].join('\n\n');
+    ].filter(Boolean).join('\n\n');
   }
   // Braces are stripped (a stray one would read as a placeholder), except the {first} a background is asked to carry.
   const inventClean = (v, max) => String(v == null ? '' : v).replace(/\{first\}/g, '\u0001').replace(/[{}\[\]"\\\r\n\t]/g, ' ').replace(/\u0001/g, '{first}').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1999,9 +2156,8 @@
   const withTimeout = (p, ms, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), ms))]);
   async function inventCall(Wc, slots, label, opts) {
     if (!sample || !slots.length) return null; opts = opts || {};
-    const t0 = performance.now(); const ctl = new AbortController(); let timedOut = false;
+    const t0 = performance.now(); const ctl = new AbortController(); let timedOut = false, timer = null;
     const stopped = new Promise((_, reject) => ctl.signal.addEventListener('abort', () => reject({ code: 'aborted', message: 'stopped' })));
-    const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS);
     const onOuter = () => ctl.abort(); if (opts.signal) { if (opts.signal.aborted) onOuter(); else opts.signal.addEventListener('abort', onOuter); }
     const avoid = await withTimeout(recentRead(), 4000, { names: [], courses: [], quirks: [] }); const prompt = inventPrompt(Wc, slots, avoid);
     let partial = '';
@@ -2014,20 +2170,25 @@
     };
     try {
       if (ctl.signal.aborted) throw { code: 'aborted', message: 'stopped' };
-      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
+      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (timer == null) timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS); if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
       const out = finish(res.text, !!res.truncated); if (!Object.keys(out.given).length) logFailure('invent_empty', { action: label }, res.text, { prompt: prompt.slice(0, 4000) });
       return out;
     } catch (e) {
       if (ctl.signal.aborted) { if (timedOut) logFailure('invent_timeout', { action: label, tier: inventTier(), bytes: prompt.length }, partial); const out = partial ? finish(partial, true) : { given: {}, notes: [], prompt, raw: '' }; out.notes = [label + ': ' + (timedOut ? 'no reply in ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s on the ' + inventTier() + ' tier (' + prompt.length.toLocaleString() + ' bytes asked, ' + partial.length + ' received)' : 'stopped after ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s') + '; ' + Object.keys(out.given).length + ' of ' + slots.length + ' kept, the rest drawn from the pools']; return out; }
       logFailure('invent_' + ((e && e.code) || 'error'), { action: label }, e && (e.text || e.message)); return { given: {}, notes: [label + ' failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' (' + e.message + ')' : '') + '; the pools were used'], prompt, raw: '' };
-    } finally { clearTimeout(timer); if (opts.signal) opts.signal.removeEventListener('abort', onOuter); }
+    } finally { if (timer != null) clearTimeout(timer); if (opts.signal) opts.signal.removeEventListener('abort', onOuter); }
   }
-  // The people are invented in batches of nine, asked for together so a slow answer to one does not hold the others; the
-  // progress and the notes are the sum of the batches.
+  // Invention batches run at a small concurrency so one creation cannot flood the sample service.
   async function inventAll(Wc, slots, label, opts) {
     const batches = []; for (let i = 0; i < slots.length; i += INVENT_BATCH) batches.push(slots.slice(i, i + INVENT_BATCH));
-    const counts = batches.map(() => 0); const total = slots.length;
-    const results = await Promise.all(batches.map((b, i) => inventCall(Wc, b, label + (batches.length > 1 ? ' ' + (i + 1) + '/' + batches.length : ''), Object.assign({}, opts, { onProgress: (n) => { counts[i] = n; if (opts && opts.onProgress) opts.onProgress(counts.reduce((a, c) => a + c, 0), total); } }))));
+    const counts = batches.map(() => 0); const total = slots.length; const results = new Array(batches.length); let next = 0;
+    const worker = async () => {
+      while (next < batches.length) {
+        const i = next++, b = batches[i];
+        results[i] = await inventCall(Wc, b, label + (batches.length > 1 ? ' ' + (i + 1) + '/' + batches.length : ''), Object.assign({}, opts, { onProgress: (n) => { counts[i] = n; if (opts && opts.onProgress) opts.onProgress(counts.reduce((a, c) => a + c, 0), total); } }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, batches.length) }, worker));
     const given = {}; const notes = []; let prompt = '', raw = '';
     for (const r of results) { if (!r) continue; Object.assign(given, r.given); notes.push(...r.notes); if (!prompt) prompt = r.prompt; raw += (raw ? '\n\n' : '') + (r.raw || ''); }
     return { given, notes, prompt, raw };
@@ -2054,24 +2215,29 @@
     await recentWrite({ names: people.map((x) => x.first).concat(people.map((x) => x.last)), courses: (g.characters || []).map((x) => (x.gen && x.gen.course) || '').concat([(adv.roommate && adv.roommate.gen && adv.roommate.gen.course) || '']), quirks: (g.characters || []).map((x) => x.gen && x.gen.quirk).concat([adv.roommate && adv.roommate.gen && adv.roommate.gen.quirk]) });
   }
   // From the creation dialog: the player's name, background and personality, invented while the pools' draw stands in.
-  let inventSeq = 0; const cTouched = new Set();
+  let inventSeq = 0, inventCtl = null; const cTouched = new Set();
+  function cancelPlayerInvention() { inventSeq += 1; if (inventCtl) inventCtl.abort(); inventCtl = null; }
   async function inventPlayerFields() {
     const Wc = creationWorld(); if (!sample || !Wc.creation) return;
-    const seq = ++inventSeq; $('#cNote').textContent = 'inventing…';
+    cancelPlayerInvention(); const seq = inventSeq; const ctl = new AbortController(); inventCtl = ctl; $('#cNote').textContent = 'inventing…';
     const slot = inventSlot('player', { race: 'human', gender: $('#cGender').value, year: 'first-year', role: Wc.creation.playerRole || 'the player, a new student.', style: (Wc.genPools && Wc.genPools.nameStyle) || 'an ordinary name from anywhere in the world', fields: ['first', 'last', 'personality'].concat(Wc.creation.backgroundShape ? ['background'] : []) });
-    const inv = await inventCall(Wc, [slot], 'player invention');
-    if (seq !== inventSeq || createWorldId !== Wc.id) return;
-    const g = inv && inv.given.player; if (!g) { $('#cNote').textContent = ''; return; }
-    if (!cTouched.has('cName') && g.first && g.last) $('#cName').value = g.first + ' ' + g.last;
-    if (!cTouched.has('cBackground') && g.background) $('#cBackground').value = g.background;
-    if (!cTouched.has('cPersonality') && g.personality) $('#cPersonality').value = g.personality;
-    $('#cNote').textContent = 'Invented fresh; edit anything.'; previewStats(Wc);
+    try {
+      const inv = await inventCall(Wc, [slot], 'player invention', { signal: ctl.signal });
+      if (seq !== inventSeq || createWorldId !== Wc.id) return;
+      const g = inv && inv.given.player; if (!g) { $('#cNote').textContent = ''; return; }
+      if (!cTouched.has('cName') && g.first && g.last) $('#cName').value = g.first + ' ' + g.last;
+      if (!cTouched.has('cBackground') && g.background) $('#cBackground').value = g.background;
+      if (!cTouched.has('cPersonality') && g.personality) $('#cPersonality').value = g.personality;
+      $('#cNote').textContent = 'Invented fresh; edit anything.'; previewStats(Wc);
+    } finally { if (inventCtl === ctl) inventCtl = null; }
   }
   // ---------- creation dialog ----------
   let createWorldId = null;
   function creationWorld() { return WORLDS[createWorldId]; }
   function openCreate(worldId) {
+    cancelPlayerInvention();
     createWorldId = worldId; const Wc = WORLDS[worldId]; const cr = Wc.creation || {};
+    $('#cBegin').disabled = false;
     $('#createTitle').textContent = 'New adventure: ' + Wc.title;
     $('#cPremise').textContent = premiseParts(Wc).setting;
     $('#cName').value = cr.nameDefault || Wc.player.name;
@@ -2083,7 +2249,8 @@
     $('#cWeakness').innerHTML = '<option value="">none</option>' + Object.keys(traits).map((k) => '<option value="' + esc(k) + '">' + esc(traits[k]) + '</option>').join('');
     const rm = cr.roommate && (Wc.roommates || Wc.genPools);
     $('#cRoommateRow').hidden = !rm;
-    if (rm) { $('#cRmSpecies').value = ''; $('#cRmName').value = ''; $('#cRmSpecies').placeholder = 'Any species; ' + roommateSpeciesKeys(Wc).length + ' have full templates'; fillRmGenders(Wc); }
+    $('#cRmSpecies').value = ''; $('#cRmName').value = ''; $('#cRmGender').innerHTML = ''; $('#cRmSpecies').placeholder = '';
+    if (rm) { $('#cRmSpecies').placeholder = 'Any species; ' + roommateSpeciesKeys(Wc).length + ' have full templates'; fillRmGenders(Wc); }
     $('#cTitle').value = ''; $('#cNote').textContent = '';
     rmNameTouched = false; rmNamePool = '';
     randomAll(); // everything starts randomised; each field stays editable
@@ -2166,6 +2333,7 @@
     $('#cNote').textContent = checked.length === 2 ? '' : 'Pick two strengths (' + checked.length + ' chosen).';
   }
   function randomField(which) {
+    cancelPlayerInvention();
     const Wc = creationWorld(); const cr = Wc.creation || {};
     const np = Wc.namePools || { first: ['Alex'], last: ['Rowan'] };
     if (which === 'name') $('#cName').value = rand(np.first) + ' ' + rand(np.last);
@@ -2183,12 +2351,15 @@
     if (which === 'rmName' && cr.roommate) { $('#cRmName').value = Wc.genPools ? '' : (() => { const saveW = W; W = Wc; try { const names = rmNamesFor(Wc, matchRoommateSpecies($('#cRmSpecies').value), $('#cRmGender').value, 6); return names.length ? rand(names) : (rand(np.first) + ' ' + rand(np.last)); } finally { W = saveW; } })(); }  // worlds that invent their people leave the name to the invention at Begin
     previewStats(Wc);
   }
-  function randomAll() { cTouched.clear(); ['name', 'gender', 'background', 'personality', 'traits'].forEach(randomField); if ((creationWorld().creation || {}).roommate) { randomField('rmSpecies'); randomField('rmGender'); randomField('rmName'); } inventPlayerFields(); }
+  function randomAll() { cancelPlayerInvention(); cTouched.clear(); ['name', 'gender', 'background', 'personality', 'traits'].forEach(randomField); if ((creationWorld().creation || {}).roommate) { randomField('rmSpecies'); randomField('rmGender'); randomField('rmName'); } }
   // ---------- creation presets: the dialog's choices saved under a name, per world, in the store (so every device sees them) ----------
-  let presets = [];
+  let presets = [], presetLoadSeq = 0;
   async function loadPresets(worldId) {
-    presets = [];
-    if (db) { try { const snap = await db.collection('presets').orderBy('updatedAt', 'desc').limit(100).get(); presets = snap.docs.map((d) => clone(d.data())).filter((x) => x && x.worldId === worldId && x.choices); } catch (e) { presets = []; } }
+    const seq = ++presetLoadSeq;
+    let loaded = [];
+    if (db) { try { const snap = await db.collection('presets').orderBy('updatedAt', 'desc').limit(100).get(); loaded = snap.docs.map((d) => clone(d.data())).filter((x) => x && x.worldId === worldId && x.choices); } catch (e) { loaded = []; } }
+    if (seq !== presetLoadSeq || worldId !== createWorldId) return;
+    presets = loaded;
     renderPresets('');
   }
   function renderPresets(selectedId) {
@@ -2197,7 +2368,7 @@
   }
   function applyPreset(x) {
     const Wc = creationWorld(); const c = x.choices || {};
-    inventSeq += 1; ['cName', 'cBackground', 'cPersonality'].forEach((id) => cTouched.add(id)); $('#cNote').textContent = '';
+    cancelPlayerInvention(); ['cName', 'cBackground', 'cPersonality'].forEach((id) => cTouched.add(id)); $('#cNote').textContent = '';
     const setSel = (id, v) => { const el = $('#' + id); if (v != null && Array.from(el.options).some((o) => o.value === v)) el.value = v; };
     $('#cName').value = c.name || $('#cName').value; setSel('cGender', c.gender);
     $('#cBackground').value = c.background || ''; $('#cPersonality').value = c.personality || '';
@@ -2231,10 +2402,14 @@
     $('#ovrAction').value = $('#action').value;
     openDlg('dlgOverride');
   }
+  let overrideDispatching = false;
   async function overrideApply(mutator, label) {
+    if (busy || overrideDispatching) return false;
+    overrideDispatching = true;
     const before = clone(adv.state);
-    try { mutator(adv.state); ensureTf(adv.state); renderAll(); await persist(); setStatus('Override: ' + label + '.'); return true; }
+    try { mutator(adv.state); ensureTf(adv.state); renderAll(); const saved = await persist(); if (saved) setStatus('Override: ' + label + '.'); return saved; }
     catch (e) { adv.state = before; setStatus('Override failed: ' + ((e && e.message) || 'error'), true); return false; }
+    finally { overrideDispatching = false; }
   }
 
   // ---------- cast editor ----------
@@ -2267,32 +2442,50 @@
     $('#cfNote').textContent = isAdded ? 'Added in this adventure.' : (cs.overrides[c.key] ? 'Edited in this adventure.' : '');
   }
   async function saveCast() {
+    if (busy) return;
     const cs = castState(); const key = castSel; const c = activeCharacters().find((x) => x.key === key) || baseCharacter(key); if (!c) return;
+    const attText = $('#cfAttitude').value.trim(), att = attText ? Number(attText) : null;
+    if (attText && !Number.isFinite(att)) { $('#cfNote').textContent = 'Attitude must be a number.'; return; }
     const name = $('#cfName').value.trim() || c.name;
     // A field left as it was shown keeps the template it was filled from (so a later rename still resolves); an edited one is kept as typed.
     const field = (id, raw) => { const typed = $(id).value.trim(); return typed === fill(raw || '').trim() ? (raw || '') : typed; };
-    const o = { name, first: name.split(' ')[0], aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims: Object.assign({}, c.aims || {}, { default: field('#cfAim', c.aims && c.aims.default) }), where: Object.assign({}, c.where || {}, { default: field('#cfWhere', c.where && c.where.default) }) };
-    if (adv.roommate && adv.roommate.key === key) { Object.assign(adv.roommate, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
+    const fieldChanged = (id, raw) => $(id).value.trim() !== fill(raw || '').trim();
+    const aimEdited = fieldChanged('#cfAim', c.aims && c.aims.default), whereEdited = fieldChanged('#cfWhere', c.where && c.where.default);
+    const aims = Object.assign({}, c.aims || {}), where = Object.assign({}, c.where || {});
+    if (aimEdited) { const text = $('#cfAim').value.trim(); aims.default = text; Object.keys(aims).forEach((k) => { if (k !== 'default') aims[k] = text; }); }
+    if (whereEdited) { const text = $('#cfWhere').value.trim(); where.default = text; Object.keys(where).forEach((k) => { if (k !== 'default') where[k] = text; }); }
+    const parts = name === c.name ? { first: c.first || name.split(' ')[0], last: c.last || name.split(' ').slice(1).join(' ') } : (() => { const plain = name.replace(/^(?:dean|professor|prof\.|doctor|dr\.|madam|master|mr\.|mrs\.|ms\.|mx\.)\s+/i, '').trim().split(/\s+/); return { first: plain[0] || name, last: plain.slice(1).join(' ') }; })();
+    const o = { name, first: parts.first, last: parts.last, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
+    if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
     if (c.name !== name) adv.state.present = adv.state.present.map((pn) => pn === c.name ? name : pn);
-    const att = Math.max(0, Math.min(10, Math.round(Number($('#cfAttitude').value) || 0))); adv.state.attitudes[key] = att;
-    renderAll(); renderCastList(); renderCastForm(); await persist(); $('#cfNote').textContent = 'Saved.';
+    if (att != null) adv.state.attitudes[key] = Math.max(0, Math.min(10, Math.round(att)));
+    renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Saved.' : 'Changes are not saved yet.';
   }
-  async function resetCast() { const cs = castState(); delete cs.overrides[castSel]; renderAll(); renderCastList(); renderCastForm(); await persist(); $('#cfNote').textContent = 'Back to the world\'s version.'; }
+  async function resetCast() {
+    if (busy) return;
+    const cs = castState(), edited = activeCharacters().find((x) => x.key === castSel), original = baseCharacter(castSel);
+    delete cs.overrides[castSel];
+    if (edited && original && edited.name !== original.name) adv.state.present = adv.state.present.map((pn) => pn === edited.name ? original.name : pn);
+    renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Back to the world\'s version.' : 'Reset here, but the change is not saved yet.';
+  }
   async function toggleRemoveCast() {
+    if (busy) return;
     const cs = castState(); const i = cs.hidden.indexOf(castSel);
-    if (i >= 0) cs.hidden.splice(i, 1); else { cs.hidden.push(castSel); const c = baseCharacter(castSel); if (c) adv.state.present = adv.state.present.filter((pn) => pn !== c.name); }
-    renderAll(); renderCastList(); renderCastForm(); await persist();
+    if (i >= 0) cs.hidden.splice(i, 1); else { cs.hidden.push(castSel); const c = activeCharacters().find((x) => x.key === castSel) || baseCharacter(castSel); if (c) { const names = new Set([c.name, c.first].concat(c.aliases || [])); adv.state.present = adv.state.present.filter((pn) => !names.has(pn)); } }
+    renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Change is not saved yet.';
   }
   async function addCast() {
+    if (busy) return;
     const cs = castState(); let base = 'npc' + (cs.added.length + 1); let key = base; let n = 1; while (activeCharacters().some((c) => c.key === key) || cs.hidden.includes(key)) key = base + '_' + (++n);
     const c = { key, name: 'New character', aliases: [], race: '', looks: '', brief: 'A new face on campus.', sheet: '', aims: { default: 'go about their own business' }, where: { default: 'around campus' }, attitude: 5 };
-    cs.added.push(c); adv.state.attitudes[key] = 5; castSel = key; renderAll(); renderCastList(); renderCastForm(); await persist();
+    cs.added.push(c); adv.state.attitudes[key] = 5; castSel = key; renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Character added here, but the change is not saved yet.';
   }
 
   // ---------- rendering ----------
   function setStatus(s, bad, action) {
+    if (!s && saveError) { s = saveError; bad = true; action = db ? { label: 'Retry save', run: () => persist() } : { label: 'Retry storage', run: () => location.reload() }; }
     const el = $('#status'); el.innerHTML = ''; el.classList.toggle('bad', !!bad); el.hidden = !s;
     if (!s) return;
     const span = document.createElement('span'); span.textContent = s; el.appendChild(span);
@@ -2310,21 +2503,42 @@
       o.onText = (ev) => { if (rec.first == null) rec.first = Date.now(); if (ev && ev.text) rec.textLen = ev.text.length; if (inner) inner(ev); };
       if (o.signal && typeof o.signal.addEventListener === 'function') o.signal.addEventListener('abort', () => { if (rec.end == null) { rec.end = Date.now(); rec.code = 'stopped (no answer)'; } });
       let pr; try { pr = Promise.resolve(raw(prompt, o)); } catch (e) { rec.end = Date.now(); rec.code = (e && e.code) || 'error'; rec.message = e && e.message; throw e; }
-      return pr.then((res) => { rec.end = Date.now(); rec.textLen = res && res.text ? res.text.length : rec.textLen; rec.code = res && res.truncated ? 'truncated' : 'ok'; rec.tierApplied = res && res.modelTierApplied; return res; }, (e) => { rec.end = Date.now(); rec.code = (e && e.code) || 'error'; rec.message = e && e.message; throw e; });
+      return pr.then((res) => { rec.end = Date.now(); rec.textLen = res && res.text ? res.text.length : rec.textLen; rec.code = res && res.truncated ? 'truncated' : 'ok'; rec.tierApplied = res && res.modelTierApplied; return res; }, (e) => {
+        rec.end = Date.now(); rec.code = (e && e.code) || 'error'; rec.message = e && e.message;
+        if (['not_granted', 'sampling_disabled', 'not_declared'].includes(rec.code) || /^capability_/.test(rec.code)) {
+          sample = null; setConn('bad', 'Claude unavailable'); setStatus('Claude access was not granted in this view. Use Retry connection if you change the artifact permissions.', true, { label: 'Retry connection', run: connectSample }); setBusyUI(false); renderRail();
+        }
+        throw e;
+      });
     };
     if (raw && raw.limits) fn.limits = raw.limits;
     return fn;
   }
   const traceLines = () => callTrace.slice().reverse().map((r) => { const now = Date.now(); const secs = (ms) => (ms / 1000).toFixed(1) + ' s'; return new Date(r.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · ' + r.label + ' · ' + r.tier + (r.tierApplied && r.tierApplied !== r.tier ? ' (answered ' + r.tierApplied + ')' : '') + ' · ' + r.bytes.toLocaleString() + ' B → ' + (r.first != null ? 'first text at ' + secs(r.first - r.start) : 'no text yet') + ' · ' + (r.end != null ? 'ended at ' + secs(r.end - r.start) + ' · ' + r.code + (r.message ? ' (' + r.message + ')' : '') + (r.textLen ? ' · ' + r.textLen.toLocaleString() + ' chars' : '') : 'running ' + secs(now - r.start)); });
   async function connectSample() {
-    setConn('', 'connecting');
-    const raw = await window.claude.use('sample'); sample = raw ? tracedSample(raw) : null;
+    setConn('', 'connecting'); setStatus('Checking Claude access…');
+    let raw = null;
+    try {
+      if (!window.claude || typeof window.claude.use !== 'function') throw new Error('Claude runtime is unavailable');
+      raw = await window.claude.use('sample');
+    } catch (e) {
+      sample = null; setConn('bad', 'Claude unavailable');
+      setStatus('Claude is unavailable in this view (' + ((e && e.code) || (e && e.message) || 'runtime unavailable') + '). Open the artifact from claude.ai in a browser, then retry.', true, { label: 'Retry connection', run: connectSample });
+      setBusyUI(false); renderRail(); return false;
+    }
+    sample = raw ? tracedSample(raw) : null;
     if (!sample) { setConn('bad', 'Claude unavailable'); setStatus('Not connected to Claude in this view, so turns cannot run. Reload the page; if it persists, open the artifact from claude.ai in a browser.', true, { label: 'Retry connection', run: connectSample }); }
-    else { setConn('ok', 'Claude ready'); if (/Not connected/.test($('#status').textContent)) setStatus(''); }
+    else { setConn('ok', 'Claude ready'); setStatus(''); }
     setBusyUI(false); renderRail();
+    return !!sample;
   }
   function setSaveNote(s, bad) { const el = $('#summaryNote'); el.textContent = s; el.style.color = bad ? 'var(--bad)' : ''; }
-  function setBusyUI(b) { ['#send', '#regen', '#regenWith', '#undo'].forEach((s) => { $(s).disabled = b || !sample; }); $('#stop').hidden = !b; if (b) $('#rewriteRow').hidden = true; }
+  function setBusyUI(b) {
+    ['#send', '#regen', '#regenWith', '#undo'].forEach((s) => { $(s).disabled = b || !sample; });
+    ['#btnSettings', '#btnDebug', '#btnOverride', '#btnCast', '#btnAdventures', '#saveSummary'].forEach((s) => { $(s).disabled = b; });
+    $('#cInventPlayer').disabled = b || !sample; $('#summary').disabled = b;
+    $('#stop').hidden = !b; if (b) $('#rewriteRow').hidden = true;
+  }
   // Inward thoughts arrive between asterisks (*like this*) and are shown in italics; everything else stays escaped text.
   const marks = (escaped) => escaped.replace(/\*([^*\n]{1,300}?)\*/g, '<em>$1</em>');
   function paragraphs(text) { return String(text || '').split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean).map((p) => '<p>' + marks(esc(p)) + '</p>').join(''); }
@@ -2358,11 +2572,12 @@
   function renderFeed() {
     const feed = $('#feed'); feed.innerHTML = '';
     const o = openingTurn();
+    const openingText = fill((adv.opening || W.opening).narrative);
     const opening = document.createElement('article'); opening.className = 'turn';
     const before = seedEventsBefore();
     opening.innerHTML = '<div class="turn-meta"><span class="n">Turn 0</span><span>Day ' + num(o.stateBefore.day) + ' ' + esc(o.stateBefore.time) + '</span><span>' + esc(o.stateBefore.location) + '</span></div>' +
       (before.length ? '<div class="before"><div class="lbl">Earlier, before the story opens</div>' + before.map((e) => '<div><span class="t">' + esc(e.when) + '</span>' + esc(e.text) + '</div>').join('') + '</div>' : '') +
-      '<div class="narr">' + paragraphs(o.narrative) + '</div>';
+      '<div class="narr">' + paragraphs(openingText) + '</div>';
     feed.appendChild(opening);
     let lastEl = opening;
     adv.turns.forEach((t, i) => { lastEl = renderTurn(t, i === adv.turns.length - 1); feed.appendChild(lastEl); });
@@ -2443,7 +2658,7 @@
     if (showHidden) { rows.push(['Flags', Object.keys(S.flags).filter((k) => S.flags[k]).join(', ') || 'none', true]); if ((adv.pendingNotes || []).length) rows.push(['Engine notes for next turn', adv.pendingNotes.join(' '), true]); }
     for (const [k, v, hidden] of rows) items.insertAdjacentHTML('beforeend', '<dt>' + esc(k) + '</dt><dd class="' + (hidden ? 'hidden-item' : '') + '">' + esc(v == null || v === '' ? '—' : v) + '</dd>');
     $('#attitudes').innerHTML = activeCharacters().filter((c) => c.key in S.attitudes).map((c) => { const v = num(S.attitudes[c.key]); const short = c.key === 'roommate' ? c.first : c.name.split(' ').slice(-1)[0]; const label = short + (raceOf(c) ? ' (' + raceOf(c) + ')' : ''); return '<div class="bar"><span class="lbl" title="' + esc(nameWithRace(c)) + '">' + esc(label) + '</span><div class="track"><div class="fill" style="width:' + (v * 10) + '%"></div></div><span class="num">' + v + '</span></div>'; }).join('');
-    if (document.activeElement !== $('#summary')) $('#summary').value = adv.memory.summary || '';
+    if (document.activeElement !== $('#summary') && !summaryDirty) $('#summary').value = adv.memory.summary || '';
     $('#beatCount').textContent = adv.memory.beats.length + ' beats pending';
     $('#timeline').innerHTML = adv.memory.events.slice(-30).reverse().map((e) => { const m = /^(Day \d+\s+\d{1,2}:\d{2})\s*(.*)$/.exec(e); return '<li>' + (m ? '<span>' + esc(m[1]) + '</span>' + esc(m[2]) : esc(e)) + '</li>'; }).join('');
     $('#eventCount').textContent = adv.memory.events.length + ' events';
@@ -2454,6 +2669,20 @@
   }
   function renderSettingsForm() {
     $('#setNarrTier').value = adv.settings.narrTier; $('#setUtilTier').value = adv.settings.utilTier; $('#setDensity').value = adv.settings.density; $('#setWindow').value = String(adv.settings.window); $('#setAutoFit').value = adv.settings.autoFit ? '1' : '0'; $('#setThoughts').value = adv.settings.thoughts === false ? '0' : '1'; $('#setInventTier').value = inventTier(); $('#setPace').value = adv.settings.pace in PACE_PER_DAY ? adv.settings.pace : 'standard';
+  }
+  async function saveSummary() {
+    if (summarySavePromise) return summarySavePromise;
+    if (!summaryDirty) return true;
+    const text = $('#summary').value.trim();
+    summarySavePromise = (async () => {
+      adv.memory.summary = text;
+      const saved = await persist();
+      if (saved && $('#summary').value.trim() === text) summaryDirty = false;
+      return saved;
+    })();
+    let saved;
+    try { saved = await summarySavePromise; } finally { summarySavePromise = null; }
+    return saved && summaryDirty ? saveSummary() : saved;
   }
   function renderDebug() {
     $('#dbgCalls').textContent = callTrace.length ? traceLines().join('\n') : 'No model calls yet this session.';
@@ -2475,8 +2704,15 @@
   $('#stop').onclick = () => { if (ctl) ctl.abort(); };
   $('#action').addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSend(); } });
   $('#toggleHidden').onclick = () => { showHidden = !showHidden; try { localStorage.setItem('windlass.spoilers', showHidden ? '1' : '0'); } catch (e) {} renderAll(); };
-  $('#saveSummary').onclick = async () => { adv.memory.summary = $('#summary').value.trim(); await persist(); };
+  $('#summary').addEventListener('input', () => { summaryDirty = true; });
+  $('#summary').addEventListener('blur', () => { if (summaryDirty) saveSummary(); });
+  $('#saveSummary').onclick = saveSummary;
   $('#btnAdventures').onclick = () => { openDlg('dlgAdventures'); listAdventures(); };
+  $('#exportCopy').onclick = async () => {
+    const text = $('#exportText').value;
+    try { await navigator.clipboard.writeText(text); setStatus('Save JSON copied to the clipboard.'); }
+    catch (e) { $('#exportText').focus(); $('#exportText').select(); setStatus('Copy was blocked by the browser; the save JSON is selected for manual copying.', true); }
+  };
   // Phone layout: the action bar tucks away while reading down a long turn and comes back at the end of the story, on a
   // scroll up, on a tap of its tab, or when the action box is focused. The action box starts one line tall and grows as typed.
   const mobileMq = window.matchMedia('(max-width: 900px)');
@@ -2531,7 +2767,11 @@
   $('#dbgPing').onclick = async () => { if (!sample) { $('#dbgCalls').textContent = 'Not connected.'; return; } const tier = $('#dbgPingTier').value, kind = $('#dbgPingKind').value; $('#dbgPing').disabled = true; const tick = setInterval(renderDebug, 1000); try { await Promise.race([sample(PING_PROMPTS[kind](), { label: 'ping ' + kind, modelTier: tier, cache: false, onText: () => {} }), new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), 60000))]); } catch (e) {} finally { clearInterval(tick); $('#dbgPing').disabled = false; renderDebug(); } };
   $('#btnOverride').onclick = openOverride;
   $('#btnCast').onclick = () => openCast();
-  $('#cfSave').onclick = saveCast; $('#cfReset').onclick = resetCast; $('#cfRemove').onclick = toggleRemoveCast; $('#castAdd').onclick = addCast;
+  let castDispatching = false;
+  $('#cfSave').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await saveCast(); } finally { castDispatching = false; } };
+  $('#cfReset').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await resetCast(); } finally { castDispatching = false; } };
+  $('#cfRemove').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await toggleRemoveCast(); } finally { castDispatching = false; } };
+  $('#castAdd').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await addCast(); } finally { castDispatching = false; } };
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => closeDlg(b.dataset.close); });
   ['setNarrTier', 'setUtilTier', 'setDensity', 'setWindow', 'setAutoFit', 'setPace', 'setThoughts', 'setInventTier'].forEach((id) => {
     $('#' + id).onchange = async () => {
@@ -2554,11 +2794,12 @@
   $('#cPreset').addEventListener('change', () => { const x = presets.find((y) => y.id === $('#cPreset').value); $('#cPresetDelete').hidden = !x; if (x) applyPreset(x); });
   $('#cPresetSave').onclick = () => { $('#cPresetName').value = defaultPresetName(); $('#cPresetSaveRow').hidden = false; $('#cPresetName').focus(); $('#cPresetName').select(); };
   $('#cPresetCancel').onclick = () => { $('#cPresetSaveRow').hidden = true; };
-  $('#cPresetConfirm').onclick = async () => { const name = $('#cPresetName').value.trim() || defaultPresetName(); $('#cPresetSaveRow').hidden = true; await savePreset(name); };
+  $('#cPresetConfirm').onclick = async (e) => { const b = e.currentTarget; if (b.disabled) return; b.disabled = true; try { const name = $('#cPresetName').value.trim() || defaultPresetName(); $('#cPresetSaveRow').hidden = true; await savePreset(name); } finally { b.disabled = false; } };
   $('#cPresetName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#cPresetConfirm').click(); } });
   $('#cPresetDelete').onclick = () => deletePreset($('#cPreset').value);
   document.querySelectorAll('#dlgCreate [data-rand]').forEach((b) => { b.onclick = () => { closeCombo(); const id = { name: 'cName', background: 'cBackground', personality: 'cPersonality' }[b.dataset.rand]; if (id) cTouched.add(id); randomField(b.dataset.rand); }; });
   $('#cRandomAll').onclick = () => { closeCombo(); randomAll(); };
+  $('#cInventPlayer').onclick = () => { if (!sample) { $('#cNote').textContent = 'Claude is unavailable in this view.'; return; } inventPlayerFields(); };
   for (const id of ['cName', 'cBackground', 'cPersonality']) $('#' + id).addEventListener('input', () => cTouched.add(id));
   document.querySelectorAll('#dlgCreate [data-combo]').forEach((b) => { b.onclick = () => openCombo(b.dataset.combo); });
   ['cName', 'cBackground', 'cRmSpecies', 'cRmName'].forEach((id) => { $('#' + id).addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' && !e.altKey && !comboOpen) { e.preventDefault(); openCombo(id); } }); });
@@ -2576,10 +2817,11 @@
   // Begin invents the people first (a second press, "Begin now", stops the invention and begins with what it has and the pools);
   // closing the dialog while it runs cancels the creation outright.
   let createCtl = null, createToken = 0;
-  $('#dlgCreate').addEventListener('close', () => { createToken += 1; inventSeq += 1; if (createCtl) createCtl.abort(); });
+  $('#dlgCreate').addEventListener('close', () => { createToken += 1; cancelPlayerInvention(); if (createCtl) createCtl.abort(); });
   $('#cBegin').onclick = async () => {
     if (createCtl) { createCtl.abort(); return; }
     if (busy) { $('#cNote').textContent = 'A turn is already running in the current adventure; wait for it to finish first.'; return; }
+    cancelPlayerInvention();
     const c = creationChoices();
     if ((WORLDS[createWorldId].creation || {}).traits && c.strengths.length !== 2) { $('#cNote').textContent = 'Pick exactly two strengths.'; return; }
     closeCombo(); inventSeq += 1; const token = ++createToken;
@@ -2587,56 +2829,82 @@
     if (sample && Wc.genPools) {
       createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
       const t0 = performance.now(); let got = 0, total = 0;
-      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, six calls of five; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
+      const calls = Math.ceil((1 + (Wc.castRoles || []).length + (Wc.minorRoles || []).length) / INVENT_BATCH);
+      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
       note(); const ticker = setInterval(note, 1000);
       try { prep = await prepareCreation(Wc, c, createCtl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
       finally { clearInterval(ticker); createCtl = null; $('#cBegin').textContent = 'Begin'; }
       if (token !== createToken) { $('#cNote').textContent = ''; return; }
     }
     $('#cNote').textContent = '';
+    $('#cBegin').disabled = true;
     newAdventure(c, createWorldId, prep || undefined); closeDlg('dlgCreate'); setStatus(''); await persist();
     if (prep) lastDebug = { prompt: prep.prompt || '(no invention call)', raw: prep.raw || '', notes: prep.notes.length ? prep.notes : ['the cast was drawn from the pools'], meta: 'Creation · cast invention' };
     rememberCast();
     await writeRoommateIntro();
   };
   // override
-  $('#ovrTestSet').onclick = async () => { adv.settings.testNote = $('#ovrTestNote').value.trim(); renderTestBanner(); await persist(); setStatus(adv.settings.testNote ? 'Test instruction set.' : 'Test instruction cleared.'); };
-  $('#ovrTestClear').onclick = async () => { adv.settings.testNote = ''; $('#ovrTestNote').value = ''; renderTestBanner(); await persist(); setStatus('Test instruction cleared.'); };
+  $('#ovrTestSet').onclick = async () => { adv.settings.testNote = $('#ovrTestNote').value.trim(); renderTestBanner(); if (await persist()) setStatus(adv.settings.testNote ? 'Test instruction set.' : 'Test instruction cleared.'); };
+  $('#ovrTestClear').onclick = async () => { adv.settings.testNote = ''; $('#ovrTestNote').value = ''; renderTestBanner(); if (await persist()) setStatus('Test instruction cleared.'); };
   $('#ovrInfluence').addEventListener('change', (e) => { const inp = e.target; if (!inp.dataset.sp) return; overrideApply((s) => { s.tf.influence[inp.dataset.sp] = Math.max(0, Math.min(100, Math.round(Number(inp.value) || 0))); }, 'influence ' + inp.dataset.sp + ' = ' + inp.value); });
   $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-unmake]'); if (!b) return; const k = b.dataset.unmake; overrideApply((st) => { const sp = W.transformation.species[k]; ensureTf(st); const r = st.tf.rungs[k] || 0; if (!r) throw new Error('no ' + sp.short + ' change to take back'); st.tf.rungs[k] = r - 1; const idx = st.tf.traits.map((t, i) => t.species === k ? i : -1).filter((i) => i >= 0).pop(); if (idx != null) st.tf.traits.splice(idx, 1); st.tf.arcs = (st.tf.arcs || []).filter((a) => a.species !== k); st.tf.tracks = (st.tf.tracks || []).filter((t) => t.species !== k); if (r === 1 && st.tf.paths) delete st.tf.paths[k]; if (st.tf.sex && st.tf.sex.species === k && st.tf.sex.rung >= r) delete st.tf.sex; st.tf.influence[k] = Math.max(0, sp.ladder[r - 1].at - 1); if (st.tf.dayGain && st.tf.dayGain.by) st.tf.dayGain.by[k] = 0; adv.pendingNotes = (adv.pendingNotes || []).filter((n) => !n.includes('(' + sp.name)); }, 'took back the last ' + k + ' change; influence set just under its threshold. The story already told it, so say in a director note how the body reads now').then(() => openOverride()); });
   $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-manifest]'); if (!b) return; const k = b.dataset.manifest; overrideApply((s) => { const sp = W.transformation.species[k]; ensureTf(s); const r = s.tf.rungs[k] || 0; if (r >= sp.ladder.length) throw new Error('no more changes on that ladder'); if (trackBusy(s.tf, k)) throw new Error('a ' + sp.short + ' change is already under way'); s.tf.influence[k] = Math.max(s.tf.influence[k] || 0, sp.ladder[r].at); const diff = [], notes = [], next = []; manifestDue(s, diff, notes, next); const a = s.tf.arcs.find((x) => x.species === k); if (a) { adv.pendingNotes = (adv.pendingNotes || []).concat([arcNote(a, s.tf)]); a.phase = 1; } else { const stepNotes = advanceTracks(s, notes); adv.pendingNotes = (adv.pendingNotes || []).concat(stepNotes); } }, 'forced next ' + k + ' change; its first note is queued for the next turn').then(() => openOverride()); });
   $('#ovrClockSet').onclick = () => overrideApply((s) => { const d = Math.max(1, Math.round(Number($('#ovrDay').value) || s.day)); const t = $('#ovrTime').value.trim(); if (!/^\d{1,2}:\d{2}$/.test(t)) throw new Error('time must be HH:MM'); const wd = W.calendar.weekdays; const startIdx = wd.indexOf(W.initialState.weekday); s.day = d; s.weekday = wd[(startIdx + (d - W.initialState.day)) % wd.length]; s.time = minToTime(timeToMin(t)); const loc = $('#ovrLocation').value.trim(); if (loc) s.location = loc; }, 'clock set');
   $('#ovrAttitudes').addEventListener('change', (e) => { const inp = e.target; if (inp.dataset.att) overrideApply((s) => { s.attitudes[inp.dataset.att] = Math.max(0, Math.min(10, Math.round(Number(inp.value) || 0))); }, 'attitude ' + inp.dataset.att + ' = ' + inp.value); else if (inp.dataset.skill) overrideApply((s) => { ensureSkills(s); s.skills[inp.dataset.skill] = Math.max(0, Math.min(15, Math.round(Number(inp.value) || 0))); }, 'skill ' + inp.dataset.skill + ' = ' + inp.value); });
-  $('#ovrFactAdd').onclick = async () => { const f = $('#ovrFact').value.trim(); if (!f) return; adv.memory.facts = adv.memory.facts || []; adv.memory.facts.push(f); $('#ovrFact').value = ''; renderRail(); await persist(); setStatus('Fact added.'); };
-  $('#ovrEventAdd').onclick = async () => { const f = $('#ovrEvent').value.trim(); if (!f) return; adv.memory.events.push(f); $('#ovrEvent').value = ''; renderRail(); await persist(); setStatus('Event added.'); };
-  $('#ovrNoteAdd').onclick = async () => { const f = $('#ovrNote').value.trim(); if (!f) return; adv.pendingNotes = (adv.pendingNotes || []).concat([f]); $('#ovrNote').value = ''; renderRail(); await persist(); setStatus('Engine note queued for the next turn.'); };
-  $('#ovrNoteClear').onclick = async () => { adv.pendingNotes = []; renderRail(); await persist(); setStatus('Engine notes cleared.'); };
+  $('#ovrFactAdd').onclick = async () => { const f = $('#ovrFact').value.trim(); if (!f) return; adv.memory.facts = adv.memory.facts || []; adv.memory.facts.push(f); $('#ovrFact').value = ''; renderRail(); if (await persist()) setStatus('Fact added.'); };
+  $('#ovrEventAdd').onclick = async () => { const f = $('#ovrEvent').value.trim(); if (!f) return; adv.memory.events.push(f); $('#ovrEvent').value = ''; renderRail(); if (await persist()) setStatus('Event added.'); };
+  $('#ovrNoteAdd').onclick = async () => { const f = $('#ovrNote').value.trim(); if (!f) return; adv.pendingNotes = (adv.pendingNotes || []).concat([f]); $('#ovrNote').value = ''; renderRail(); if (await persist()) setStatus('Engine note queued for the next turn.'); };
+  $('#ovrNoteClear').onclick = async () => { adv.pendingNotes = []; renderRail(); if (await persist()) setStatus('Engine notes cleared.'); };
   $('#ovrStateApply').onclick = async () => { let parsed; try { parsed = JSON.parse($('#ovrState').value); } catch (e) { $('#ovrStateNote').textContent = 'Not valid JSON.'; return; } const ok = await overrideApply((s) => { if (!parsed || typeof parsed !== 'object' || !parsed.items || !parsed.attitudes) throw new Error('state needs items and attitudes'); Object.keys(s).forEach((k) => delete s[k]); Object.assign(s, parsed); }, 'state replaced'); $('#ovrStateNote').textContent = ok ? 'Applied.' : 'Not applied.'; };
   $('#ovrStateReset').onclick = () => { $('#ovrState').value = JSON.stringify(adv.state, null, 1); $('#ovrStateNote').textContent = ''; };
   $('#ovrReplyApply').onclick = async () => { $('#ovrReplyNote').textContent = 'working…'; const r = await applyManualReply($('#ovrAction').value.trim(), $('#ovrReply').value); $('#ovrReplyNote').textContent = r; };
 
   // ---------- boot ----------
+  let bootLast = null;
+  try { bootLast = localStorage.getItem('windlass.last'); } catch (e) { setSaveNote('local save pointer unavailable', true); }
   newAdventure({}, DEFAULT_WORLD);
   setBusyUI(false);
   connectSample();
   (async () => {
-    downloads = await window.claude.use('downloads');
-    db = await window.claude.use('db');
-    if (!db) { setSaveNote('saves unavailable in this view', true); return; }
-    let last = null; try { last = localStorage.getItem('windlass.last'); } catch (e) {}
+    try {
+      if (!window.claude || typeof window.claude.use !== 'function') throw new Error('Claude runtime is unavailable');
+      downloads = await window.claude.use('downloads');
+      db = await window.claude.use('db');
+      if (!db) throw new Error('persistent storage capability was not granted');
+    } catch (e) {
+      db = null; downloads = null;
+      saveError = 'Windlass cannot save in this view (' + ((e && e.code) || (e && e.message) || 'storage unavailable') + '). Open the artifact in claude.ai and allow persistent storage.';
+      setSaveNote('saves unavailable in this view', true);
+      setStatus(saveError + ' You can still play, but progress will not be saved.', true, { label: 'Retry storage', run: () => { location.reload(); } });
+      openCreate(DEFAULT_WORLD);
+      return;
+    }
+    let snap = null, listError = null;
     try {
       // Open the adventure saved most recently on any device, so a phone session carries on from the desktop and back.
-      let snap = null; try { snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { snap = null; }
-      if (snap && !snap.empty) { await loadAdventure(snap.docs[0].id); setSaveNote('loaded'); return; }
-      if (last) { const s = await db.doc('adventures/' + last).get(); if (s.exists) { await loadAdventure(last); setSaveNote('loaded'); return; } }
-      setSaveNote('no saves yet'); openCreate(DEFAULT_WORLD);
-    } catch (e) {
-      const why = (e && e.code) || (e && e.message) || 'error';
-      setSaveNote('could not load saves: ' + why, true);
-      setStatus('Your saved adventure could not be loaded (' + why + '). This page is showing a fresh, unsaved adventure. Open Adventures to try again, or see Debug.', true);
-      lastDebug = { prompt: '', raw: '', notes: ['load failed: ' + why, (e && e.stack) ? String(e.stack).slice(0, 800) : ''], meta: 'Boot load failure' };
-      try { newAdventure({}, DEFAULT_WORLD); } catch (e2) {}
+      snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
+    } catch (e) { listError = e; }
+    const ids = (snap && snap.docs ? snap.docs.map((d) => d.id) : []);
+    if (bootLast && !ids.includes(bootLast)) ids.push(bootLast);
+    for (const id of ids) {
+      try {
+        await loadAdventure(id);
+        setSaveNote('loaded');
+        setStatus('Welcome back. Pick up where you left off.');
+        return;
+      } catch (e) {
+        lastDebug = { prompt: '', raw: '', notes: ['load failed for ' + id + ': ' + ((e && e.message) || 'invalid save'), (e && e.stack) ? String(e.stack).slice(0, 800) : ''], meta: 'Boot load failure' };
+      }
     }
+    if (listError) {
+      const why = (listError && listError.code) || (listError && listError.message) || 'storage error';
+      setSaveNote('could not read saves: ' + why, true);
+      setStatus('Windlass could not read saved adventures (' + why + '). A new adventure can still be started, but cannot load until storage access is restored.', true);
+    } else if (ids.length) {
+      setSaveNote('saved adventures could not be loaded', true);
+      setStatus('None of the saved adventures could be loaded. See Debug for the latest save error, or start a new adventure.', true);
+    } else setSaveNote('no saves yet');
+    openCreate(DEFAULT_WORLD);
   })();
 })();
 </script>

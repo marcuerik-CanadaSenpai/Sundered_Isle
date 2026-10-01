@@ -10,7 +10,7 @@ window.WINDLASS_WORLDS.halloway = {
   title: 'Halloway College of Binding',
   version: '0.7',
 
-  premise: 'You are {name}, nineteen, a first-year at Halloway College of Binding on the headland above Sallow Reach. Students here bond with an animal kin and, over months, take on its aspects. The college calls it the Attunement. It is why everyone came, and it is the thing everyone is afraid of.',
+  premise: 'Halloway College of Binding stands on the headland above Sallow Reach, where students bond with an animal kin and, over months, take on its aspects. The college calls it the Attunement. You are {name}, nineteen, a first-year. It is why everyone came, and it is the thing everyone is afraid of.',
 
   // Sent every turn as <rules>. Keep it short. One rule, one place. Positive phrasing.
   rules: [
@@ -23,7 +23,7 @@ window.WINDLASS_WORLDS.halloway = {
     'Variety: aims are directions, not scripts: a character pursues one by different means each scene and lets it rest for a few turns after {first} answers or ignores a bid. A signature habit (a hum, a gesture, a running joke) appears at most once a scene and not in consecutive turns unless {first} engages with it; each turn shows a different side of the people present (a new topic, a want, a mood, a piece of their day). Do not end consecutive turns on the same image.',
     'Other people: every named character present has an aim this scene (<characters>) and pursues it. Humans are rare, so {first} draws looks everywhere: stares, double-takes, questions, an approach, an offer, now and then a cold shoulder on principle. Interest is not deference: nobody praises, defers to or confides in {first} without cause shown on the page. Nobody knows anyone they share no class, club, dorm or event with. Clubs, stalls and places are run by the people in <characters>; invented extras are walk-ons, never leaders or rule-makers. {first} is the only human first-year but not otherwise special: other humans study here and made their own choices.',
     'Outcomes: when <action> gives a roll, the evaluation states the difficulty and decides success, partial or failure from the total. A failure has a visible cost this turn; do not soften it. When there is no roll, narrate the natural consequence.',
-    'Attunement: stage and progress change only by the triggers in <progression>, through state_updates. Physical change is described only in a turn where <progression> says the stage has advanced. Nothing reverses. Never mention stages, progress, numbers or engine terms in the narrative.',
+    'Attunement: stage and progress change only by the triggers in <progression>, through state_updates. When {first} swallows reach-salt, set flags.salt_taken_this_turn true; the engine applies the progress and fever, so do not add progress yourself. Physical change is described only in a turn where <progression> says the stage has advanced. Nothing reverses. Never mention stages, progress, numbers or engine terms in the narrative.',
     'What people know: every character knows only what they could plausibly have seen or been told. Nobody notices a change in {first} before {first} has; afterwards they notice only what is plainly visible, and they do not name or predict what is happening to {first}. If {first} chooses to ignore a change, nobody presses the subject.',
     'Time: the clock in <clock> is authoritative. Report the minutes that pass in time_advance_minutes (10 to 120 in a normal scene; more only for sleep or travel). Respect the bell schedule; if a bell would ring during the scene, it rings.',
     'Consistency: contradict nothing in <state>, <clock>, <timeline> or <recent_turns>. If the action assumes something false, the narrative corrects it in-world.',
@@ -36,7 +36,7 @@ window.WINDLASS_WORLDS.halloway = {
   // Sent every turn as <world>.
   world: [
     'Halloway College of Binding sits on a headland above the harbour town of Sallow Reach. Students spend three years learning binding: forming a bond with an animal familiar, called a kin, and over months taking on aspects of it. First-years are matched with a kin at their first Working, on the third day of term, from the animals Dr Hale keeps in the menagerie; the match is made by the kin as much as by the student.',
-    'What advances Attunement: a formal Working in the Long Hall (progress plus 5 to 10); strong emotion while in physical contact with the kin (plus 2 to 5); sleeping with the kin in the room (plus 1 per night); reach-salt (plus 30 to 40 over three days, with fever). What slows it: separation from the kin for more than a day, which also causes distress in both. Nothing reverses it.',
+    'What advances Attunement: a formal Working in the Long Hall (progress plus 5 to 10); strong emotion while in physical contact with the kin (plus 2 to 5); sleeping with the kin in the room (plus 1 per night); reach-salt (plus 30 to 40 over three days, with fever). What slows it: a full day separated from the kin, which also causes distress in both. Nothing reverses it.',
     'Factions. The Wardens are faculty, all deep-turned, who regulate the pace of student Attunement and punish acceleration. The Quiet Table is a student society that argues for slowing Attunement and choosing a stopping stage; it meets in the old laundry on Fridays after study hall. The Tidal Club is an informal group that wants to reach Stage 3 or 4 fast, trades reach-salt, and meets on the sea stairs after curfew. Sallow Reach townsfolk are civil to unbound and lightly marked students and cold to anyone visibly turned; the constable, Aldous Pike, takes an interest in students seen at the tidal caves.',
     'Places. The front court, with the bursar\'s table on arrival days. The dormitory wing, with east and west stairs; first-years room on the third floor, two to a room. The Long Hall, a bare vaulted room with a stone circle set into the floor. The menagerie, a walled yard behind the kitchen garden with open pens and a warm brick shed for the smaller kin. The refectory. The library, which holds the bond registers. The north lecture room. The old laundry. The sea stairs, which run from the kitchen garden down to the shingle and the tidal caves.'
   ],
@@ -95,8 +95,9 @@ window.WINDLASS_WORLDS.halloway = {
   schedule: [
     { time: '06:30', name: 'rise bell', slot: 'rise' },
     { time: '07:00', name: 'breakfast, refectory', slot: 'breakfast' },
-    { time: '08:00', name: 'first Working, Long Hall (first-years)', slot: 'working', days: ['Monday', 'Wednesday', 'Friday'], notable: true },
+    { time: '08:00', name: 'Working, Long Hall (first-years)', slot: 'working', days: ['Monday', 'Wednesday', 'Friday'], notable: true },
     { time: '08:00', name: 'morning free', slot: 'morning', days: ['Tuesday', 'Thursday', 'Saturday', 'Sunday'] },
+    { time: '09:00', name: 'arrival registration, front court', slot: 'arrival', day: 1, notable: true },
     { time: '10:00', name: 'lecture, Theory of Bonds, north lecture room', slot: 'lecture', days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], notable: true },
     { time: '10:00', name: 'late morning free', slot: 'morning', days: ['Saturday', 'Sunday'] },
     { time: '12:00', name: 'midday meal, refectory', slot: 'midday' },
@@ -122,7 +123,7 @@ window.WINDLASS_WORLDS.halloway = {
       key: 'marsh', name: 'Professor Adaline Marsh', race: 'Heron kin',
       brief: 'Warden of first-years. Stage 4, heron: long neck, grey plumage at the temples, unblinking.',
       sheet: 'Warden of first-years, Stage 4 (heron). Regulates first-year Attunement to twenty minutes of Working three times a week and punishes acceleration. Lost two students of her own year to Stage 5 and does not discuss it. Speaks precisely, waits out silences, remembers everything said in her lecture room.',
-      where: { default: 'her rooms in the Wardens\' house', working: 'the Long Hall', lecture: 'the north lecture room', breakfast: 'the Wardens\' end of the refectory', midday: 'the Wardens\' end of the refectory', kincare: 'the menagerie, briefly', night: 'her rooms' },
+      where: { default: 'her rooms in the Wardens\' house', arrival: 'the front court, at the bursar\'s table', working: 'the Long Hall', lecture: 'the north lecture room', breakfast: 'the Wardens\' end of the refectory', midday: 'the Wardens\' end of the refectory', kincare: 'the menagerie, briefly', night: 'her rooms' },
       aims: { default: 'keep first-year Attunement slow and find out who is bringing reach-salt up the sea stairs', working: 'hold every first-year to twenty minutes and watch for anyone pushing past it', lecture: 'teach; notice who asks about the higher stages' }
     },
     {
@@ -227,7 +228,7 @@ window.WINDLASS_WORLDS.halloway = {
   initialState: {
     day: 1, weekday: 'Saturday', time: '09:10',
     location: 'Front court, Halloway College',
-    present: ['{first}', 'Marta Quill', 'Tobias Fen'],
+    present: ['{first}', 'Professor Adaline Marsh', 'Marta Quill', 'Tobias Fen'],
     items: {
       attunement_stage: 0, attunement_progress: 0,
       kin: 'none yet; first-years are matched at the first Working on Day 3',
