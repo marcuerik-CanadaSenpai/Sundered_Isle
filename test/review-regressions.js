@@ -148,7 +148,7 @@ async function checkStaleChunkRecovery() {
   const h = await startAdventure();
   try {
     useTurnHandler(h);
-    for (let i = 1; i <= 11; i++) assert(await h.turn('Stored turn ' + i), 'turn did not finish: ' + i);
+    for (let i = 1; i <= 21; i++) assert(await h.turn('Stored turn ' + i), 'turn did not finish: ' + i);
     const [mainPath, mainEntry] = adventureEntry(h);
     const id = mainPath.split('/')[1];
     mainEntry.data.turnCount = 10;
@@ -158,12 +158,13 @@ async function checkStaleChunkRecovery() {
     h.click('#reloadAdv');
     assert(await h.settle(100, 8000), 'reloading the stale-chunk save did not finish');
     assert.deepEqual(visibleActions(h), Array.from({ length: 10 }, (_, i) => 'Stored turn ' + (i + 1)));
-    assert.match(h.$('#status').textContent, /Ignored 1 stale turn beyond the save record/);
+    assert.match(h.$('#status').textContent, /Ignored 11 stale turns beyond the save record/);
 
     assert(await h.turn('After stale repair'), 'the adventure did not continue after stale history was removed');
     assert.deepEqual(turnsIn(h, id).map((turn) => turn.action), Array.from({ length: 10 }, (_, i) => 'Stored turn ' + (i + 1)).concat(['After stale repair']));
     const repairedChunk = h.mock.store.get('adventures/' + id + '/turns/0001');
     assert.deepEqual(repairedChunk.data.turns.map((turn) => turn.action), ['After stale repair'], 'the stale chunk should be rewritten with the new valid turn');
+    assert(!h.mock.store.has('adventures/' + id + '/turns/0002'), 'later stale chunks should be removed in the same save');
 
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));

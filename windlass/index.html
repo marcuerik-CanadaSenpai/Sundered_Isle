@@ -2070,7 +2070,7 @@
       const start = chunkIdx * CHUNK; const sliceLen = mine.turns.slice(start, start + CHUNK).length;
       if (sliceLen) { live(); await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) mine._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { live(); await chunkRef(n / CHUNK).delete(); if ((mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk) >= n / CHUNK) mine._savedUpToChunk = n / CHUNK - 1; }
-      for (const id of mine._staleChunks || []) {
+      for (const id of (mine._staleChunks || []).slice()) {
         if (Number.isInteger(Number(id)) && Number(id) < Math.ceil(n / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== id); continue; }
         live(); await db.doc('adventures/' + mine.id + '/turns/' + id).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== id);
       }
@@ -2125,7 +2125,7 @@
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
         live(); await db.doc(path).set(chunkBody(i)); written.push(path);
       }
-      if (id === mine.id) for (const chunkId of mine._staleChunks || []) {
+      if (id === mine.id) for (const chunkId of (mine._staleChunks || []).slice()) {
         if (Number.isInteger(Number(chunkId)) && Number(chunkId) < Math.ceil(mine.turns.length / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId); continue; }
         live(); await db.doc('adventures/' + id + '/turns/' + chunkId).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId);
       }
