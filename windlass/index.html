@@ -1741,8 +1741,8 @@
   function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.pendingBefore; return c; }
   const ALTS_MAX_BYTES = 48000;
   const jsonBytes = (o) => new TextEncoder().encode(JSON.stringify(o)).length;
-  // Keeps the newest previous versions that fit in ALTS_MAX_BYTES (always at least the newest one).
-  function capAlts(alts) { const out = alts.slice(); while (out.length > 1 && jsonBytes(out) > ALTS_MAX_BYTES) out.shift(); return out; }
+  // Keeps the newest previous versions that fit in ALTS_MAX_BYTES; a single version bigger than that is not kept either.
+  function capAlts(alts) { const out = alts.slice(); while (out.length && jsonBytes(out) > ALTS_MAX_BYTES) out.shift(); return out; }
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
   function trimState(s) { return s ? { day: s.day, time: s.time, location: s.location, present: s.present } : s; }
   function trimTurnHistory(t) {
@@ -1754,8 +1754,12 @@
   // How many of the newest turns keep their full history, i.e. how far Undo (and Regenerate after an Undo) can go back.
   const UNDO_DEPTH = 2;
   function trimBeyondUndo(turns) { for (let i = 0; i < turns.length - UNDO_DEPTH; i++) trimTurnHistory(turns[i]); }
-  // A turn whose history was trimmed (or never stored) cannot be undone or regenerated: restoring it would leave a partial state.
-  const restorable = (t) => !!(t && !t._trimmed && t.memBefore && Array.isArray(t.memBefore.events) && Array.isArray(t.memBefore.beats) && t.stateBefore && t.stateBefore.items && t.stateBefore.attitudes && t.stateBefore.flags);
+  // A turn whose history was trimmed (or never stored, or stored malformed) cannot be undone or regenerated: restoring it
+  // would leave a partial state. Everything Undo, Regenerate and Previous version put back into play is checked here.
+  const isRec = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+  const okSnapshotState = (s) => isRec(s) && isRec(s.items) && isRec(s.attitudes) && isRec(s.flags) && Array.isArray(s.present) && Number.isFinite(Number(s.day)) && typeof s.time === 'string' && typeof s.location === 'string' && (s.tf == null || (isRec(s.tf) && isRec(s.tf.influence) && (s.tf.traits == null || Array.isArray(s.tf.traits))));
+  const okSnapshotMemory = (m) => isRec(m) && Array.isArray(m.events) && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && (m.summary == null || typeof m.summary === 'string');
+  const restorable = (t) => !!(t && !t._trimmed && okSnapshotState(t.stateBefore) && okSnapshotMemory(t.memBefore) && (t.pendingBefore == null || Array.isArray(t.pendingBefore)));
   const notRestorableMsg = () => 'This turn can no longer be undone or regenerated: only the last ' + UNDO_DEPTH + ' turns keep the history needed to step back.';
   let timerId = null;
   function startTimer(t0) { stopTimer(); timerId = setInterval(() => { const s = Math.round((performance.now() - t0) / 1000); $('#elapsed').textContent = s + ' s'; if (s === 150) setStatus('Still waiting for the first word after 150 s. You can Stop and try again.', true); }, 1000); $('#elapsed').textContent = '0 s'; $('#elapsed').hidden = false; }
@@ -1831,21 +1835,28 @@
       if (summaryDirty && !(await saveSummary())) return;
       if (await syncFromStore()) return;
       if (!restorable(adv.turns[adv.turns.length - 1])) { setStatus(notRestorableMsg(), true); return; }
+      const keep = { state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
       const last = adv.turns.pop();
       adv.state = clone(last.stateBefore); adv.memory = clone(last.memBefore); adv.pendingNotes = (last.pendingBefore || []).slice();
-      renderAll(); await persist({ removedTurn: true });
+      // A restored snapshot that still cannot be shown is put back rather than left half-applied.
+      try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
+      catch (e) { adv.turns.push(last); adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not undo this turn: its saved history is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+      await persist({ removedTurn: true });
     } finally { actionDispatching = false; }
   }
   async function usePreviousVersion(turnId) {
     const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
     if (await syncFromStore()) return;
     if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
+    const keep = { alts: t.alts.slice(), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
     const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
     prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
     adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
     adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...(prev.events || [])); adv.memory.beats.push(...(prev.beats || [])); adv.memory.facts.push(...(prev.facts || []));
     adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
-    renderAll(); await persist();
+    try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
+    catch (e) { t.alts = keep.alts; adv.turns[adv.turns.length - 1] = t; adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not switch to the previous version: it is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+    await persist();
   }
 
   // ---------- persistence ----------
