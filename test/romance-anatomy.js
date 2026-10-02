@@ -36,7 +36,9 @@ async function main() {
     assert.match(prompt, /Body detail \(binding\)/, 'scene-specific anatomical guidance must reach the narrator');
     assert.match(prompt, /Do not replace a named feature with generic warmth or euphemism/, 'established anatomy must not be euphemized');
     assert.match(prompt, /Narrative length:.*640 words/i, 'the rich scene band must be enforced for romance');
-    assert(await h.turn('I read the program quietly'), 'ordinary turn did not finish');
+    assert(await h.turn('I read the program quietly in the huge courtyard'), 'ordinary turn did not finish');
+    assert.doesNotMatch(prompts[1], /Romance scene pacing \(binding\)/,
+      'ordinary words containing romance roots must not trigger romance pacing');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');

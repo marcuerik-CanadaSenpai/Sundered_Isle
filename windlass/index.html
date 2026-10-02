@@ -1281,7 +1281,7 @@
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
   function isRomanceScene(input) {
     const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
-    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug\w*|hold(?:ing)? hands|intimat\w*|tender\w*|court\w*|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender\w*|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
   function transformationSceneActive() {
     return !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||

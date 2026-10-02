@@ -19,4 +19,4 @@ The full-name guard rejects an intro that omits any part of the roommate's name 
 
 ## Test commands
 
-From `test/`, run `npm ci`, then `npm run smoke`, `npm run turns`, `npm run review-regressions`, `npm run exposure-fallback`, `npm run name-matcher`, and `npm run schedule-precedence`. The differential scenarios are `review/verification/<finding>.js`; each compares `src` (published) with `main` (current build). The `*-challenge.js` scripts cover additional routes.
+From `test/`, run `npm ci`, then `npm run smoke`, `npm run turns`, `npm run review-regressions`, `npm run exposure-fallback`, `npm run name-matcher`, `npm run schedule-precedence`, and `npm run romance-anatomy`. The harness checks the scene-specific romance prompts, ordinary-scene density, and world anatomy guidance. The differential scenarios are `review/verification/<finding>.js`; each compares `src` (published) with `main` (current build). The `*-challenge.js` scripts cover additional routes.
