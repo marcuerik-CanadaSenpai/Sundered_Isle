@@ -713,10 +713,13 @@
     const pool = t.names[gender] || t.names[genders[0]];
     const typedName = String(c.rmName || '').trim();
     const name = typedName || (Array.isArray(pool) ? rand(pool) : pool);
+    // "replaces" drops a standalone cast member who is this same authored character; only safe when the roommate
+    // actually is them: the player kept the template's own name (the dialog prefills it) or typed that character's name or alias.
     const replacementKey = species && t.replaces && t.replaces[gender];
     const replacement = replacementKey && (W.characters || []).find((c) => c.key === replacementKey);
-    const replacementNames = (replacement ? [replacement.name].concat(replacement.aliases || []) : []).concat(Array.isArray(pool) ? pool : [pool]).map((nm) => String(nm || '').trim().toLowerCase());
-    const replaces = replacementKey && (!typedName || replacementNames.includes(typedName.toLowerCase())) ? replacementKey : null;
+    const knownNames = (Array.isArray(pool) ? pool : [pool]).concat(replacement ? [replacement.name].concat(replacement.aliases || []) : []).map((nm) => String(nm || '').trim().toLowerCase());
+    const keptTemplateName = !typedName || knownNames.includes(typedName.toLowerCase());
+    const replaces = replacementKey && keptTemplateName ? replacementKey : null;
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
     const race = species ? speciesRace(W, species) : cap(typed);
     return { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender, pronouns: g.pronouns, name, first: name.split(' ')[0], last: name.split(' ').slice(1).join(' '), replaces, brief: t.brief, sheet: t.sheet, where: t.where, aims: t.aims, attitude: t.attitude == null ? 5 : t.attitude, intro: t.intro, aliases: [name.split(' ')[0]] };
@@ -1311,13 +1314,16 @@
   // What is still human: each settled change takes fifteen points; the trials answer only above the line. The Spa gives it back.
   const HUMANITY_LINE = 40;
   function humanity(S) { const settled = ((S.tf && S.tf.traits) || []).filter((t) => t.settled !== false).length; return Math.max(0, 100 - 15 * settled); }
-  function gmBlock(S, first) {
+  // lean (near the prompt cap): the passing oddities are left out, and partial knowledge is kept only for people in the scene.
+  function gmBlock(S, first, lean) {
     const out = []; const sec = W.secrets || {}; const found = dungeonsFound(S), cleared = dungeonsCleared(S);
+    const inScene = (k) => { const c = charByKey(k); return !!c && S.present.some((pn) => String(pn).toLowerCase().includes(String(c.first || c.name.split(' ')[0]).toLowerCase())); };
     if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (each settled change takes fifteen; the Spa restores it). ' + (h >= HUMANITY_LINE ? 'Above the line of ' + HUMANITY_LINE + ': the closed places will answer.' : 'Below the line of ' + HUMANITY_LINE + ': no closed place will open and no guardian can be faced until the Spa has given enough back; the doors simply stay shut, and nobody says why.')); }
     if (sec.rule) out.push(fill(sec.rule));
-    if (sec.hints && sec.hints.length) out.push('Oddities that may surface in passing, at most one every few turns, never explained:\n' + sec.hints.map((h) => '- ' + fill(h)).join('\n'));
+    if (!lean && sec.hints && sec.hints.length) out.push('Oddities that may surface in passing, at most one every few turns, never explained:\n' + sec.hints.map((h) => '- ' + fill(h)).join('\n'));
     if (sec.keeper) { const c = charByKey(sec.keeper.key); out.push('The keeper: ' + (c ? c.name : sec.keeper.key) + ' ' + fill(sec.keeper.text)); }
-    if (sec.partial) out.push('Partial knowledge held by particular people; they let it slip only when pressed by someone they trust:\n' + Object.keys(sec.partial).map((k) => { const c = charByKey(k); return '- ' + (c ? c.name : k) + ' ' + fill(sec.partial[k]); }).join('\n'));
+    const partialKeys = sec.partial ? Object.keys(sec.partial).filter((k) => !lean || inScene(k)) : [];
+    if (partialKeys.length) out.push('Partial knowledge held by particular people; they let it slip only when pressed by someone they trust:\n' + partialKeys.map((k) => { const c = charByKey(k); return '- ' + (c ? c.name : k) + ' ' + fill(sec.partial[k]); }).join('\n'));
     if (W.dungeons) out.push('The seven closed places. Set flags.dungeon_<key>_found the turn ' + first + ' gets inside, and flags.dungeon_<key>_cleared the turn the trial is passed and the guardian faced. Until found, a place is only a location and a rumour:\n' + W.dungeons.map((d) => {
       const f = S.flags['dungeon_' + d.key + '_found'], c = S.flags['dungeon_' + d.key + '_cleared'];
       if (c) return '- ' + d.sin + ' (key ' + d.key + '), ' + d.name + ' [passed]: ' + fill(d.where) + '. Its guardian has been faced and what it held is in <discovered>.';
@@ -1391,7 +1397,7 @@
     parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
     if (W.secrets || W.dungeons) {
-      parts.push(x('gm_only', gmBlock(S, p.first), 'note="for the narrator alone; no character knows this unless it says so; never stated in narration"'));
+      parts.push(x('gm_only', gmBlock(S, p.first, L.gmLevel === 'lean'), 'note="for the narrator alone; no character knows this unless it says so; never stated in narration"'));
       const cleared = dungeonsCleared(S);
       if (cleared.length) parts.push(x('discovered', cleared.map((d) => '- From ' + d.name + ': ' + fill(d.fragment)).join('\n'), 'note="known to ' + esc(p.first) + '; may be spoken of"'));
     }
@@ -1410,8 +1416,9 @@
     if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
     const recentChars = limits && limits.recentChars, olderChars = limits && limits.olderRecentChars;
     // Near the cap the older verbatim turns keep only their tail (olderRecentChars) before any turn is dropped; later every turn does (recentChars).
-    const recentNarr = (t, isLast) => { let n = t.narrative; if (!isLast && olderChars && n.length > olderChars) n = '[…] ' + n.slice(-olderChars).replace(/^\S*\s+/, ''); if (recentChars && n.length > recentChars) n = n.slice(-recentChars); return n; };
-    parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (olderChars ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
+    let abridgedOlder = false;
+    const recentNarr = (t, isLast) => { let n = t.narrative; if (!isLast && olderChars && n.length > olderChars) { n = '[…] ' + n.slice(-olderChars).replace(/^\S*\s+/, ''); abridgedOlder = true; } if (recentChars && n.length > recentChars) n = n.slice(-recentChars); return n; };
+    parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (abridgedOlder ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
     const actionLines = ['Player action: ' + turnInput.action];
     const named = focusedNames;
     if (named.length) actionLines.push('Focus: the action names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action invites it.');
@@ -1425,14 +1432,14 @@
       const d6 = turnInput.roll.d6;
       const totals = Object.keys(st).map((k) => k + ' ' + (d6 + st[k])).join(', ');
       const skillTotals = W.skills ? '; skills, for magic and craft: ' + Object.keys(W.skills).map((k) => k + ' ' + (d6 + skillLevel((S.skills || {})[k]))).join(', ') : '';
-      actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total and the outcome from the table, do not recompute them; the engine checks them against these numbers, and the narrative must show the outcome the table gives, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
+      actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
     }
     actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + band[0] + ' to ' + band[1] + ' when the scene earns it, and shorter whenever ' + p.first + ' reaches a choice sooner' + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. Stop at the first moment ' + p.first + ' would speak or choose.');
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
       'Reply with only one JSON object and nothing else, no code fence. Inside every string, escape double quotes as \\" and write paragraph breaks as \\n; never put a raw line break inside a string. Fields, in this order:',
-      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the dice table gives for that total, "reason": one sentence},',
+      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the outcome rule gives for that total against the difficulty, "reason": one sentence},',
       '"narrative": string, at most ' + band[1] + ' words, second person present tense, ending at the first moment ' + p.first + ' would speak or choose' + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
       '"suggested_actions": exactly three strings, 12 words or fewer each: plausible things ' + p.first + ' would actually consider doing next, given who ' + p.first + ' is (<player>) and what just happened (speak, ask, move, accept or refuse what was offered, leave, act); each doable at the exact moment and place where the narrative ends, with the people present then, never a moment already passed; no two alike in kind; nothing odd, whimsical or out of character,',
       '"secret_info": string, 60 words or fewer, facts the player does not yet know that follow from this turn,',
@@ -1640,23 +1647,26 @@
       // A label or code fence the model adds despite being asked not to is stripped; the summary itself is what is kept.
       const s = String(res.text || '').trim().replace(/^```[a-z]*\s*|\s*```$/g, '').replace(/^(?:new |updated )?summary\s*[:\-–]\s*/i, '').trim();
       const words = wc(s);
-      return { s, words, truncated: !!res.truncated, bad: !!res.truncated || words < 20 || words > 600 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s) };
+      return { s, words, limit: strict ? 250 : 300, truncated: !!res.truncated, bad: !!res.truncated || words < 20 || words > 600 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s) };
     };
     // A fold that comes back cut off, over 600 words or as a refusal is asked for once more with a tighter limit; so is one
     // the service failed on. A long summary that still will not condense is kept as it is rather than thrown away.
-    let r;
-    try { r = await ask(false); } catch (e) { if (e && (e.code === 'cancelled' || e.code === 'prompt_too_large')) throw e; r = await ask(true); }
-    if (r.bad) r = await ask(true);
+    // Only one retry in all: a service failure followed by an unusable strict reply gives up. No retry after a failure
+    // that took Claude access away (sample is cleared by then), nor straight after a rate limit or a refusal.
+    let r, retried = false;
+    const retry = () => { retried = true; return ask(true); };
+    try { r = await ask(false); } catch (e) { if (!sample || (e && (e.code === 'cancelled' || e.code === 'prompt_too_large' || e.code === 'rate_limited' || e.code === 'refused'))) throw e; r = await retry(); }
+    if (r.bad && !retried) r = await retry();
     if (r.bad) throw { code: 'invalid_summary', message: 'memory fold returned an unusable summary (' + (r.truncated ? 'cut off' : r.words + ' words') + ')' };
     M.summary = r.s; if (foldBeatsNow) M.beats = M.beats.slice(18); if (foldFactsNow) M.facts = M.facts.slice(20);
-    return 'folded ' + (foldBeatsNow ? '18 beats' : '') + (foldBeatsNow && foldFactsNow ? ' and ' : '') + (foldFactsNow ? '20 facts' : '') + ' into the summary' + (r.words > 300 ? ' (' + r.words + ' words, over the 300 asked for)' : '');
+    return 'folded ' + (foldBeatsNow ? '18 beats' : '') + (foldBeatsNow && foldFactsNow ? ' and ' : '') + (foldFactsNow ? '20 facts' : '') + ' into the summary' + (r.words > r.limit ? ' (' + r.words + ' words, over the ' + r.limit + ' asked for)' : '');
   }
 
   // ---------- turn ----------
   // Runs the engine on a parsed reply: validation, clamps, clock, progression, memory, turn record. Shared by live turns and overrides.
   async function commitReply(data, input, ctx) {
     const { stateBefore, memBefore, pendingBefore, notes, regen, raw, tierApplied, timing, truncated, allowFit } = ctx;
-    if ((ctx.mine || ctx.ownerAdv) && adv !== (ctx.mine || ctx.ownerAdv)) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
+    if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     const band = ctx.band || wordBand();
     const { out, notes: n2 } = normaliseReply(data); notes.push(...n2);
     for (const inferred of actionExposures(input.action)) {
@@ -1676,7 +1686,7 @@
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
-    if ((ctx.mine || ctx.ownerAdv) && adv !== (ctx.mine || ctx.ownerAdv)) throw { code: 'stale', message: 'A different adventure was loaded while this turn was being prepared; the reply was discarded.' };
+    if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     const state = clone(adv.state);
     const applied = applyUpdates(state, out.updates, stateBefore); notes.push(...applied.notes);
     const metNow = recordMet(state, out.kindsMet); if (metNow.length) { notes.push('kinds met: ' + metNow.join(', ')); applied.diff.push({ path: 'met', from: '', to: metNow.map(kindLabel).join(', ') }); }
@@ -1726,37 +1736,42 @@
       stateBefore = clone(adv.state); memBefore = clone(adv.memory); pendingBefore = (adv.pendingNotes || []).slice();
       input.band = sceneBand(input);
       built = buildPrompt(input);
-      // Stay under the runtime's 64 KiB input cap: shorten the timeline and the older beats first, then the verbatim
-      // window, then the lore and style examples, and finally the recent turns' own text — each stage re-measured, so a
-      // pathologically long single turn cannot fall through every stage still oversized and get sent to the runtime anyway.
+      // Stay under the runtime's 64 KiB input cap by shedding in stages, each re-measured, so a pathologically long single
+      // turn cannot fall through every stage still oversized and get sent to the runtime anyway.
       let guard = null;
+      const setWin = Math.max(1, Number(adv.settings.window) || 3);
       const fits = () => new TextEncoder().encode(built.prompt).length <= 63000;
       // First what the story misses least: fewer timeline lines and older beats, one style example, a smaller lore budget,
       // one-line sheets for people who are not in the scene, then the older verbatim turns abridged to their tail ends.
       // Only after that are verbatim turns dropped, and only at the very end is anything cut that normally goes whole.
+      // A stage whose window is wider than the player's own setting is skipped: it would only repeat the stage before it.
       for (const lim of [
         { events: 20, earlier: 12 },
         { events: 20, earlier: 12, exemplars: 1 },
         { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000 },
         { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean' },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', olderRecentChars: 2500 },
-        { events: 10, earlier: 6, exemplars: 1, loreBudget: 3000, castLevel: 'lean', olderRecentChars: 1500 },
-        { window: 3, events: 10, earlier: 6, exemplars: 1, loreBudget: 3000, castLevel: 'lean', olderRecentChars: 900 },
-        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 3000, castLevel: 'lean', olderRecentChars: 1500 },
-        { window: 1, events: 10, earlier: 6, exemplars: 1, loreBudget: 3000, castLevel: 'lean' },
-        { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true, castLevel: 'lean' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', recentChars: 6000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', recentChars: 2000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
-        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
-      ]) { if (fits()) break; built = buildPrompt(input, lim); guard = lim; }
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', gmLevel: 'lean' },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean' },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 2500 },
+        { events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500 },
+        { window: 3, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900 },
+        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500 },
+        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900 },
+        { window: 1, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean' },
+        { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean' },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000 },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000 },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
+      ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
-        guard.window ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
+        guard.window && guard.window < setWin ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
         'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats',
         guard.exemplars ? 'one style example' : '',
         guard.noLore ? 'lore dropped' : (guard.loreBudget ? 'lore budget ' + guard.loreBudget + ' characters' : ''),
         guard.castLevel === 'brief' ? 'character sheets clipped to a line' : (guard.castLevel === 'lean' ? 'full sheets only for people in the scene' : ''),
+        guard.gmLevel === 'lean' ? 'narrator-only secrets trimmed' : '',
         guard.olderRecentChars ? 'older verbatim turns abridged to their last ' + guard.olderRecentChars + ' characters' : '',
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
         guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
@@ -1952,7 +1967,7 @@
     try {
       if (await syncFromStore()) return;
       if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
-      const keep = { alts: t.alts.slice(), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
+      const keep = { alts: clone(t.alts), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };   // deep: prev is mutated below
       const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
       prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
       adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
@@ -1974,7 +1989,9 @@
   // So each save carries a revision number; before writing, and whenever the page comes back into view, the store is checked
   // and a newer save is reloaded instead of overwritten.
   // dirty: this page holds a change the store does not (a refused or failed save); loadingAdv: a Continue from Adventures is still loading
-  let syncing = false, dirty = false, loadingAdv = false;
+  let syncing = false, dirty = false, loadingAdv = false, deletingAdv = false;
+  // Why the page is refusing an action while it is held.
+  const busyMsg = () => deletingAdv ? 'An adventure is being removed.' : loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.';
   async function newerInStore() {
     if (!db || !adv || !adv.id) return null;
     const snap = await db.doc('adventures/' + adv.id).get();
@@ -2000,7 +2017,7 @@
   }
   function offerConflict(n) {
     setStatus('This adventure was saved from another device after this page last saved (' + n.turnCount + ' turns there, ' + adv.turns.length + ' here). Load that save, or overwrite it with this page\'s version?', true, [
-      { label: 'Load the newer save', run: async () => { try { const warning = await loadAdventure(adv.id); dirty = false; setStatus(warning || 'Loaded the newer save.'); } catch (e) { setStatus('Could not load it: ' + ((e && e.code) || (e && e.message)), true); } } },
+      { label: 'Load the newer save', run: async () => { try { const warning = await loadAdventure(adv.id); dirty = false; setStatus('Loaded the newer save.' + (warning ? ' ' + warning : ''), !!warning); } catch (e) { setStatus('Could not load it: ' + ((e && e.code) || (e && e.message)), true); } } },
       { label: 'Overwrite with this page', run: () => overwriteStore() }
     ]);
   }
@@ -2208,7 +2225,7 @@
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
           '<span class="acts"><button data-act="open"' + (WORLDS[aw] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
-        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus(loadingAdv ? 'An adventure is already loading.' : 'A turn is already running.', true); return; }
+        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus(busyMsg(), true); return; }
           // Until the load lands, the page is held as it is during a turn: every control that changes or saves the adventure is off.
           loadingAdv = true; busy = true; setBusyUI(true); $('#stop').hidden = true; setStatus('loading…');
           try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning || '', !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); }
@@ -2216,7 +2233,7 @@
         };
         row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
           if (!t) return;
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+          if (busy) { setStatus(busyMsg(), true); return; }
           if (isCur) { adv.title = t; const saved = await persist(); if (saved) setStatus('Adventure renamed.'); }
           else {
             const ref = db.doc('adventures/' + a.id), s = await ref.get();
@@ -2227,23 +2244,30 @@
         });
         row.querySelector('[data-act="copy"]').onclick = () => inlineConfirm(row, 'Title for the copy', a.title + ' (copy)', async (t) => {
           if (!t) return;
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+          if (busy) { setStatus(busyMsg(), true); return; }
           const newId = uid('adv'); const stamp = Date.parse(adv.updatedAt || new Date().toISOString());
           const updatedAt = new Date((Number.isFinite(stamp) ? stamp : Date.now()) - 1).toISOString();
           await persistAll(newId, { title: t, updatedAt, cleanupOnFailure: true });
           setStatus('Saved a copy: ' + t); listAdventures();
         });
         row.querySelector('[data-act="delete"]').onclick = () => inlineConfirm(row, 'Remove "' + a.title + '" for good?', null, async () => {
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
-          const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
-          for (const c of chunks.docs) await db.doc('adventures/' + a.id + '/turns/' + c.id).delete();
-          try { const fl = await db.collection('adventures/' + a.id + '/failures').limit(100).get(); for (const c of fl.docs) await db.doc('adventures/' + a.id + '/failures/' + c.id).delete(); } catch (e) {}
-          await db.doc('adventures/' + a.id).delete();
-          if (isCur) {
-            let left = null; try { left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { left = null; }
-            if (left && !left.empty) await loadAdventure(left.docs[0].id);
-            else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
-          }
+          if (busy) { setStatus(busyMsg(), true); return; }
+          // The page is held for the whole removal, as it is for a load: nothing can open or save this adventure while its
+          // blocks and document are being deleted.
+          deletingAdv = true; busy = true; setBusyUI(true); $('#stop').hidden = true; setStatus('removing…');
+          try {
+            const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
+            for (const c of chunks.docs) await db.doc('adventures/' + a.id + '/turns/' + c.id).delete();
+            try { const fl = await db.collection('adventures/' + a.id + '/failures').limit(100).get(); for (const c of fl.docs) await db.doc('adventures/' + a.id + '/failures/' + c.id).delete(); } catch (e) {}
+            await db.doc('adventures/' + a.id).delete();
+            setStatus('');
+            if (isCur) {
+              let left = null; try { left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { left = null; }
+              if (left && !left.empty) await loadAdventure(left.docs[0].id);
+              else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
+            }
+          } catch (e) { setStatus('Could not remove that adventure: ' + ((e && e.message) || 'error'), true); }
+          finally { deletingAdv = false; busy = false; setBusyUI(false); try { renderAll(); } catch (e2) {} }
           listAdventures();
         });
         el.appendChild(row);
@@ -2281,7 +2305,7 @@
     } finally { $('#exportAdv').disabled = false; }
   }
   async function importFile(file) {
-    if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+    if (busy) { setStatus(busyMsg(), true); return; }
     const oldAdv = adv, oldWorldId = W.id;
     busy = true; setBusyUI(true); $('#stop').hidden = true;   // an import swaps and saves the open adventure: hold the page meanwhile
     try {
