@@ -8,6 +8,7 @@
     "turns": "node turnsmoke.js",
     "review-regressions": "node review-regressions.js",
     "romance-anatomy": "node romance-anatomy.js",
+    "schedule-precedence": "node schedule-precedence.js",
     "name-matcher": "node name-matcher.js",
     "long-game": "node probe2.js",
     "import-export": "node probe3.js",
