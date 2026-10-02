@@ -641,6 +641,9 @@
     const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '. ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
     const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
+    // A drawn or typed name that is an authored character's means the roommate is that person: they are not listed twice.
+    const twin = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((nm) => String(nm || '').trim().toLowerCase() === p.name.trim().toLowerCase()));
+    if (twin) r.replaces = twin.key;
     r.intro = composeIntro(r);
     return r;
   }
@@ -1279,15 +1282,22 @@
     return out;
   }
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
+  function isRomanceScene(input) {
+    const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
+    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug\w*|hold(?:ing)? hands|intimat\w*|tender\w*|court\w*|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+  }
+  function transformationSceneActive() {
+    return !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
+      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+  }
   function isTransition(input) {
     const a = String(input.action || '').trim();
     return /^(i\s+)?(go|walk|head|return|leave|unpack|sleep|go to bed|lie down|wait|follow|sit|get up|wake|eat|shower|wash|dress|take the stairs|climb|cross)\b/i.test(a) && wc(a) <= 9 && !input.director && !input.rewrite;
   }
   function sceneDensity(input) {
     const a = String(input.action || '');
-    const romance = /\b(date|romance|romantic|flirt|confess|kiss|kissing|kissed|cuddle|cuddling|cuddled|embrace|embraced|hug|hugged|hold hands|holding hands|intimate|tender|court|courtship|love|sleep with|share a bed|ask .{0,20} out|slow dance|affection)\b/i.test(a);
-    const tf = !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
-      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+    const romance = isRomanceScene(input);
+    const tf = transformationSceneActive();
     const firstMeeting = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i.test(a) &&
       activeCharacters().some((c) => {
         const names = [c.first, c.name].concat(c.aliases || []).filter(Boolean);
@@ -1299,7 +1309,9 @@
   }
   // Auto keeps transitions concise and reserves the richest band for romance, first meetings and active changes.
   function sceneBand(input) {
-    const density = adv.settings.density === 'auto' ? sceneDensity(input) : adv.settings.density;
+    const preferred = sceneDensity(input);
+    const density = adv.settings.density === 'auto' ? preferred :
+      ((isRomanceScene(input) || transformationSceneActive()) ? 'rich' : adv.settings.density);
     input.sceneDensity = density;
     let [lo, hi] = (W.wordBands || {})[density] || wordBand();
     if (isTransition(input) && density !== 'rich') hi = lo + Math.round((hi - lo) * 0.45);
@@ -1453,6 +1465,8 @@
     if (turnInput.director) actionLines.push('Director note (binding): ' + turnInput.director);
     if (turnInput.rewrite) actionLines.push('Regeneration note (binding, for this rewrite only): ' + turnInput.rewrite);
     if (adv.settings.testNote) actionLines.push('Test instruction (binding): ' + adv.settings.testNote);
+    if (isRomanceScene(turnInput)) actionLines.push('Romance scene pacing (binding): use the rich scene band, give the requested closeness one specific reciprocal beat at a time, and render the actual sequence of gesture, response, pause, dialogue and relevant physical sensation rather than summarizing it as warmth or skipping ahead. Describe established bodies and the contact between them with calm, concrete anatomical detail; anatomy is not inherently sexual. Do not decide the player\'s desire, feelings or next action. If the request reaches sex, finish the non-explicit romantic lead-in and fade to black at that boundary; do not depict sex or append a morning-after/time-skip in this turn.');
+    if (isRomanceScene(turnInput) || transformationSceneActive()) actionLines.push('Body detail (binding): where touch or change makes anatomy relevant, use the exact visible/contacting features and their location, movement, texture and practical effect as established in <characters>, <lore> and <transformation>. Do not replace a named feature with generic warmth, hide it behind a euphemism, or invent structures or functions absent from those sources.');
     if (turnInput.roll && turnInput.roll.d6) {
       const D = W.difficulty; const st = p.stats;
       // The totals are worked out here, so the narrator reads the outcome off a table instead of adding and comparing itself.
@@ -1740,7 +1754,7 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = clone(adv.memory); } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
@@ -1897,7 +1911,7 @@
   function trimTurnHistory(t) {
     if (t._trimmed) return false;
     t.stateBefore = trimState(t.stateBefore); t.stateAfter = trimState(t.stateAfter);
-    t.memBefore = null; t.pendingBefore = null; t.alts = [];
+    t.memBefore = null; t.memAfter = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
     return true;
   }
@@ -1941,6 +1955,8 @@
       const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
+      // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
+      if (!properWordIn(text, r.first) && !properWordIn(text, r.name)) throw new Error('the roommate is not named');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
       adv.opening.narrative = openingNarrative(text); adv.opening.introWritten = true; adv.roommate.intro = text;
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
@@ -2229,6 +2245,9 @@
       const last = recoveredTail[recoveredTail.length - 1];
       adv.state = clone(last.stateAfter);
       let replayFrom = recoveredTail.length;
+      // memAfter is the fold's result (summary, beats, facts) recorded on the turn that folded; an older save may hold a
+      // whole memory there. Replay starts from the newest usable memory and applies each turn's events and any fold.
+      const foldRecord = (m) => record(m) && typeof m.summary === 'string' && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && !Array.isArray(m.events);
       for (let i = recoveredTail.length - 1; i >= 0; i--) {
         if (validMemory(recoveredTail[i].memAfter)) { adv.memory = clone(recoveredTail[i].memAfter); replayFrom = i + 1; break; }
         if (validMemory(recoveredTail[i].memBefore)) { adv.memory = clone(recoveredTail[i].memBefore); replayFrom = i; break; }
@@ -2241,6 +2260,7 @@
         if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
         if (Array.isArray(turn.beats)) adv.memory.beats.push(...turn.beats);
         if (Array.isArray(turn.facts)) adv.memory.facts.push(...turn.facts);
+        if (foldRecord(turn.memAfter)) { adv.memory.summary = turn.memAfter.summary; adv.memory.beats = clone(turn.memAfter.beats); adv.memory.facts = clone(turn.memAfter.facts || []); }
       }
       if (Array.isArray(last.pendingAfter)) adv.pendingNotes = clone(last.pendingAfter);
     }
