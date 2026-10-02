@@ -2344,6 +2344,7 @@
       if (!record(a.memory) || (a.memory.events != null && !Array.isArray(a.memory.events)) || (a.memory.beats != null && !Array.isArray(a.memory.beats)) || (a.memory.facts != null && !Array.isArray(a.memory.facts)) || (a.memory.summary != null && typeof a.memory.summary !== 'string')) throw new Error('save memory is incomplete');
       if ((a.player != null && !validPlayer(a.player)) || (a.roommate != null && (!record(a.roommate) || !record(a.roommate.pronouns))) || (a.opening != null && !record(a.opening)) || (a.cast != null && !record(a.cast))) throw new Error('save character data is invalid');
       if (a.settings != null && !record(a.settings)) throw new Error('save settings are invalid');
+      if (a.turnCount != null && (!Number.isInteger(a.turnCount) || a.turnCount < 0)) throw new Error('save turn count is invalid');
       const turns = p.turns == null ? [] : p.turns;
       if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
       const settings = normaliseSettings(clone(a.settings || {}));
@@ -2352,6 +2353,10 @@
       if (next.memory.summary == null) next.memory.summary = '';
       const hadDuplicateNumbers = new Set(next.turns.map((t) => t.n)).size !== next.turns.length;
       const renumbered = orderTurns(next.turns); cleanAlts(next.turns);
+      const declaredTurnCount = a.turnCount == null ? null : a.turnCount;
+      const staleTurnCount = declaredTurnCount == null ? 0 : Math.max(0, next.turns.length - declaredTurnCount);
+      const missingTurnCount = declaredTurnCount == null ? 0 : Math.max(0, declaredTurnCount - next.turns.length);
+      if (staleTurnCount) next.turns.length = declaredTurnCount;
       if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
       next.memory.facts = next.memory.facts || [];
       // Imported turns may predate the history-trimming fix (every turn still carrying its full memBefore/pendingBefore/alts);
@@ -2362,7 +2367,8 @@
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
-      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? (hadDuplicateNumbers ? ' Turn numbers were repaired in chronological order because duplicates were present.' : ' Turn numbers were repaired in saved order.') : ''), !!renumbered);
+      const countWarning = staleTurnCount ? ' Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record.' : missingTurnCount ? ' The save record expected ' + declaredTurnCount + ' turns, but only ' + next.turns.length + ' were available.' : '';
+      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? (hadDuplicateNumbers ? ' Turn numbers were repaired in chronological order because duplicates were present.' : ' Turn numbers were repaired in saved order.') : '') + countWarning, !!(renumbered || staleTurnCount || missingTurnCount));
     } catch (e) {
       adv = oldAdv; setWorld(oldWorldId);
       setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);

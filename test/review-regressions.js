@@ -174,6 +174,42 @@ async function checkStaleChunkRecovery() {
   }
 }
 
+async function checkStaleImportRecovery() {
+  const h = await startAdventure();
+  try {
+    useTurnHandler(h);
+    for (let i = 1; i <= 21; i++) assert(await h.turn('Imported turn ' + i), 'turn did not finish: ' + i);
+    const [, mainEntry] = adventureEntry(h);
+    const adventure = JSON.parse(JSON.stringify(mainEntry.data));
+    adventure.turnCount = 10;
+    const payload = JSON.stringify({ format: 'windlass-save-1', world: { id: adventure.worldId }, adventure, turns: turnsIn(h, adventure.id) });
+
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle before import');
+    const input = h.$('#importFile');
+    Object.defineProperty(input, 'files', {
+      value: [new h.window.File([payload], 'stale-history.json', { type: 'application/json' })],
+      configurable: true
+    });
+    input.dispatchEvent(new h.window.Event('change', { bubbles: true }));
+    assert(await h.settle(100, 8000), 'importing the stale-history save did not finish');
+    assert.deepEqual(visibleActions(h), Array.from({ length: 10 }, (_, i) => 'Imported turn ' + (i + 1)));
+    assert.match(h.$('#status').textContent, /Ignored 11 stale turns beyond the save record/);
+
+    const [importedPath, importedEntry] = [...h.mock.store.entries()].find(([path, entry]) => /^adventures\/[^/]+$/.test(path) && entry.data.title.endsWith('(imported)'));
+    assert(importedEntry, 'the imported adventure was not persisted');
+    const importedId = importedPath.split('/')[1];
+    assert.equal(importedEntry.data.turnCount, 10);
+    assert.deepEqual(turnsIn(h, importedId).map((turn) => turn.action), Array.from({ length: 10 }, (_, i) => 'Imported turn ' + (i + 1)));
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
 async function checkGeneratedRoommateReplacement() {
   const h = await startAdventure();
   try {
@@ -210,6 +246,7 @@ async function checkGeneratedRoommateReplacement() {
   await checkInferenceAndCompaction();
   await checkDuplicateChronology();
   await checkStaleChunkRecovery();
+  await checkStaleImportRecovery();
   await checkGeneratedRoommateReplacement();
   console.log('review regressions passed');
 })().catch((error) => {
