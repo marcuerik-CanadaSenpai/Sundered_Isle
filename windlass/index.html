@@ -2017,7 +2017,9 @@
       // trimmed turn gets one too: after a second Undo it is newest and holds no memory of its own.
       const prev = adv.turns[adv.turns.length - 1];
       // Its after-state is the undone turn's before-state; a trimmed turn gets the whole of it back, so a recovery can restore from it.
-      if (prev && last.stateBefore) prev.stateAfter = clone(last.stateBefore);
+      // It is no longer marked trimmed, so the whole after-state is trimmed again once the turn falls out of Undo's reach; it
+      // still cannot be undone itself (its before-state and memory stay trimmed, which restorable() checks).
+      if (prev && last.stateBefore) { prev.stateAfter = clone(last.stateBefore); delete prev._trimmed; }
       if (prev && last.memBefore) prev.memAfter = { summary: last.memBefore.summary || '', beats: clone(last.memBefore.beats || []), facts: clone(last.memBefore.facts || []) };
       await persist({ removedTurn: true });
     } finally { actionDispatching = false; }
@@ -2209,7 +2211,7 @@
   function cleanAlts(turns) {
     for (const t of turns) {
       t.alts = Array.isArray(t.alts) ? t.alts.filter((a) => validAlt(a, t)) : [];
-      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
+      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.memAfter; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
       t.alts = capAlts(t.alts);
     }
   }
@@ -2299,7 +2301,7 @@
     const warnings = [];
     if (recoveredTail.length && !renumbered) warnings.push('Recovered ' + recoveredTail.length + ' complete saved turn' + (recoveredTail.length === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save' + (recoverySaveFailed ? '; retry the save to sync it' : '') + '.');
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
-    if (unrecoverable) warnings.push(unrecoverable + ' newer saved turn' + (unrecoverable === 1 ? ' was' : 's were') + ' found ahead of the adventure record but could not be recovered (the newest of them kept too little of its state), so the game opens at the last turn the record knows. Export a backup before continuing if you want to keep the save as it is.');
+    if (unrecoverable) warnings.push(unrecoverable + ' newer saved turn' + (unrecoverable === 1 ? ' was' : 's were') + ' found ahead of the adventure record but could not be recovered (the newest of them kept too little of its state), so the game opens at the last turn the record knows. ' + (unrecoverable === 1 ? 'That turn is' : 'Those turns are') + ' not shown, Export will not include ' + (unrecoverable === 1 ? 'it' : 'them') + ', and taking a turn here replaces ' + (unrecoverable === 1 ? 'it' : 'them') + ' in the store.');
     else if (turnCountMismatch && !recoveredTail.length) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + expectedTurns + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);

@@ -2,6 +2,7 @@
 // 1. Fold at turn F, two more turns (F is trimmed), two Undos (F is newest again), then a reload from the record as it was
 //    after turn F-1: turn F and its folded summary must be recovered.
 // 2. A save whose newest turn ahead of the record is trimmed opens at the record's turns, with a warning, and plays on.
+// 3 and 4 are below.
 const { boot } = require('./boot');
 const J = (x) => JSON.parse(JSON.stringify(x));
 const copy = (store) => new Map([...store].map(([k, v]) => [k, J(v)]));
@@ -48,10 +49,36 @@ async function trimmedTail(fail) {
   if (h2.errors.length || h2.mock.violations.length) fail('trimmed tail: page errors or contract violations');
   h2.close();
 }
+// 3. After two Undos and two new turns, the turn whose after-state Undo restored is trimmed again (save size stays bounded).
+async function retrimAfterUndo(fail) {
+  const h = await newGame();
+  for (const a of ['One.', 'Two.', 'Three.']) await h.turn(a);
+  h.click('#undo'); await h.idle(10000); h.click('#undo'); await h.idle(10000);
+  await h.turn('Two again.'); await h.turn('Three again.');
+  const dk = advKey(h.mock.store); const t1 = turnsOf(h.mock.store, dk).find((t) => t.n === 1);
+  if (!t1 || !t1._trimmed || (t1.stateAfter && t1.stateAfter.items)) fail('re-trim: turn 1 kept its whole after-state after two Undos and two new turns');
+  if (h.errors.length || h.mock.violations.length) fail('re-trim: page errors or contract violations');
+  h.close();
+}
+// 4. A stored previous version that carries a fold record (from an older build) loses it on load, so the next save drops it.
+async function altRecordDropped(fail) {
+  const h = await newGame();
+  await h.turn('One.'); h.click('#regen'); await h.idle(20000);
+  const store = copy(h.mock.store); const dk = advKey(store); h.close();
+  const chunk = store.get(chunks(store, dk)[0]).data; const t1 = chunk.turns[0];
+  if (!t1.alts || !t1.alts.length) { fail('alt record: Regenerate kept no previous version'); return; }
+  t1.alts[0].memAfter = { summary: 'old fold', beats: ['x'], facts: [] };
+  const h2 = await boot({ setup(w, m) { m.store = store; } }); await h2.settle(150, 8000); await h2.idle(10000);
+  h2.click('#btnSettings'); h2.$('#setDensity').value = h2.$('#setDensity').value === 'rich' ? 'standard' : 'rich'; h2.$('#setDensity').dispatchEvent(new h2.window.Event('change')); await h2.idle(8000);
+  const alts = turnsOf(h2.mock.store, dk).flatMap((t) => t.alts || []);
+  if (alts.some((a) => a && a.memAfter)) fail('alt record: a stored previous version still carries a fold record after load and save');
+  if (h2.errors.length || h2.mock.violations.length) fail('alt record: page errors or contract violations');
+  h2.close();
+}
 (async () => {
   const failures = []; const fail = (m) => failures.push(m);
-  try { await twoUndos(fail); await trimmedTail(fail); } catch (e) { failures.push('threw: ' + ((e && e.stack) || e)); }
+  try { await twoUndos(fail); await trimmedTail(fail); await retrimAfterUndo(fail); await altRecordDropped(fail); } catch (e) { failures.push('threw: ' + ((e && e.stack) || e)); }
   if (failures.length) { console.error('UNDO RECOVERY FAILED\n- ' + failures.join('\n- ')); process.exit(1); }
-  console.log('undo recovery passed: two Undos then a stale record recover the folded turn; a trimmed tail opens with a warning');
+  console.log('undo recovery passed: two Undos then a stale record recover the folded turn; a trimmed tail opens with a warning; restored state is re-trimmed; old fold records leave previous versions');
   process.exit(0);
 })();
