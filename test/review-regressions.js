@@ -144,9 +144,72 @@ async function checkDuplicateChronology() {
   }
 }
 
+async function checkPromptAndStaleRecovery() {
+  const h = await startAdventure();
+  try {
+    useTurnHandler(h);
+    const [seedPath, seedEntry] = adventureEntry(h);
+    const seedId = seedPath.split('/')[1];
+    seedEntry.data.memory.facts = Array.from({ length: 100 }, (_, i) => 'Fact ' + i + ' ' + 'word '.repeat(120));
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle');
+    h.click('#reloadAdv');
+    assert(await h.settle(100, 8000), 'reloading seeded save did not finish');
+    assert(await h.turn('Prompt guard check turn'), 'prompt guard turn did not finish');
+    const seededTurns = turnsIn(h, seedId);
+    const seededLast = seededTurns[seededTurns.length - 1];
+    const guardNote = (seededLast.notes || []).find((n) => /prompt near the size cap:/.test(n));
+    assert(guardNote, 'oversized prompt should produce a guard note');
+    assert.match(guardNote, /transformation guidance compacted/, 'guard note should report compact transformation stage');
+    assert.match(guardNote, /facts budgeted by bytes/, 'guard note should report byte-budget facts stage');
+    h.click('#btnDebug');
+    const promptText = h.$('#dbgPrompt').textContent;
+    assert(!promptText.includes('Story thread:'), 'compact transformation stage should omit long story-thread guidance');
+    assert(promptText.includes('(earlier facts omitted to stay under the prompt size cap)'), 'facts byte budget should mark omitted older facts');
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+
+  const h2 = await startAdventure();
+  try {
+    useTurnHandler(h2);
+    for (let i = 1; i <= 12; i++) assert(await h2.turn('Recovery turn ' + i), 'turn did not finish: ' + i);
+    const [mainPath, mainEntry] = adventureEntry(h2);
+    const id = mainPath.split('/')[1];
+    const before = turnsIn(h2, id);
+    mainEntry.data.turnCount = 4;
+    mainEntry.data.memory = { summary: 'stale summary', events: ['old'], beats: ['old'], facts: ['old'] };
+    mainEntry.data.pendingNotes = ['old note'];
+
+    h2.click('#btnAdventures');
+    assert(await h2.settle(80, 4000), 'adventure list did not settle');
+    h2.click('#reloadAdv');
+    assert(await h2.settle(100, 8000), 'reloading stale save did not finish');
+    assert.match(h2.$('#status').textContent, /Recovered 12 saved turns from chunks, though the save record listed 4/);
+
+    const after = turnsIn(h2, id);
+    assert.equal(after.length, 12, 'reloaded save should keep all chunk turns');
+    assert.deepEqual(visibleActions(h2), Array.from({ length: 12 }, (_, i) => 'Recovery turn ' + (i + 1)));
+    const clock = h2.$('#clock').textContent;
+    assert(clock.includes('Day ' + before[before.length - 1].stateAfter.day), 'reloaded day should match the latest chunk turn state');
+    assert(clock.includes(before[before.length - 1].stateAfter.time), 'reloaded clock time should match the latest chunk turn state');
+
+    const diagnostics = h2.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h2.close();
+  }
+}
+
 (async () => {
   await checkInferenceAndCompaction();
   await checkDuplicateChronology();
+  await checkPromptAndStaleRecovery();
   console.log('review regressions passed');
 })().catch((error) => {
   console.error('REVIEW REGRESSIONS FAILED\n' + (error && error.stack || error));

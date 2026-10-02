@@ -1173,7 +1173,7 @@
   }
   // What the body is now, for the narrator: the anatomy of the changes complete (the finished shape once a kind has reached it),
   // the steps told so far of any change under way, and where a path has carried the body toward a woman's or a man's.
-  function bodyNowLines(tf, who) {
+  function bodyNowLines(tf, who, compact) {
     const T = W.transformation; const out = [];
     for (const k of Object.keys(T.species)) {
       const sp = T.species[k]; const n = tf.traits.filter((t) => t.species === k && t.settled !== false).length;
@@ -1188,23 +1188,35 @@
           const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex');
           if (st) told.push(...st.steps.slice(0, st.i));
         }
-        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.map(pf).join('; ') + '.');
+        if (told.length) {
+          const shown = compact ? told.slice(-2) : told;
+          parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + shown.map(pf).join('; ') + '.');
+        }
       }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
-      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + bt.steps.slice(0, bt.i).map(pf).join('; ') + '.');
+      if (bt && bt.i > 0) {
+        const steps = bt.steps.slice(0, bt.i);
+        const shown = compact ? steps.slice(-2) : steps;
+        parts.push('Under way (' + bt.trait + '), told so far: ' + shown.map(pf).join('; ') + '.');
+      }
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
     }
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
     return out;
   }
-  function transformationBlock(state) {
+  function transformationBlock(state, compact) {
     const T = W.transformation; if (!T) return '';
     ensureTf(state); const tf = state.tf; const who = firstName();
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + Object.keys(T.species).map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ') + '.');
     lines.push('Changes so far: ' + (tf.traits.length ? tf.traits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
-    const body = bodyNowLines(tf, who); if (body.length) lines.push(body.join('\n'));
+    const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
+    if (compact) {
+      lines.push('Report transformative contact this turn in "exposures" as {"species": one of ' + Object.keys(T.species).join('|') + ', "intensity": 1|2|3}; report each contact once in the turn it happens, not again while it continues. Keep established transformation details true; do not invent new bodily effects or identity changes.');
+      lines.push('Ladders of change for active kinds are in <lore>.');
+      return lines.join('\n');
+    }
     lines.push('Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
     lines.push('What raises influence:\n' + Object.keys(T.species).map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
@@ -1377,7 +1389,7 @@
     parts.push(x('rules', W.rules.map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
-    if (W.transformation) parts.push(x('transformation', transformationBlock(S)));
+    if (W.transformation) parts.push(x('transformation', transformationBlock(S, !!L.compactTransformation)));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
     const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
@@ -1411,8 +1423,27 @@
     parts.push(x('clock', clockLine(S) + '\n' + calendarLine(S), 'note="authoritative; the engine keeps the calendar"'));
     const summary = String(M.summary || ''); const summaryShown = (L.summaryChars && summary.length > L.summaryChars) ? '[…] ' + summary.slice(-L.summaryChars).replace(/^\S*\s+/, '') : summary;
     parts.push(x('summary', summaryShown || '(nothing yet)', 'note="the distant past, in brief' + (summaryShown !== summary ? '; only its most recent part (the prompt was near its size cap)' : '') + '"'));
-    const factsShown = L.facts != null ? (L.facts ? M.facts.slice(-L.facts) : []) : M.facts;
-    if (factsShown.length) parts.push(x('facts', factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f)).join('\n'), 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
+    let factsShown = L.facts != null ? (L.facts ? M.facts.slice(-L.facts) : []) : M.facts;
+    let omittedFacts = M.facts.length - factsShown.length;
+    if (L.factsBytes != null) {
+      const budget = Math.max(0, Number(L.factsBytes) || 0);
+      const kept = []; let used = 0;
+      for (let i = M.facts.length - 1; i >= 0; i--) {
+        const line = '- ' + (L.factChars ? clip(String(M.facts[i]), L.factChars) : String(M.facts[i]));
+        const bytes = new TextEncoder().encode(line + '\n').length;
+        if (used + bytes > budget) continue;
+        kept.push(line); used += bytes;
+      }
+      kept.reverse();
+      factsShown = kept.map((line) => line.slice(2));
+      omittedFacts = M.facts.length - factsShown.length;
+    }
+    if (factsShown.length || omittedFacts > 0) {
+      const lines = [];
+      if (omittedFacts > 0) lines.push('- (earlier facts omitted to stay under the prompt size cap)');
+      for (const f of factsShown) lines.push('- ' + (L.factChars ? clip(String(f), L.factChars) : String(f)));
+      parts.push(x('facts', lines.join('\n'), 'note="established facts that stay true; contradict none of them' + (omittedFacts > 0 ? '; older facts were omitted for size' : '') + '"'));
+    }
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
     if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
@@ -1764,9 +1795,10 @@
         { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean' },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000 },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
-        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000, compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, factsBytes: 9000, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief', compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, factsBytes: 3000, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000, compactTransformation: true },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, factsBytes: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000, compactTransformation: true }
       ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
         guard.window && guard.window < setWin ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
@@ -1777,7 +1809,8 @@
         guard.gmLevel === 'lean' ? 'narrator-only secrets trimmed' : '',
         guard.olderRecentChars ? 'older verbatim turns abridged to their last ' + guard.olderRecentChars + ' characters' : '',
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
-        guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
+        guard.compactTransformation ? 'transformation guidance compacted' : '',
+        guard.factsBytes != null ? 'facts budgeted by bytes (' + guard.factsBytes + '), summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
         guard.blockChars ? 'every other block cut to ' + guard.blockChars + ' characters' : ''
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
@@ -2172,11 +2205,27 @@
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
-    const turnCountMismatch = (d.turnCount || 0) !== turns.length;
+    const turnCountInDoc = d.turnCount || 0;
+    const turnCountMismatch = turnCountInDoc !== turns.length;
+    let recoveredFromChunks = false;
+    let recoveredState = clone(d.state), recoveredMemory = clone(d.memory), recoveredPending = clone(d.pendingNotes || []);
+    if (turns.length > turnCountInDoc && turns.length) {
+      const last = turns[turns.length - 1];
+      if (okSnapshotState(last.stateAfter) && okSnapshotMemory(last.memBefore)) {
+        const merged = clone(last.memBefore); merged.facts = merged.facts || [];
+        merged.events.push(...(Array.isArray(last.events) ? last.events : []));
+        merged.beats.push(...(Array.isArray(last.beats) ? last.beats : []));
+        merged.facts.push(...(Array.isArray(last.facts) ? last.facts : []));
+        recoveredState = clone(last.stateAfter);
+        recoveredMemory = merged;
+        recoveredPending = Array.isArray(last.pendingAfter) ? clone(last.pendingAfter) : recoveredPending;
+        recoveredFromChunks = true;
+      }
+    }
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
     // A renumbered save rewrites every chunk on its next save (the stored chunks still hold the repeated numbers).
-    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
+    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: recoveredState, memory: recoveredMemory, pendingNotes: recoveredPending, turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -2190,7 +2239,9 @@
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
     const warnings = [];
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
-    if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
+    if (turnCountMismatch) warnings.push(recoveredFromChunks
+      ? 'Recovered ' + turns.length + ' saved turn' + (turns.length === 1 ? '' : 's') + ' from chunks, though the save record listed ' + turnCountInDoc + '. The save record was stale; export a backup before continuing.'
+      : 'Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + turnCountInDoc + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
     return warning;
