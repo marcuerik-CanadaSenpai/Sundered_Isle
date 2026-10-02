@@ -1756,6 +1756,10 @@
     adv.turns.push(turn);
     if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
+    // Recovery reads a fold record only off the newest turn (an older one's successor carries the folded memory in its
+    // memBefore), so once this turn has committed the one before it gives its record up. A stopped or stale turn never
+    // reaches this line, so it leaves the previous turn as it was.
+    if (adv.turns.length > 1) delete adv.turns[adv.turns.length - 2].memAfter;
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
     // renderer and migration). Trimming the turn that has just dropped out of reach keeps a long adventure's stored turns
@@ -1956,7 +1960,8 @@
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
       // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
-      if (!properWordIn(text, r.first) && !properWordIn(text, r.name)) throw new Error('the roommate is not named');
+      const namedIn = (hay, nm) => { nm = String(nm || '').trim(); return !!nm && new RegExp('(^|[^\\p{L}\\p{M}])' + escRe(nm) + '(?![\\p{L}\\p{M}])', 'iu').test(hay); };
+      if (!namedIn(text, r.first) && !namedIn(text, r.name)) throw new Error('the roommate is not named');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
       adv.opening.narrative = openingNarrative(text); adv.opening.introWritten = true; adv.roommate.intro = text;
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
