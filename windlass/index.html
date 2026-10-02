@@ -1173,7 +1173,7 @@
   }
   // What the body is now, for the narrator: the anatomy of the changes complete (the finished shape once a kind has reached it),
   // the steps told so far of any change under way, and where a path has carried the body toward a woman's or a man's.
-  function bodyNowLines(tf, who) {
+  function bodyNowLines(tf, who, compact) {
     const T = W.transformation; const out = [];
     for (const k of Object.keys(T.species)) {
       const sp = T.species[k]; const n = tf.traits.filter((t) => t.species === k && t.settled !== false).length;
@@ -1188,27 +1188,35 @@
           const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex');
           if (st) told.push(...st.steps.slice(0, st.i));
         }
-        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.map(pf).join('; ') + '.');
+        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
-      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + bt.steps.slice(0, bt.i).map(pf).join('; ') + '.');
+      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
     }
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
     return out;
   }
-  function transformationBlock(state) {
+  function transformationBlock(state, compact) {
     const T = W.transformation; if (!T) return '';
     ensureTf(state); const tf = state.tf; const who = firstName();
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
-    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + Object.keys(T.species).map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ') + '.');
-    lines.push('Changes so far: ' + (tf.traits.length ? tf.traits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
-    const body = bodyNowLines(tf, who); if (body.length) lines.push(body.join('\n'));
-    lines.push('Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
+    const kinds = Object.keys(T.species);
+    const visibleTraits = compact ? tf.traits.filter((t) => t.settled === false).concat(tf.traits.filter((t) => t.settled !== false).slice(-3)) : tf.traits;
+    const influenceNow = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ') + (kinds.some((k) => !(tf.influence[k] || 0)) ? ' (unlisted kinds 0)' : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
+    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
+    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') + (visibleTraits.length < tf.traits.length ? '; earlier settled changes are reflected in the body summary' : '') : 'none') + '.');
+    const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
+    lines.push(compact
+      ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
+      : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
-    lines.push('What raises influence:\n' + Object.keys(T.species).map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
-    lines.push('Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+    const methodKinds = kinds;
+    lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
+    lines.push(compact
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep. Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1377,7 +1385,7 @@
     parts.push(x('rules', W.rules.map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
-    if (W.transformation) parts.push(x('transformation', transformationBlock(S)));
+    if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation)));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
     const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
@@ -1412,7 +1420,24 @@
     const summary = String(M.summary || ''); const summaryShown = (L.summaryChars && summary.length > L.summaryChars) ? '[…] ' + summary.slice(-L.summaryChars).replace(/^\S*\s+/, '') : summary;
     parts.push(x('summary', summaryShown || '(nothing yet)', 'note="the distant past, in brief' + (summaryShown !== summary ? '; only its most recent part (the prompt was near its size cap)' : '') + '"'));
     const factsShown = L.facts != null ? (L.facts ? M.facts.slice(-L.facts) : []) : M.facts;
-    if (factsShown.length) parts.push(x('facts', factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f)).join('\n'), 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
+    if (factsShown.length) {
+      let factLines = factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f));
+      let factsText = factLines.join('\n');
+      const factsBytes = L.factsBytes;
+      if (factsBytes != null && new TextEncoder().encode(factsText).length > factsBytes) {
+        const omitted = '- Earlier facts omitted from this prompt to fit the runtime limit; the save is unchanged.';
+        const budget = Math.max(0, factsBytes - new TextEncoder().encode(omitted + '\n').length);
+        const selected = [];
+        for (let i = factLines.length - 1; i >= 0; i--) {
+          const candidate = [factLines[i]].concat(selected).join('\n');
+          if (new TextEncoder().encode(candidate).length > budget) break;
+          selected.unshift(factLines[i]);
+        }
+        factLines = selected;
+        factsText = omitted + (factLines.length ? '\n' + factLines.join('\n') : '');
+      }
+      parts.push(x('facts', factsText, 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
+    }
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
     if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
@@ -1715,7 +1740,7 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = clone(adv.memory); } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
@@ -1765,8 +1790,10 @@
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000 },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000 },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
-        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, factsBytes: 4500, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, factsBytes: 4500, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000, compactTransformation: true }
       ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
         guard.window && guard.window < setWin ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
@@ -1778,6 +1805,8 @@
         guard.olderRecentChars ? 'older verbatim turns abridged to their last ' + guard.olderRecentChars + ' characters' : '',
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
         guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
+        guard.factsBytes != null ? 'facts capped by a 4,500-byte budget when needed' : '',
+        guard.compactTransformation ? 'settled transformation history compacted for this prompt only' : '',
         guard.blockChars ? 'every other block cut to ' + guard.blockChars + ' characters' : ''
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
@@ -2089,7 +2118,7 @@
   // would have used. Returns the body to write (it may still be too big, and then the write fails with a clear message).
   const CHUNK_MAX_BYTES = 250000;
   function chunkBody(i) {
-    const turns = adv.turns.slice(i * CHUNK, (i + 1) * CHUNK); const body = { c: i, turns };
+    const turns = adv.turns.slice(i * CHUNK, (i + 1) * CHUNK); const body = { c: i, rev: (adv.rev || 0) + 1, turns };
     if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body;
     for (const t of turns) { if (t.alts && t.alts.length) { t.alts = []; if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body; } }
     const last = adv.turns[adv.turns.length - 1];
@@ -2164,19 +2193,57 @@
     if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
     if (d.id && d.id !== id) throw new Error('save id does not match its document path');
     const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+    const validMemory = (m) => record(m) && Array.isArray(m.events) && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && (m.summary == null || typeof m.summary === 'string');
     const validPlayer = (p) => record(p) && typeof p.name === 'string' && typeof p.first === 'string' && record(p.pronouns) && record(p.stats);
     if (!record(d.state) || !record(d.state.items) || !record(d.state.attitudes) || !record(d.state.flags) || !Array.isArray(d.state.present) || !Number.isFinite(Number(d.state.day)) || typeof d.state.time !== 'string' || typeof d.state.location !== 'string' || !record(d.memory) || !Array.isArray(d.memory.events) || !Array.isArray(d.memory.beats) || (d.memory.facts != null && !Array.isArray(d.memory.facts)) || (d.memory.summary != null && typeof d.memory.summary !== 'string') || (d.settings != null && !record(d.settings)) || (d.player != null && !validPlayer(d.player)) || (d.roommate != null && (!record(d.roommate) || !record(d.roommate.pronouns))) || (d.opening != null && !record(d.opening)) || (d.cast != null && !record(d.cast)) || (d.turnCount != null && (!Number.isInteger(d.turnCount) || d.turnCount < 0))) throw new Error('save data is incomplete');
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
-    const turns = []; chunks.docs.forEach((c) => { const b = c.data(); if (b && Array.isArray(b.turns)) turns.push(...clone(b.turns)); });
+    const chunkRecords = chunks.docs.map((doc) => doc.data()).filter((b) => b && Array.isArray(b.turns));
+    const storedTurns = chunkRecords.flatMap((b) => clone(b.turns));
+    const expectedTurns = d.turnCount || 0;
+    const turns = storedTurns.slice(0, expectedTurns);
+    let recoveredTail = [];
+    if (storedTurns.length >= expectedTurns) {
+      let chunkIndex = Math.floor(expectedTurns / CHUNK), offset = expectedTurns % CHUNK, nextTurn = expectedTurns + 1;
+      while (true) {
+        const chunk = chunkRecords.find((b) => b.c === chunkIndex);
+        if (!chunk || chunk.rev !== (Number(d.rev) || 0) + 1 || chunk.turns.length <= offset) break;
+        const next = chunk.turns.slice(offset);
+        if (next.some((t, i) => !record(t) || t.n !== nextTurn + i)) break;
+        recoveredTail.push(...clone(next));
+        nextTurn += next.length;
+        if (chunk.turns.length < CHUNK) break;
+        chunkIndex++; offset = 0;
+      }
+    }
+    turns.push(...recoveredTail);
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
-    const turnCountMismatch = (d.turnCount || 0) !== turns.length;
+    const turnCountMismatch = expectedTurns !== turns.length;
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
-    // A renumbered save rewrites every chunk on its next save (the stored chunks still hold the repeated numbers).
+    // A repaired or recovered save rewrites its chunks on the next save.
     adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
+    if (recoveredTail.length && !renumbered) {
+      const last = recoveredTail[recoveredTail.length - 1];
+      adv.state = clone(last.stateAfter);
+      let replayFrom = recoveredTail.length;
+      for (let i = recoveredTail.length - 1; i >= 0; i--) {
+        if (validMemory(recoveredTail[i].memAfter)) { adv.memory = clone(recoveredTail[i].memAfter); replayFrom = i + 1; break; }
+        if (validMemory(recoveredTail[i].memBefore)) { adv.memory = clone(recoveredTail[i].memBefore); replayFrom = i; break; }
+      }
+      adv.memory.events = Array.isArray(adv.memory.events) ? adv.memory.events : [];
+      adv.memory.beats = Array.isArray(adv.memory.beats) ? adv.memory.beats : [];
+      adv.memory.facts = Array.isArray(adv.memory.facts) ? adv.memory.facts : [];
+      for (const turn of recoveredTail.slice(replayFrom)) {
+        if (Array.isArray(turn.events)) adv.memory.events.push(...turn.events);
+        if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
+        if (Array.isArray(turn.beats)) adv.memory.beats.push(...turn.beats);
+        if (Array.isArray(turn.facts)) adv.memory.facts.push(...turn.facts);
+      }
+      if (Array.isArray(last.pendingAfter)) adv.pendingNotes = clone(last.pendingAfter);
+    }
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -2188,9 +2255,12 @@
     }
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
+    let recoverySaveFailed = false;
+    if (recoveredTail.length && !renumbered) { dirty = true; recoverySaveFailed = !(await persist()); }
     const warnings = [];
+    if (recoveredTail.length && !renumbered) warnings.push('Recovered ' + recoveredTail.length + ' complete saved turn' + (recoveredTail.length === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save' + (recoverySaveFailed ? '; retry the save to sync it' : '') + '.');
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
-    if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
+    else if (turnCountMismatch && !recoveredTail.length) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + expectedTurns + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
     return warning;
