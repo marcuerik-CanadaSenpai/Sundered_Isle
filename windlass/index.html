@@ -1627,8 +1627,8 @@
     return turn;
   }
   async function takeTurn(input, opts) {
-    if (busy) { setStatus('A turn is already running.', true); return false; }
     if (loadingAdv) { setStatus('An adventure is still loading; try again in a moment.', true); return false; }
+    if (busy) { setStatus('A turn is already running.', true); return false; }
     if (!sample) { setStatus('Not connected to Claude in this view. Use Retry connection, or reload the page.', true); return false; }
     const regen = opts && opts.regen;
     const mine = adv;   // guards against a different adventure being loaded while this turn's model calls are in flight
@@ -1717,8 +1717,8 @@
   }
   // Override: run a pasted reply through the same pipeline with no model call.
   async function applyManualReply(action, replyText) {
-    if (busy) { return 'A turn is already running.'; }
     if (loadingAdv) { return 'An adventure is still loading; try again in a moment.'; }
+    if (busy) { return 'A turn is already running.'; }
     const data = tolerantJson(replyText); if (!usableReply(data)) return 'That must be a JSON object with a non-empty narrative.';
     busy = true; setBusyUI(true);
     const mine = adv;
@@ -1841,7 +1841,7 @@
     if (await syncFromStore()) return;
     if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
     const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
-    prev.stateBefore = prev.stateBefore || t.stateBefore; prev.memBefore = prev.memBefore || t.memBefore; prev.pendingBefore = prev.pendingBefore || t.pendingBefore;
+    prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
     adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
     adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...(prev.events || [])); adv.memory.beats.push(...(prev.beats || [])); adv.memory.facts.push(...(prev.facts || []));
     adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
@@ -1904,39 +1904,48 @@
   setInterval(() => { if (document.visibilityState === 'visible') syncFromStore(); }, 60000);
   async function persist(opts) {
     if (!db) { dirty = true; saveError = 'Saving is unavailable in this view; export a copy to keep your progress.'; setSaveNote('save unavailable', true); setStatus(saveError, true); return false; }
+    // A save belongs to the adventure it started on. Each write is built synchronously right after live() confirms that
+    // adventure is still the open one, so a different adventure loaded during an await is never mixed into its documents.
+    const mine = adv;
+    const live = () => { if (adv !== mine) throw { code: 'stale', message: 'a different adventure was opened during the save' }; };
     try {
-      const newer = await newerInStore();
+      const newer = await newerInStore(); live();
       if (newer) {
         dirty = true;
         if (newer.deleted) setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true);
         else offerConflict(newer);
         return false;
       }
-      const n = adv.turns.length; const chunkIdx = Math.floor(Math.max(0, n - 1) / CHUNK);
-      const chunkRef = (i) => db.doc('adventures/' + adv.id + '/turns/' + String(i).padStart(4, '0'));
+      const n = mine.turns.length; const chunkIdx = Math.floor(Math.max(0, n - 1) / CHUNK);
+      const chunkRef = (i) => db.doc('adventures/' + mine.id + '/turns/' + String(i).padStart(4, '0'));
       // Chunks are written before the adventure doc, and any earlier chunk a previous persist() failed to write is
       // retried first: this way the doc is never updated to claim a turn count that is not actually backed by saved
       // chunks, and a one-off write failure is repaired on the very next save instead of silently losing turns for good.
       // The chunk about to be written stops counting as saved until the write succeeds, so a failed rewrite of a full chunk
       // (Regenerate or Undo of a chunk-closing turn) is retried on a later save instead of being skipped for good.
-      const confirmed = Math.min(adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk, chunkIdx - 1); adv._savedUpToChunk = confirmed;
-      for (let i = confirmed + 1; i < chunkIdx; i++) { await chunkRef(i).set(chunkBody(i)); adv._savedUpToChunk = i; }
-      const start = chunkIdx * CHUNK; const sliceLen = adv.turns.slice(start, start + CHUNK).length;
-      if (sliceLen) { await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) adv._savedUpToChunk = chunkIdx; }
-      if (opts && opts.removedTurn && n % CHUNK === 0) { await chunkRef(n / CHUNK).delete(); if ((adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk) >= n / CHUNK) adv._savedUpToChunk = n / CHUNK - 1; }
-      const doc = advDoc();
-      await db.doc('adventures/' + adv.id).set(doc);
-      adv.updatedAt = doc.updatedAt; adv.rev = doc.rev;
+      const confirmed = Math.min(mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk, chunkIdx - 1); mine._savedUpToChunk = confirmed;
+      for (let i = confirmed + 1; i < chunkIdx; i++) { live(); await chunkRef(i).set(chunkBody(i)); mine._savedUpToChunk = i; }
+      const start = chunkIdx * CHUNK; const sliceLen = mine.turns.slice(start, start + CHUNK).length;
+      if (sliceLen) { live(); await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) mine._savedUpToChunk = chunkIdx; }
+      if (opts && opts.removedTurn && n % CHUNK === 0) { live(); await chunkRef(n / CHUNK).delete(); if ((mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk) >= n / CHUNK) mine._savedUpToChunk = n / CHUNK - 1; }
+      live(); const doc = advDoc();
+      await db.doc('adventures/' + mine.id).set(doc);
+      mine.updatedAt = doc.updatedAt; mine.rev = doc.rev;
+      if (adv !== mine) return true;   // saved in full; the page has since moved to another adventure, whose state is not ours to touch
       dirty = false;
       // Best effort: the turns just out of Undo's reach were saved whole in the previous chunk; store them trimmed now.
       const trimmedChunk = Math.floor((n - 1 - UNDO_DEPTH) / CHUNK);
-      if (n > UNDO_DEPTH && trimmedChunk < chunkIdx && trimmedChunk <= adv._savedUpToChunk) { try { await chunkRef(trimmedChunk).set(chunkBody(trimmedChunk)); } catch (e) {} }
+      if (n > UNDO_DEPTH && trimmedChunk < chunkIdx && trimmedChunk <= mine._savedUpToChunk) { try { live(); await chunkRef(trimmedChunk).set(chunkBody(trimmedChunk)); } catch (e) {} }
+      if (adv !== mine) return true;
       const hadSaveError = !!saveError;
       saveError = null;
       setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       if (hadSaveError) setStatus('');
       return true;
-    } catch (e) { dirty = true; saveError = saveFailedText(e); setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, tooBigCode(e) ? { label: 'Export a copy', run: () => exportAdventure() } : { label: 'Retry save', run: () => persist() }); return false; }
+    } catch (e) {
+      if (adv !== mine) return false;   // the adventure this save belonged to is no longer open; leave the open one's state alone
+      dirty = true; saveError = saveFailedText(e); setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, tooBigCode(e) ? { label: 'Export a copy', run: () => exportAdventure() } : { label: 'Retry save', run: () => persist() }); return false;
+    }
   }
   // The store refuses documents over 256 KiB. A chunk that would be too big first sheds previous versions (oldest turn
   // first), then the Undo history of its older turns; what is shed is only what Regenerate's "Previous version" and Undo
@@ -1961,18 +1970,20 @@
   }
   async function persistAll(id, opts) {
     // Writes every chunk, then the adventure document (used when copying an adventure and when overwriting a save).
-    const written = [];
+    // Like persist(), every write is built from the adventure that was open when it started, or not made at all.
+    const written = []; const mine = adv;
+    const live = () => { if (adv !== mine) throw { code: 'stale', message: 'a different adventure was opened during the save' }; };
     try {
-      for (let i = 0; i * CHUNK < adv.turns.length; i++) chunkBody(i);   // size check every block before writing any
-      for (let i = 0; i * CHUNK < adv.turns.length; i++) {
+      for (let i = 0; i * CHUNK < mine.turns.length; i++) chunkBody(i);   // size check every block before writing any
+      for (let i = 0; i * CHUNK < mine.turns.length; i++) {
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
-        await db.doc(path).set(chunkBody(i)); written.push(path);
+        live(); await db.doc(path).set(chunkBody(i)); written.push(path);
       }
-      const doc = advDoc(); doc.id = id;
+      live(); const doc = advDoc(); doc.id = id;
       if (opts && opts.title != null) doc.title = opts.title;
       if (opts && opts.updatedAt != null) doc.updatedAt = opts.updatedAt;
       await db.doc('adventures/' + id).set(doc);
-      if (id === adv.id) { adv.updatedAt = doc.updatedAt; adv.rev = doc.rev; adv._savedUpToChunk = Math.floor(adv.turns.length / CHUNK) - 1; dirty = false; saveError = null; }
+      if (id === mine.id) { mine.updatedAt = doc.updatedAt; mine.rev = doc.rev; mine._savedUpToChunk = Math.floor(mine.turns.length / CHUNK) - 1; if (adv === mine) { dirty = false; saveError = null; } }
       return true;
     } catch (e) {
       if (opts && opts.cleanupOnFailure) {
@@ -1992,11 +2003,20 @@
   // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
   const LEGACY_WORLD = 'halloway';
   // A previous version becomes the live turn and state on "Previous version", so only well-formed ones are kept from a save.
-  function validAlt(a) {
+  // Every list field a previous version brings back into play (the feed, the suggestions, memory, the engine notes) must be
+  // a list, and it must be a version of the turn it is stored on.
+  const ALT_LISTS = ['events', 'beats', 'facts', 'suggestions', 'notes', 'diff', 'exposures', 'pendingAfter'];
+  function validAlt(a, owner) {
     const rec = (x) => !!x && typeof x === 'object' && !Array.isArray(x); const st = a && a.stateAfter;
-    return rec(a) && Number.isInteger(a.n) && a.n >= 1 && typeof a.narrative === 'string' && rec(st) && rec(st.items) && rec(st.attitudes) && rec(st.flags) && Array.isArray(st.present) && Number.isFinite(Number(st.day)) && typeof st.time === 'string' && typeof st.location === 'string' && (a.events == null || Array.isArray(a.events)) && (a.beats == null || Array.isArray(a.beats)) && (a.facts == null || Array.isArray(a.facts));
+    return rec(a) && Number.isInteger(a.n) && a.n === owner.n && typeof a.narrative === 'string' && rec(st) && rec(st.items) && rec(st.attitudes) && rec(st.flags) && Array.isArray(st.present) && Number.isFinite(Number(st.day)) && typeof st.time === 'string' && typeof st.location === 'string' && ALT_LISTS.every((k) => a[k] == null || Array.isArray(a[k]));
   }
-  function cleanAlts(turns) { for (const t of turns) t.alts = Array.isArray(t.alts) ? t.alts.filter(validAlt) : []; }
+  // The before-state a version shares with its turn is always taken from the turn (usePreviousVersion), never from the save.
+  function cleanAlts(turns) {
+    for (const t of turns) {
+      t.alts = Array.isArray(t.alts) ? t.alts.filter((a) => validAlt(a, t)) : [];
+      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
+    }
+  }
   // Loads a save and returns a warning for the player when something had to be repaired or is missing (null otherwise).
   async function loadAdventure(id) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
@@ -2069,9 +2089,15 @@
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
           '<span class="acts"><button data-act="open"' + (WORLDS[aw] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
-        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus('A turn is already running.', true); return; } if (loadingAdv) { setStatus('An adventure is already loading.', true); return; } loadingAdv = true; setStatus('loading…'); try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning || '', !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); } finally { loadingAdv = false; } };
+        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus(loadingAdv ? 'An adventure is already loading.' : 'A turn is already running.', true); return; }
+          // Until the load lands, the page is held as it is during a turn: every control that changes or saves the adventure is off.
+          loadingAdv = true; busy = true; setBusyUI(true); $('#stop').hidden = true; setStatus('loading…');
+          try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning || '', !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); }
+          finally { loadingAdv = false; busy = false; setBusyUI(false); try { renderAll(); } catch (e2) {} }
+        };
         row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
           if (!t) return;
+          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
           if (isCur) { adv.title = t; const saved = await persist(); if (saved) setStatus('Adventure renamed.'); }
           else {
             const ref = db.doc('adventures/' + a.id), s = await ref.get();
@@ -2082,6 +2108,7 @@
         });
         row.querySelector('[data-act="copy"]').onclick = () => inlineConfirm(row, 'Title for the copy', a.title + ' (copy)', async (t) => {
           if (!t) return;
+          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
           const newId = uid('adv'); const stamp = Date.parse(adv.updatedAt || new Date().toISOString());
           const updatedAt = new Date((Number.isFinite(stamp) ? stamp : Date.now()) - 1).toISOString();
           await persistAll(newId, { title: t, updatedAt, cleanupOnFailure: true });
@@ -2135,8 +2162,9 @@
     } finally { $('#exportAdv').disabled = false; }
   }
   async function importFile(file) {
-    if (busy) { setStatus('A turn is already running.', true); return; }
+    if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
     const oldAdv = adv, oldWorldId = W.id;
+    busy = true; setBusyUI(true); $('#stop').hidden = true;   // an import swaps and saves the open adventure: hold the page meanwhile
     try {
       const text = await file.text(); const p = JSON.parse(text);
       if (!p || p.format !== 'windlass-save-1' || !p.adventure) throw new Error('not a Windlass save');
@@ -2145,13 +2173,15 @@
       if (!Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('this save needs a world that is not loaded');
       const validPlayer = (x) => record(x) && typeof x.name === 'string' && typeof x.first === 'string' && record(x.pronouns) && record(x.stats);
       if (!record(a.state) || !record(a.state.items) || !record(a.state.attitudes) || !record(a.state.flags) || !Array.isArray(a.state.present) || !Number.isFinite(Number(a.state.day)) || typeof a.state.time !== 'string' || typeof a.state.location !== 'string') throw new Error('save state is incomplete');
-      if (!record(a.memory) || (a.memory.events != null && !Array.isArray(a.memory.events)) || (a.memory.beats != null && !Array.isArray(a.memory.beats)) || (a.memory.facts != null && !Array.isArray(a.memory.facts))) throw new Error('save memory is incomplete');
+      if (!record(a.memory) || (a.memory.events != null && !Array.isArray(a.memory.events)) || (a.memory.beats != null && !Array.isArray(a.memory.beats)) || (a.memory.facts != null && !Array.isArray(a.memory.facts)) || (a.memory.summary != null && typeof a.memory.summary !== 'string')) throw new Error('save memory is incomplete');
       if ((a.player != null && !validPlayer(a.player)) || (a.roommate != null && (!record(a.roommate) || !record(a.roommate.pronouns))) || (a.opening != null && !record(a.opening)) || (a.cast != null && !record(a.cast))) throw new Error('save character data is invalid');
       if (a.settings != null && !record(a.settings)) throw new Error('save settings are invalid');
       const turns = p.turns == null ? [] : p.turns;
       if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
       const settings = normaliseSettings(clone(a.settings || {}));
       const next = { id: uid('adv'), title: (typeof a.title === 'string' ? a.title : 'Imported') + ' (imported)', createdAt: a.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), settings, player: record(a.player) ? clone(a.player) : null, roommate: record(a.roommate) ? clone(a.roommate) : null, opening: record(a.opening) ? clone(a.opening) : null, creation: record(a.creation) ? clone(a.creation) : null, cast: record(a.cast) ? clone(a.cast) : null, state: clone(a.state), memory: Object.assign({ summary: '', events: [], beats: [], facts: [] }, clone(a.memory)), pendingNotes: Array.isArray(a.pendingNotes) ? clone(a.pendingNotes) : [], turns: clone(turns) };
+      for (const k of ['events', 'beats', 'facts']) if (!Array.isArray(next.memory[k])) next.memory[k] = [];
+      if (next.memory.summary == null) next.memory.summary = '';
       const renumbered = orderTurns(next.turns); cleanAlts(next.turns);
       if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
       next.memory.facts = next.memory.facts || [];
@@ -2165,9 +2195,9 @@
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
       closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? ' Some turn numbers in the file repeated, so its ' + adv.turns.length + ' turns were renumbered in file order.' : ''), !!renumbered);
     } catch (e) {
-      adv = oldAdv; setWorld(oldWorldId); renderAll();
+      adv = oldAdv; setWorld(oldWorldId);
       setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);
-    }
+    } finally { busy = false; setBusyUI(false); try { renderAll(); } catch (e2) {} }
   }
 
   // ---------- invention: the model writes the people, the code keeps the dice ----------
