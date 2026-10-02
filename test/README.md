@@ -4,12 +4,14 @@ Runs the real page in jsdom against `mock-claude.js`, a strict mock of the artif
 
 The mock enforces the documented limits: 256 KiB per db document, 5,000 documents, the db path grammar, the 64 KiB sample input cap, sample option validation and the downloads extension allow-list. Every breach is recorded in `mock.violations` before the call is rejected. `mock.pending` counts db operations that have started and not yet settled; `h.idle()` and `h.settle()` wait for it to reach zero.
 
-`smoke` and `turns` are pass/fail checks: they exit 1 if a turn does not finish, the feed or the store is missing a turn, or the page logged an error or a contract violation. The other scripts are probes that print what they observe.
+`smoke` and `turns` are pass/fail checks: they exit 1 if a turn does not finish, the feed or the store is missing a turn, or the page logged an error or a contract violation. `prompt-guard` and `chunk-recovery` are pass/fail checks too. The other scripts are probes that print what they observe.
 
 ```bash
 npm install
 npm run smoke          # create an adventure, take one turn, check it was shown and saved
 npm run turns          # twelve turns, each shown and stored
+npm run prompt-guard   # large fact store + long action: the guard compacts the transformation block and bounds facts, prompt stays within the cap
+npm run chunk-recovery # a document left behind its chunk saves: complete turns and the current state are recovered on load
 npm run long-game      # realistic long game; on the snapshot it shows the chunk-size save failure (review/REVIEW.md H1)
 npm run import-export  # export then import a 25-turn save (chunks 0000-0002); on the snapshot the imported copy keeps only 0002 (H2)
 npm run serve          # the real page with the mock injected, at http://127.0.0.1:4173/
