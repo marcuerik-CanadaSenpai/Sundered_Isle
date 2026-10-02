@@ -1,0 +1,16 @@
+{
+  "name": "windlass-test-harness",
+  "private": true,
+  "description": "Runs the real Windlass page in jsdom against a strict mock of the artifact runtime (db, sample, downloads).",
+  "scripts": {
+    "exposure-fallback": "node exposure-fallback.js",
+    "smoke": "node smoke.js",
+    "turns": "node turnsmoke.js",
+    "review-regressions": "node review-regressions.js",
+    "name-matcher": "node name-matcher.js",
+    "long-game": "node probe2.js",
+    "import-export": "node probe3.js",
+    "serve": "node server.js 4173"
+  },
+  "dependencies": { "jsdom": "24.1.3" }
+}
