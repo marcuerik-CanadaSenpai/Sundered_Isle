@@ -116,7 +116,8 @@ async function turnRoute(bk, sd, route, mode) {
   await h.idle(20000);
   const endStatus = statusText(h);
   const pageTitle = await pageCurrentTitle(h);
-  const ev = evaluate(h, sd, store, mk, sd.A, pageTitle);
+  // A verdict only counts if the gated turn really started and was held while the route ran.
+  const ev = evaluate(h, sd, store, mk, sd.A, pageTitle, { ok: held });
   let follow = null;
   if (mode === 'fail') {
     // rollback check: take an ordinary turn on Bravo and see which state it starts from
@@ -128,7 +129,7 @@ async function turnRoute(bk, sd, route, mode) {
     follow = { bPageBefore, nextTurnStateBefore: sb, storedB: st(bd), ok: /Bravo Hall/.test(sb) && /^D22 /.test(sb) };
     ev.pass = ev.pass && follow.ok && /Bravo Hall/.test(bPageBefore);
   }
-  const r = { build: bk, route: route + (mode === 'fail' ? '+fail' : ''), start, ui, tried, midStatus, endStatus, ...ev, follow };
+  const r = { build: bk, route: route + (mode === 'fail' ? '+fail' : ''), start, ui, held, tried, midStatus, endStatus, ...ev, follow };
   h.close();
   return r;
 }
@@ -150,11 +151,11 @@ async function introRoute(bk, sd, route) {
   const endStatus = statusText(h);
   const pageTitle = await pageCurrentTitle(h);
   const newSun = idByTitle(store, 'NewSun')[0] || null;
-  const ev = evaluate(h, sd, store, mk, newSun, pageTitle);
+  const ev = evaluate(h, sd, store, mk, newSun, pageTitle, { ok: held });   // the intro call must really have been held
   // Alpha's stored opening must be unchanged unless Alpha was deleted
   const aSame = JSON.stringify(advJson(sd.store, sd.A)) === JSON.stringify(advJson(store, sd.A));
   ev.pass = ev.pass && aSame;
-  const r = { build: bk, route: 'intro:' + route, ui, tried, midStatus, endStatus, Asame: aSame, newSunExists: !!newSun, ...ev };
+  const r = { build: bk, route: 'intro:' + route, ui, held, tried, midStatus, endStatus, Asame: aSame, newSunExists: !!newSun, ...ev };
   h.close();
   return r;
 }
@@ -173,8 +174,9 @@ async function bootRoute(bk, sd) {
   await h.idle(20000);
   const endStatus = statusText(h);
   const pageTitle = await pageCurrentTitle(h);
-  // the placeholder was never saved, so the only acceptable outcome is: Alpha untouched (or Alpha gets nothing from the placeholder turn)
-  const ev = evaluate(h, sd, store, mk, null, pageTitle);
+  // the placeholder was never saved, so the only acceptable outcome is: Alpha untouched (or Alpha gets nothing from the placeholder turn).
+  // The verdict needs the race itself: the early turn held while the boot load landed.
+  const ev = evaluate(h, sd, store, mk, null, pageTitle, { ok: held && loaded });
   const r = { build: bk, route: 'bootload', tried: 'turn sent before boot load (held=' + held + ', loadedDuring=' + loaded + ')', midStatus, endStatus, ...ev };
   h.close();
   return r;
@@ -194,7 +196,7 @@ async function bootFitRoute(bk, sd) {
   await h.idle(20000);
   const endStatus = statusText(h);
   const pageTitle = await pageCurrentTitle(h);
-  const ev = evaluate(h, sd, store, mk, null, pageTitle);
+  const ev = evaluate(h, sd, store, mk, null, pageTitle, { ok: held && loaded });   // the fit call must have been held while the boot load landed
   const ks = [...store.keys()].filter((k) => k.startsWith('adventures/' + sd.A + '/turns/')).sort();
   const lastA = ks.length ? (() => { const ch = store.get(ks[ks.length - 1]).data; return ch.turns[ch.turns.length - 1]; })() : null;
   ev.AlastTurn = lastA ? 'n' + lastA.n + ' action=' + lastA.action + ' stateBefore=D' + lastA.stateBefore.day + ' ' + lastA.stateBefore.time + ' ' + String(lastA.stateBefore.location).slice(0, 30) : '-';

@@ -196,7 +196,7 @@ function install(window, opts) {
     const label = call.label || '';
     const prompt = typeof input === 'string' ? input : input.map((m) => m.content).join('\n');
     if (/Rewrite it to between/.test(prompt)) return words(120, ['The', 'corridor', 'hums', 'with', 'distant', 'voices', 'as', 'you', 'walk', 'on.']);
-    if (/You maintain the long-term memory/.test(prompt)) return 'Day 1: the player arrived, met the roommate and learned the house rules. Nothing else of note.';
+    if (/You maintain the long-term memory/.test(prompt)) return 'Day 1: the player arrived at the house, met the roommate, learned the house rules and settled into the shared room. Nothing else of note happened that day.';
     if (/Write the roommate's first appearance/.test(prompt)) return words(130, ['Your', 'roommate', 'looks', 'up', 'from', 'a', 'half-unpacked', 'box', 'and', 'gives', 'you', 'a', 'tired,', 'friendly', 'wave.']);
     if (/Invent the people listed in <people>/.test(prompt)) {
       const block = (/<people>([\s\S]*?)<\/people>/.exec(prompt) || [, ''])[1];
