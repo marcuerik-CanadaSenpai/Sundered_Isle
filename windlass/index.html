@@ -498,6 +498,7 @@
   const WORLD_IDS = Object.keys(WORLDS);
   if (!WORLD_IDS.length) { document.body.innerHTML = '<p style="padding:24px">No world file loaded.</p>'; return; }
   const DEFAULT_WORLD = WORLDS.sundered ? 'sundered' : (WORLDS.mythaven ? 'mythaven' : WORLD_IDS[0]);
+  const LEGACY_WORLD_FALLBACK = WORLDS.halloway ? 'halloway' : DEFAULT_WORLD;
   let W = null;              // the current adventure's world
   const DEFAULT_SETTINGS = { narrTier: 'complex', utilTier: 'quick', density: 'standard', window: 3, autoFit: true, loreBudget: 6000, testNote: '', pace: 'standard', thoughts: true, inventTier: 'quick' };
   function normaliseSettings(input) {
@@ -513,7 +514,7 @@
   // Pace of change: the most influence one species can gain in one story day (turns are minutes; days are what a slow burn is measured in).
   const PACE_PER_DAY = { slow: 5, standard: 10, fast: 20, unbounded: 0 };
   const TURN_KEYS = ['evaluation', 'narrative', 'suggested_actions', 'secret_info', 'state_updates', 'time_advance_minutes', 'events', 'beats', 'facts'];
-  const CHUNK = 10;
+  const CHUNK = 10, MAX_TURN_ALTERNATIVES = 3, DB_DOC_MAX_BYTES = 256 * 1024;
 
   let sample = null, db = null, downloads = null;
   let adv = null;            // current adventure
@@ -1169,7 +1170,7 @@
   }
   // What the body is now, for the narrator: the anatomy of the changes complete (the finished shape once a kind has reached it),
   // the steps told so far of any change under way, and where a path has carried the body toward a woman's or a man's.
-  function bodyNowLines(tf, who) {
+  function bodyNowLines(tf, who, compact) {
     const T = W.transformation; const out = [];
     for (const k of Object.keys(T.species)) {
       const sp = T.species[k]; const n = tf.traits.filter((t) => t.species === k && t.settled !== false).length;
@@ -1184,27 +1185,36 @@
           const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex');
           if (st) told.push(...st.steps.slice(0, st.i));
         }
-        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.map(pf).join('; ') + '.');
+        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
-      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + bt.steps.slice(0, bt.i).map(pf).join('; ') + '.');
+      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
     }
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
     return out;
   }
-  function transformationBlock(state) {
+  function transformationBlock(state, compact) {
     const T = W.transformation; if (!T) return '';
     ensureTf(state); const tf = state.tf; const who = firstName();
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
-    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + Object.keys(T.species).map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ') + '.');
-    lines.push('Changes so far: ' + (tf.traits.length ? tf.traits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
-    const body = bodyNowLines(tf, who); if (body.length) lines.push(body.join('\n'));
-    lines.push('Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
+    const kinds = Object.keys(T.species);
+    const changedKinds = new Set(tf.traits.map((t) => t.species));
+    const visibleTraits = compact ? tf.traits.filter((t) => t.settled === false).concat(tf.traits.filter((t) => t.settled !== false).slice(-3)) : tf.traits;
+    const influenceNow = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ') + (kinds.some((k) => !(tf.influence[k] || 0)) ? ' (unlisted kinds 0)' : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
+    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
+    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') + (visibleTraits.length < tf.traits.length ? '; earlier settled changes are reflected in the body summary' : '') : 'none') + '.');
+    const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
+    lines.push(compact
+      ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
+      : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
-    lines.push('What raises influence:\n' + Object.keys(T.species).map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
-    lines.push('Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+    const methodKinds = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0 || (tf.tracks || []).some((t) => t.species === k) || (tf.arcs || []).some((a) => a.species === k) || changedKinds.has(k)) : kinds;
+    lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
+    lines.push(compact
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep. Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1346,7 +1356,7 @@
     const turns = [openingTurn()].concat(adv.turns);
     const win = Math.max(1, (limits && limits.window) || Number(adv.settings.window) || 3);
     const eventsN = (limits && limits.events) || 40;
-    const earlierN = (limits && limits.earlier) || 24;
+    const earlierN = limits && limits.earlier != null ? limits.earlier : 24;
     const recent = turns.slice(-win);
     const older = turns.slice(0, Math.max(0, turns.length - win));
     const recentText = recent.map((t) => t.narrative).join('\n');
@@ -1366,20 +1376,22 @@
     parts.push(x('rules', W.rules.map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
-    if (W.transformation) parts.push(x('transformation', transformationBlock(S)));
+    if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation)));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
     const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
     parts.push(x('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + ')' + (p.last ? '' : '; no surname was given, so never invent one') + '. ' + fill(p.description) + sexLine + '\nStats (1 to 5): ' + Object.keys(p.stats).map((k) => W.stats[k] + ' ' + p.stats[k]).join(', ') + '.' + metLine, 'note="everything known about the player; invent nothing else about them"'));
     const chars = activeCharacters().map((c) => {
       const names = [c.name.split(' ').pop()].concat(c.aliases || []).map((n) => n.toLowerCase());
-      const full = names.some((n) => S.present.some((pp) => pp.toLowerCase().includes(n)) || wordIn(mentioned, n));
+      const full = !(limits && limits.compactCharacters) && names.some((n) => S.present.some((pp) => pp.toLowerCase().includes(n)) || wordIn(mentioned, n));
       const where = (c.where && (c.where[slot] || c.where.default)) || 'unknown';
       const aim = (c.aims && ((slot === 'evening' && S.day > 1 && /mixer/i.test(c.aims[slot] || '') ? '' : c.aims[slot]) || c.aims.default)) || '';
       const att = S.attitudes[c.key];
-      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet)) + (c.looks && (full || !c.gen) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
+      const description = fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet));
+      const brief = limits && limits.compactCharacters && description.length > 220 ? description.slice(0, 217).replace(/\s+\S*$/, '') + '…' : description;
+      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + brief + (c.looks && (full || !c.gen) && !(limits && limits.compactCharacters) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
-    parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
+    parts.push(x('characters', chars + '\n\n' + ((limits && limits.compactCharacters) ? '' : minorCharactersText(mentioned)), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
     if (W.secrets || W.dungeons) {
       parts.push(x('gm_only', gmBlock(S, p.first), 'note="for the narrator alone; no character knows this unless it says so; never stated in narration"'));
@@ -1393,10 +1405,26 @@
     parts.push(x('state', JSON.stringify(stateForModel, null, 1) + (hiddenKeys.length ? '\nHidden from the player: ' + hiddenKeys.join(', ') + '.' : ''), 'note="update through state_updates using these paths: location, present, items.<key>, attitudes.<key>, flags.<key>"'));
     parts.push(x('clock', clockLine(S) + '\n' + calendarLine(S), 'note="authoritative; the engine keeps the calendar"'));
     parts.push(x('summary', M.summary || '(nothing yet)', 'note="the distant past, in brief"'));
-    if (M.facts.length) parts.push(x('facts', M.facts.map((f) => '- ' + f).join('\n'), 'note="established facts that stay true; contradict none of them"'));
+    if (M.facts.length) {
+      let factLines = M.facts.map((f) => '- ' + f), factsText = factLines.join('\n');
+      const factsBytes = limits && limits.factsBytes;
+      if (factsBytes != null && new TextEncoder().encode(factsText).length > factsBytes) {
+        const omitted = '- Earlier facts omitted from this prompt to fit the runtime limit; the save is unchanged.';
+        const budget = Math.max(0, factsBytes - new TextEncoder().encode(omitted + '\n').length);
+        const selected = [];
+        for (let i = factLines.length - 1; i >= 0; i--) {
+          const candidate = [factLines[i]].concat(selected).join('\n');
+          if (new TextEncoder().encode(candidate).length > budget) continue;
+          selected.unshift(factLines[i]);
+        }
+        factLines = selected;
+        factsText = omitted + (factLines.length ? '\n' + factLines.join('\n') : '');
+      }
+      parts.push(x('facts', factsText, 'note="established facts that stay true; contradict none of them"'));
+    }
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
-    if (older.length) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
+    if (earlierN > 0 && older.length) parts.push(x('earlier_turns', older.slice(Math.max(0, older.length - earlierN)).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
     const recentChars = limits && limits.recentChars;
     const recentNarr = (t) => (recentChars && t.narrative.length > recentChars) ? t.narrative.slice(-recentChars) : t.narrative;
     parts.push(x('recent_turns', recent.map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : '') + ', oldest first"'));
@@ -1672,7 +1700,7 @@
       stateBefore, stateAfter: clone(state), memBefore, pendingBefore, pendingAfter: clone(adv.pendingNotes),
       words, band, timing: timing || { first: 0, total: 0 }, notes, alts: []
     };
-    if (regen) { turn.alts = (regen.alts || []).concat([stripAlts(regen)]); turn.n = regen.n; }
+    if (regen) { turn.alts = (regen.alts || []).slice(-(MAX_TURN_ALTERNATIVES - 1)).map(compactAlternative).concat([compactAlternative(regen)]).slice(-MAX_TURN_ALTERNATIVES); turn.n = regen.n; }
     // Keep two complete turns so Undo and Regenerate can restore a short recent window; compact older snapshots to bound save size.
     if (adv.turns.length >= 2) trimTurnHistory(adv.turns[adv.turns.length - 2]);
     adv.turns.push(turn);
@@ -1706,10 +1734,13 @@
         { window: 1, events: 10, earlier: 6 },
         { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 6000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000 }
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000 },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000, factsBytes: 4500 },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000, factsBytes: 4500, compactCharacters: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000, factsBytes: 4500, compactCharacters: true, compactTransformation: true }
       ]) { if (fits()) break; built = buildPrompt(input, lim); guard = lim; }
-      if (guard) notes.push('prompt near the size cap: ' + (guard.window ? 'verbatim window reduced to ' + guard.window + ', ' : '') + 'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats' + (guard.noLore ? ', lore and extra style examples dropped' : '') + (guard.recentChars ? ', recent turns cut to their last ' + guard.recentChars + ' characters' : ''));
-      if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage; the current turn is unusually long. Try a shorter action, or lower the verbatim window in Settings.' };
+      if (guard) notes.push('prompt near the size cap: ' + (guard.window ? 'verbatim window reduced to ' + guard.window + ', ' : '') + 'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats' + (guard.noLore ? ', lore and extra style examples dropped' : '') + (guard.recentChars ? ', recent turns cut to their last ' + guard.recentChars + ' characters' : '') + (guard.factsBytes != null ? ', older facts omitted from this prompt only' : '') + (guard.compactCharacters ? ', character descriptions shortened for this prompt only' : '') + (guard.compactTransformation ? ', settled transformation history compacted for this prompt only' : ''));
+      if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is still too large after optional context was trimmed. Shorten the action or director note, or reduce the scene context; this turn was not sent.' };
       showDraft(input, '');
       setStatus('thinking on ' + adv.settings.narrTier + ' tier…');
       const ask = () => sample(built.prompt, {
@@ -1748,7 +1779,7 @@
       else if (code === 'invalid_json') msg = 'The reply was unusable after two attempts. Try the turn again, or see Debug.';
       else if (code === 'truncated') msg = 'The reply was cut off after two attempts. Try again; if it keeps happening, choose a shorter length in Settings.';
       else if (code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared' || /^capability_/.test(code)) { sample = null; setConn('bad', 'Claude unavailable'); msg = 'This page is not allowed to use Claude in this view.'; statusAction = { label: 'Retry connection', run: connectSample }; }
-      else if (code === 'prompt_too_large') msg = 'Prompt too large for the runtime; lower the verbatim window in Settings.';
+      else if (code === 'prompt_too_large') msg = 'Prompt still too large after trimming optional context. Shorten the action or director note, or reduce the scene context; your turn was not sent.';
       else if (code === 'upstream_error') msg = 'The service failed mid-turn. Try again.';
       else if (code === 'page_error') msg = 'Page error: ' + (e.message || 'unknown') + ' (see Debug).';
       else msg = 'Error: ' + code + (e && e.message ? ' — ' + e.message : '');
@@ -1783,6 +1814,11 @@
     } finally { busy = false; setBusyUI(false); renderAll(); setStatus(''); }
   }
   function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; return c; }
+  function compactAlternative(t) {
+    const c = stripAlts(t);
+    c.stateBefore = trimState(c.stateBefore); c.memBefore = null; c.pendingBefore = null; c._trimmed = true;
+    return c;
+  }
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
   function trimState(s) { return s ? { day: s.day, time: s.time, location: s.location, present: s.present } : s; }
   function trimTurnHistory(t) {
@@ -1872,18 +1908,28 @@
     } finally { actionDispatching = false; }
   }
   async function usePreviousVersion(turnId) {
-    const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
-    if (await syncFromStore()) return;
-    const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = t.alts.concat([cur]);
-    adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
-    adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...prev.events); adv.memory.beats.push(...prev.beats); adv.memory.facts.push(...(prev.facts || []));
-    adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
-    renderAll(); await persist();
+    const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !Array.isArray(t.alts) || !t.alts.length || busy) return;
+    if (!canRestoreTurn(t)) { setStatus('This turn cannot be restored safely; keep the current version.', true); return; }
+    actionDispatching = true;
+    try {
+      if (await syncFromStore()) return;
+      const prev = t.alts.pop(), cur = compactAlternative(t);
+      prev.stateBefore = clone(t.stateBefore); prev.memBefore = clone(t.memBefore); prev.pendingBefore = clone(t.pendingBefore || []); delete prev._trimmed;
+      prev.alts = t.alts.slice(-MAX_TURN_ALTERNATIVES).map(compactAlternative).concat([cur]).slice(-MAX_TURN_ALTERNATIVES);
+      adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
+      adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...prev.events); adv.memory.beats.push(...prev.beats); adv.memory.facts.push(...(prev.facts || []));
+      adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
+      renderAll(); await persist();
+    } finally { actionDispatching = false; }
   }
 
   // ---------- persistence ----------
   function advDoc() {
     return { id: adv.id, worldId: W.id, worldVersion: W.version, title: adv.title, createdAt: adv.createdAt, updatedAt: new Date().toISOString(), rev: (adv.rev || 0) + 1, settings: adv.settings, player: adv.player, roommate: adv.roommate, opening: adv.opening || null, creation: adv.creation || null, cast: adv.cast || null, state: adv.state, memory: adv.memory, pendingNotes: adv.pendingNotes || [], turnCount: adv.turns.length, lastLine: (adv.turns.length ? adv.turns[adv.turns.length - 1].narrative : openingTurn().narrative).slice(0, 160) };
+  }
+  function assertDocumentSize(data) {
+    const bytes = new TextEncoder().encode(JSON.stringify(data)).length;
+    if (bytes > DB_DOC_MAX_BYTES) throw { code: 'document_too_large', message: 'A save record is ' + bytes + ' bytes; the storage limit is 256 KiB.' };
   }
   // ---------- cross-device sync ----------
   // Every turn is saved to the artifact store automatically, and the same store serves every device. What can go stale is a
@@ -1949,12 +1995,19 @@
       // Chunks are written before the adventure doc, and any earlier chunk a previous persist() failed to write is
       // retried first: this way the doc is never updated to claim a turn count that is not actually backed by saved
       // chunks, and a one-off write failure is repaired on the very next save instead of silently losing turns for good.
-      const confirmed = adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk;
-      for (let i = confirmed + 1; i < chunkIdx; i++) { await chunkRef(i).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); adv._savedUpToChunk = i; }
+      const confirmed = adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk, chunksToWrite = [];
+      for (let i = confirmed + 1; i < chunkIdx; i++) {
+        const data = { c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) };
+        assertDocumentSize(data); chunksToWrite.push([i, data]);
+      }
       const start = chunkIdx * CHUNK; const slice = adv.turns.slice(start, start + CHUNK);
-      if (slice.length) { await chunkRef(chunkIdx).set({ c: chunkIdx, turns: slice }); if (slice.length === CHUNK) adv._savedUpToChunk = chunkIdx; }
+      if (slice.length) {
+        const data = { c: chunkIdx, turns: slice };
+        assertDocumentSize(data); chunksToWrite.push([chunkIdx, data]);
+      }
+      const doc = advDoc(); assertDocumentSize(doc);
+      for (const [i, data] of chunksToWrite) { await chunkRef(i).set(data); if (data.turns.length === CHUNK) adv._savedUpToChunk = i; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { await chunkRef(n / CHUNK).delete(); if ((adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk) >= n / CHUNK) adv._savedUpToChunk = n / CHUNK - 1; }
-      const doc = advDoc();
       await db.doc('adventures/' + adv.id).set(doc);
       adv.updatedAt = doc.updatedAt; adv.rev = doc.rev;
       dirty = false;
@@ -1963,19 +2016,33 @@
       setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       if (hadSaveError) setStatus('');
       return true;
-    } catch (e) { dirty = true; saveError = 'Save failed (' + ((e && e.code) || (e && e.message) || 'unknown') + '). Your changes remain here; retry by saving again.'; setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, { label: 'Retry save', run: () => persist() }); return false; }
+    } catch (e) {
+      dirty = true;
+      if (e && e.code === 'document_too_large') {
+        saveError = 'Save not written: ' + e.message + ' Your current adventure remains open; export a backup before continuing.';
+        setSaveNote('save too large', true); setStatus(saveError, true);
+      } else {
+        saveError = 'Save failed (' + ((e && e.code) || (e && e.message) || 'unknown') + '). Your changes remain here; retry by saving again.';
+        setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, { label: 'Retry save', run: () => persist() });
+      }
+      return false;
+    }
   }
   async function persistAll(id, opts) {
     // Writes every chunk, then the adventure document (used when copying an adventure and when overwriting a save).
     const written = [];
     try {
+      const chunks = [];
       for (let i = 0; i * CHUNK < adv.turns.length; i++) {
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
-        await db.doc(path).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); written.push(path);
+        const data = { c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) };
+        assertDocumentSize(data); chunks.push({ path, data });
       }
       const doc = advDoc(); doc.id = id;
       if (opts && opts.title != null) doc.title = opts.title;
       if (opts && opts.updatedAt != null) doc.updatedAt = opts.updatedAt;
+      assertDocumentSize(doc);
+      for (const chunk of chunks) { await db.doc(chunk.path).set(chunk.data); written.push(chunk.path); }
       await db.doc('adventures/' + id).set(doc);
       if (id === adv.id) { adv.updatedAt = doc.updatedAt; adv.rev = doc.rev; adv._savedUpToChunk = Math.floor(adv.turns.length / CHUNK) - 1; dirty = false; saveError = null; }
       return true;
@@ -1990,7 +2057,7 @@
   async function loadAdventure(id) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
     const d = snap.data();
-    const wid = d && d.worldId;
+    const wid = d && (d.worldId || LEGACY_WORLD_FALLBACK);
     if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
     if (d.id && d.id !== id) throw new Error('save id does not match its document path');
     const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -2004,10 +2071,30 @@
     turns.sort((a, b) => a.n - b.n);
     const renumberedTurns = turns.some((t, i) => t.n !== i + 1);
     if (renumberedTurns) turns.forEach((t, i) => { t.n = i + 1; });
-    const turnCountMismatch = (d.turnCount || 0) !== turns.length;
+    const expectedTurns = d.turnCount || 0, turnCountMismatch = expectedTurns !== turns.length;
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
     adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumberedTurns ? -1 : Math.floor(turns.length / CHUNK) - 1 };
+    let recoveredTurns = 0;
+    if (turnCountMismatch && turns.length > expectedTurns && !renumberedTurns) {
+      const trailing = turns.slice(expectedTurns), last = trailing[trailing.length - 1];
+      const sequential = trailing.every((t, i) => t.n === expectedTurns + i + 1);
+      if (sequential && last && record(last.stateAfter)) {
+        adv.state = clone(last.stateAfter);
+        adv.memory = clone(record(trailing[0].memBefore) ? trailing[0].memBefore : d.memory);
+        adv.memory.events = Array.isArray(adv.memory.events) ? adv.memory.events : [];
+        adv.memory.beats = Array.isArray(adv.memory.beats) ? adv.memory.beats : [];
+        adv.memory.facts = Array.isArray(adv.memory.facts) ? adv.memory.facts : [];
+        for (const t of trailing) {
+          if (Array.isArray(t.events)) adv.memory.events.push(...t.events);
+          if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
+          if (Array.isArray(t.beats)) adv.memory.beats.push(...t.beats);
+          if (Array.isArray(t.facts)) adv.memory.facts.push(...t.facts);
+        }
+        adv.pendingNotes = Array.isArray(last.pendingAfter) ? clone(last.pendingAfter) : adv.pendingNotes;
+        recoveredTurns = trailing.length;
+      }
+    }
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -2019,10 +2106,14 @@
     }
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
+    let recoverySaveFailed = false;
+    if (recoveredTurns) { dirty = true; recoverySaveFailed = !(await persist()); }
     const loadWarnings = [];
-    if (turnCountMismatch) loadWarnings.push('The save record expected ' + (d.turnCount || 0) + ' turns, but ' + turns.length + ' were available; some history may be missing.');
+    if (recoveredTurns) loadWarnings.push('Recovered ' + recoveredTurns + ' complete saved turn' + (recoveredTurns === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save.');
+    else if (turnCountMismatch) loadWarnings.push('The save record expected ' + expectedTurns + ' turns, but ' + turns.length + ' were available; some history may be missing.');
     if (renumberedTurns) loadWarnings.push((hadDuplicateNumbers ? 'Duplicate' : 'Non-sequential') + ' turn numbers were repaired in chronological order; renumbering cannot recover missing turns.');
-    const loadWarning = loadWarnings.length ? 'Loaded with a save warning: ' + loadWarnings.join(' ') + ' Export a backup before continuing.' : '';
+    if (recoverySaveFailed) loadWarnings.push('The repaired state could not be saved automatically; export a backup before continuing.');
+    const loadWarning = loadWarnings.length ? 'Loaded with a save warning: ' + loadWarnings.join(' ') + (recoverySaveFailed || !recoveredTurns ? ' Export a backup before continuing.' : '') : '';
     if (loadWarning) setStatus(loadWarning, true);
     return loadWarning;
   }
@@ -2056,10 +2147,11 @@
       if (snap.empty) { el.innerHTML = '<div class="small">No saved adventures yet.</div>'; return; }
       snap.docs.forEach((d) => {
         const a = d.data(); const row = document.createElement('div'); row.className = 'advrow';
-        const wt = WORLDS[a.worldId] ? WORLDS[a.worldId].title : (a.worldId || 'unknown world');
+        const wid = a.worldId || LEGACY_WORLD_FALLBACK;
+        const wt = WORLDS[wid] ? WORLDS[wid].title : (wid || 'unknown world');
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
-          '<span class="acts"><button data-act="open"' + (WORLDS[a.worldId] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
+          '<span class="acts"><button data-act="open"' + (WORLDS[wid] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
         row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus('A turn is already running.', true); return; } setStatus('loading…'); try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning, !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); } };
         row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
           if (!t) return;
@@ -2132,7 +2224,7 @@
       const text = await file.text(); const p = JSON.parse(text);
       if (!p || p.format !== 'windlass-save-1' || !p.adventure) throw new Error('not a Windlass save');
       const a = p.adventure, record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
-      const wid = a.worldId || (p.world && p.world.id);
+      const wid = a.worldId || (p.world && p.world.id) || LEGACY_WORLD_FALLBACK;
       if (!Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('this save needs a world that is not loaded');
       const validPlayer = (x) => record(x) && typeof x.name === 'string' && typeof x.first === 'string' && record(x.pronouns) && record(x.stats);
       if (!record(a.state) || !record(a.state.items) || !record(a.state.attitudes) || !record(a.state.flags) || !Array.isArray(a.state.present) || !Number.isFinite(Number(a.state.day)) || typeof a.state.time !== 'string' || typeof a.state.location !== 'string') throw new Error('save state is incomplete');
@@ -2682,7 +2774,7 @@
         (showHidden ? '<button class="quiet" data-reveal="changes">Changes (' + (t.diff || []).length + ')</button>' +
         '<button class="quiet" data-reveal="secret">Secret</button>' +
         '<button class="quiet" data-reveal="eval">Evaluation</button>' : '') +
-        (t.alts && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + t.alts.length + ')</button>' : '') +
+        (Array.isArray(t.alts) && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + num(t.alts.length) + ')</button>' : '') +
         '<span class="spacer"></span>' +
         (warn && showHidden ? '<span class="pill warn" title="' + esc((t.notes || []).join('\n')) + '">' + warn + ' note' + (warn > 1 ? 's' : '') + '</span>' : '') +
         '<span class="pill">' + esc(t.tierApplied || t.tierAsked) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
@@ -2725,7 +2817,7 @@
       const keys = Object.keys(T.species).sort((a, b) => (S.tf.influence[b] || 0) - (S.tf.influence[a] || 0));
       $('#influence').innerHTML = keys.map((k) => { const v = num(S.tf.influence[k]); return '<div class="bar"><span>' + esc(T.species[k].short) + '</span><div class="track"><div class="fill" style="width:' + v + '%"></div></div><span class="num">' + v + '</span></div>'; }).join('');
       $('#tfNote').textContent = T.thresholdsNote || '';
-      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · under way, step ' + bt.i + ' of ' + bt.steps.length : ' · beginning'; };
+      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · under way, step ' + num(bt.i) + ' of ' + num(Array.isArray(bt.steps) ? bt.steps.length : 0) : ' · beginning'; };
       $('#traits').innerHTML = (S.tf.traits.length ? S.tf.traits.slice().reverse().map((t) => '<li><span>Day ' + num(t.day) + ' · ' + esc(T.species[t.species].short) + (t.settled === false ? trackLabel(t) : '') + '</span>' + esc(t.trait) + '</li>').join('') : '<li class="small">None yet.</li>') + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '') + Object.keys(S.tf.paths || {}).filter((k) => S.tf.paths[k] && S.tf.paths[k].sex && !(S.tf.sex && S.tf.sex.species === k)).map((k) => '<li class="small"><span>' + esc(T.species[k].short) + ' path</span>also going toward ' + (S.tf.paths[k].sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body</li>').join('');
     }
     const items = $('#items'); items.innerHTML = '';
