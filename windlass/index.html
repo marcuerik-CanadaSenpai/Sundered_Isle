@@ -803,7 +803,9 @@
   // ---------- clock and schedule ----------
   const nextWeekday = (d) => { const wd = W.calendar.weekdays; return wd[(wd.indexOf(d) + 1) % wd.length]; };
   function daySchedule(weekday, day) {
-    return W.schedule.filter((e) => (!e.days || e.days.includes(weekday)) && (e.day == null || e.day === day)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
+    const entries = W.schedule.filter((e) => (!e.days || e.days.includes(weekday)) && (e.day == null || e.day === day));
+    const overrides = new Set(entries.filter((e) => e.day != null).map((e) => e.time));
+    return entries.filter((e) => e.day != null || !overrides.has(e.time)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
   }
   function slotInfo(state) {
     const sch = daySchedule(state.weekday, state.day), now = timeToMin(state.time);
