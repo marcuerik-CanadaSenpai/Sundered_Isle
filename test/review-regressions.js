@@ -144,9 +144,47 @@ async function checkDuplicateChronology() {
   }
 }
 
+async function checkChunkRecoveryRevision() {
+  const h = await startAdventure();
+  try {
+    useTurnHandler(h);
+    assert(await h.turn('Save a recoverable turn'), 'turn did not finish');
+    const [path, entry] = adventureEntry(h);
+    const id = path.split('/')[1];
+    const doc = () => h.mock.store.get('adventures/' + id).data;
+    const chunk = h.mock.store.get('adventures/' + id + '/turns/0000');
+    chunk.data.turns[0].memAfter = { summary: 'folded checkpoint', events: ['checkpoint event'], beats: [], facts: [] };
+    doc().turnCount = 0;
+    doc().rev = chunk.data.rev - 1;
+
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle');
+    h.click('#reloadAdv');
+    assert(await h.settle(100, 8000), 'recovering the interrupted save did not finish');
+    assert.deepEqual(visibleActions(h), ['Save a recoverable turn']);
+    assert.match(h.$('#status').textContent, /Recovered 1 complete saved turn/);
+    assert.equal(doc().memory.summary, 'folded checkpoint', 'recovery should restore the post-fold memory checkpoint');
+
+    doc().turnCount = 0;
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle before stale-chunk check');
+    h.click('#reloadAdv');
+    assert(await h.settle(100, 8000), 'loading the shorter save did not finish');
+    assert.deepEqual(visibleActions(h), [], 'a chunk from an already committed revision must not resurrect removed turns');
+    assert.equal(entry.data.turnCount, 0);
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
 (async () => {
   await checkInferenceAndCompaction();
   await checkDuplicateChronology();
+  await checkChunkRecoveryRevision();
   console.log('review regressions passed');
 })().catch((error) => {
   console.error('REVIEW REGRESSIONS FAILED\n' + (error && error.stack || error));
