@@ -1756,6 +1756,10 @@
     adv.turns.push(turn);
     if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
+    // Recovery reads a fold record only off the newest turn (an older one's successor carries the folded memory in its
+    // memBefore), so once this turn has committed the one before it gives its record up. A stopped or stale turn never
+    // reaches this line, so it leaves the previous turn as it was.
+    if (adv.turns.length > 1) delete adv.turns[adv.turns.length - 2].memAfter;
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
     // renderer and migration). Trimming the turn that has just dropped out of reach keeps a long adventure's stored turns
@@ -1901,7 +1905,7 @@
   }
   // A previous version shares its starting point (stateBefore, memBefore, pendingBefore) with the turn that replaced it,
   // so only what differs is kept; usePreviousVersion takes the shared part back from the current turn.
-  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.pendingBefore; return c; }
+  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.memAfter; delete c.pendingBefore; return c; }   // a previous version keeps no fold record: only the live newest turn does
   const ALTS_MAX_BYTES = 48000;
   const jsonBytes = (o) => new TextEncoder().encode(JSON.stringify(o)).length;
   // Keeps the newest previous versions that fit in ALTS_MAX_BYTES; a single version bigger than that is not kept either.
@@ -1956,7 +1960,8 @@
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
       // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
-      if (!properWordIn(text, r.first) && !properWordIn(text, r.name)) throw new Error('the roommate is not named');
+      const namedIn = (hay, nm) => { nm = String(nm || '').trim(); return !!nm && new RegExp('(^|[^\\p{L}\\p{M}])' + escRe(nm) + '(?![\\p{L}\\p{M}])', 'iu').test(hay); };
+      if (!namedIn(text, r.first) && !namedIn(text, r.name)) throw new Error('the roommate is not named');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
       adv.opening.narrative = openingNarrative(text); adv.opening.introWritten = true; adv.roommate.intro = text;
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
@@ -2007,6 +2012,15 @@
       // A restored snapshot that still cannot be shown is put back rather than left half-applied.
       try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
       catch (e) { adv.turns.push(last); adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not undo this turn: its saved history is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+      // The turn that is newest again gave up its fold record when the undone turn committed; the undone turn's memBefore is
+      // the memory after it, so the record is rebuilt from that (recovery may need it if the next save is interrupted). A
+      // trimmed turn gets one too: after a second Undo it is newest and holds no memory of its own.
+      const prev = adv.turns[adv.turns.length - 1];
+      // Its after-state is the undone turn's before-state; a trimmed turn gets the whole of it back, so a recovery can restore from it.
+      // It is no longer marked trimmed, so the whole after-state is trimmed again once the turn falls out of Undo's reach; it
+      // still cannot be undone itself (its before-state and memory stay trimmed, which restorable() checks).
+      if (prev && last.stateBefore) { prev.stateAfter = clone(last.stateBefore); delete prev._trimmed; }
+      if (prev && last.memBefore) prev.memAfter = { summary: last.memBefore.summary || '', beats: clone(last.memBefore.beats || []), facts: clone(last.memBefore.facts || []) };
       await persist({ removedTurn: true });
     } finally { actionDispatching = false; }
   }
@@ -2197,7 +2211,7 @@
   function cleanAlts(turns) {
     for (const t of turns) {
       t.alts = Array.isArray(t.alts) ? t.alts.filter((a) => validAlt(a, t)) : [];
-      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
+      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.memAfter; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
       t.alts = capAlts(t.alts);
     }
   }
@@ -2231,6 +2245,11 @@
         chunkIndex++; offset = 0;
       }
     }
+    // The state is restored from the newest recovered turn, so its after-state must be whole (a trimmed turn keeps only the
+    // clock, place and who is present). Without one the turns cannot be recovered, and the record's own turns load as before.
+    const wholeState = (x) => record(x) && record(x.items) && record(x.attitudes) && record(x.flags) && Array.isArray(x.present);
+    let unrecoverable = 0;
+    if (recoveredTail.length && !wholeState(recoveredTail[recoveredTail.length - 1].stateAfter)) { unrecoverable = recoveredTail.length; recoveredTail = []; }
     turns.push(...recoveredTail);
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
@@ -2244,9 +2263,11 @@
     if (recoveredTail.length && !renumbered) {
       const last = recoveredTail[recoveredTail.length - 1];
       adv.state = clone(last.stateAfter);
-      let replayFrom = recoveredTail.length;
       // memAfter is the fold's result (summary, beats, facts) recorded on the turn that folded; an older save may hold a
-      // whole memory there. Replay starts from the newest usable memory and applies each turn's events and any fold.
+      // whole memory there. Replay starts from the newest usable memory and applies each turn's events and any fold; when
+      // no recovered turn holds one (their history trimmed), it starts from the record's own memory, which is the memory
+      // just before the first recovered turn, and replays them all.
+      let replayFrom = 0;
       const foldRecord = (m) => record(m) && typeof m.summary === 'string' && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && !Array.isArray(m.events);
       for (let i = recoveredTail.length - 1; i >= 0; i--) {
         if (validMemory(recoveredTail[i].memAfter)) { adv.memory = clone(recoveredTail[i].memAfter); replayFrom = i + 1; break; }
@@ -2280,6 +2301,7 @@
     const warnings = [];
     if (recoveredTail.length && !renumbered) warnings.push('Recovered ' + recoveredTail.length + ' complete saved turn' + (recoveredTail.length === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save' + (recoverySaveFailed ? '; retry the save to sync it' : '') + '.');
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
+    if (unrecoverable) warnings.push(unrecoverable + ' newer saved turn' + (unrecoverable === 1 ? ' was' : 's were') + ' found ahead of the adventure record but could not be recovered (the newest of them kept too little of its state), so the game opens at the last turn the record knows. ' + (unrecoverable === 1 ? 'That turn is' : 'Those turns are') + ' not shown, Export will not include ' + (unrecoverable === 1 ? 'it' : 'them') + ', and taking a turn here replaces ' + (unrecoverable === 1 ? 'it' : 'them') + ' in the store.');
     else if (turnCountMismatch && !recoveredTail.length) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + expectedTurns + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
