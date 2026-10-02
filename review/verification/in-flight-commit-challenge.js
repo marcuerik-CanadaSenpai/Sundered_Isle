@@ -120,7 +120,10 @@ async function continueEsc(bk, sd, kind) {
   const aJ = JSON.stringify(advJson(store, sd.A));
   const aGot = aJ.includes(mk) ? 'got-turn' : (aJ === JSON.stringify(advJson(sd.store, sd.A)) ? 'untouched' : 'changed');
   const reload = await reloadCheck(bk, store, 'Bravo');
-  const pass = !bHasA && !/Alpha Quay/.test(pageAfter === '?' ? '' : (title === 'Bravo' ? pageAfter : '')) && h.errors.length === 0 && h.mock.violations.length === 0;
+  // The race must really have happened: Bravo's slowed chunk query was hit and Bravo finished loading with Bravo's own
+  // state; and the page must have refused new actions while it loaded (controls disabled). A page that never left Alpha fails.
+  const raced = slow.hits.length > 0 && landed && title === 'Bravo' && /Bravo Hall/.test(pageAfter);
+  const pass = raced && !sendEnabled && !regenEnabled && !bHasA && h.errors.length === 0 && h.mock.violations.length === 0;
   const r = { build: bk, route: kind, start: startClock, dlgOpenAfterEsc: dlgOpen, sendEnabled, regenEnabled, held: held + ':' + heldKind, landedBeforeRelease, landed, slowHits: slow.hits.length, midStatus, endStatus, page: title, pageStateAfterRelease: pageAfter, follow, Bstored: st(bDoc) + ' tc ' + (bDoc && bDoc.turnCount), BhasAlphaMaterial: bHasA, A: aGot, reload, errors: h.errors.length, viol: h.mock.violations.length, pass };
   h.close();
   return r;
@@ -152,7 +155,10 @@ async function bootRegen(bk, sd) {
   const aHasPlaceholder = at.some((t) => /Override placeholder/.test(t.action)) || JSON.stringify(advJson(store, sd.A)).includes(mk);
   const dupN = at.length !== new Set(at.map((t) => t.n)).size;
   const reload = await reloadCheck(bk, store, 'Alpha');
-  const pass = !aHasPlaceholder && !(title === 'Alpha' && !/Alpha Quay/.test(pageAfter)) && h.errors.length === 0 && h.mock.violations.length === 0;
+  // The race must really have happened: the slowed boot query was hit, the Override turn applied, the regenerate call was
+  // held while the boot load landed, and Alpha ended up open with Alpha's own state.
+  const raced = slow.hits.length > 0 && /Applied/.test(ovrNote) && held && landed && title === 'Alpha' && /Alpha Quay/.test(pageAfter);
+  const pass = raced && !aHasPlaceholder && h.errors.length === 0 && h.mock.violations.length === 0;
   const r = { build: bk, route: 'bootRegen', placeholderClock, ovrNote, regenEnabled, held, loadedBeforeRelease, landed, endStatus, page: title, pageStateAfterRelease: pageAfter, follow, AhasPlaceholderTurn: aHasPlaceholder, dupN, reload, errors: h.errors.length, viol: h.mock.violations.length, pass };
   h.close();
   return r;
