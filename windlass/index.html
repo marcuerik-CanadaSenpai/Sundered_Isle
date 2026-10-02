@@ -1316,14 +1316,22 @@
     let [lo, hi] = (W.wordBands || {})[density] || wordBand();
     if (isTransition(input) && density !== 'rich') hi = lo + Math.round((hi - lo) * 0.45);
     if (arcActive()) { lo += 80; hi += 140; }
-    // A director note that asks for a length ("about 600 words") sets the band, so the prompt and the length fit agree with it.
-    const asked = directorWords(input.director);
-    if (asked) { hi = asked; lo = Math.round(asked * 0.8); }
+    // A director note that asks for a length ("about 600 words", "at least 600 words", "400 to 600 words") sets the band, so the
+    // prompt and the length fit agree with it. A number of words mentioned for any other reason ("the 100 words on the plaque") is not a length.
+    const asked = directorBand(input.director);
+    if (asked) [lo, hi] = asked;
     return [lo, hi];
   }
-  function directorWords(note) {
-    let n = 0; for (const m of String(note || '').matchAll(/(\d{2,4})\s*(?:\+\s*)?words?\b/gi)) n = Math.max(n, +m[1]);
-    return n ? Math.min(1500, Math.max(60, n)) : 0;
+  function directorBand(note) {
+    const t = String(note || ''); const N = '(\\d{2,4})'; const WD = '\\s*-?\\s*words?\\b';
+    const lim = (n) => Math.min(1500, Math.max(60, Math.round(n)));
+    const band = (a, b) => { a = lim(a); b = lim(b); return a <= b ? [a, b] : [b, a]; };
+    let m;
+    if ((m = t.match(new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'i')))) return band(+m[1], +m[2]);
+    if ((m = t.match(new RegExp(N + '\\s*\\+' + WD, 'i'))) || (m = t.match(new RegExp('(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD, 'i'))) || (m = t.match(new RegExp(N + WD + '\\s+or (?:more|longer)', 'i')))) return band(+m[1], +m[1] * 1.25);
+    if ((m = t.match(new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'i')))) return band(+m[1] * 0.6, +m[1]);
+    if ((m = t.match(new RegExp('(?:(?:about|around|roughly|approximately|in|keep it to|make it|aim for)\\s+|~\\s*)' + N + WD, 'i'))) || (m = t.match(new RegExp(N + WD + '\\s+(?:long|in length)', 'i'))) || (m = t.match(new RegExp(N + '-word\\s+(?:scene|turn|reply|narrative|passage|response)', 'i')))) return band(+m[1] * 0.85, +m[1] * 1.1);
+    return null;
   }
   // The world's premise in two parts: the setting (shown when creating) and the personal part from "You are …" on, which opens
   // the story once the player has a name. The narrator gets the whole premise in <world> as before.

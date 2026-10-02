@@ -63,8 +63,12 @@ async function main() {
       'a director note must not license unstated choices for the protagonist');
     assert(await h.turn('Keep talking', { director: 'Tell it in about 600 words.' }), 'director length turn did not finish');
     assert(prompts.length > 3, 'the director-length storyteller prompt was not captured');
-    assert.match(prompts[3], /Narrative length: at most 600 words/, 'a director-requested length must set the prompt ceiling');
-    assert.match(prompts[3], /"narrative": string, at most 600 words/, 'the output format must use the director-requested length');
+    assert.match(prompts[3], /Narrative length: at most 660 words; 510 to 660/, 'a director-requested length must set the prompt band');
+    assert.match(prompts[3], /"narrative": string, at most 660 words/, 'the output format must use the director-requested length');
+    assert(await h.turn('Keep talking', { director: 'Tell it in 600+ words.' }), 'director lower-bound turn did not finish');
+    assert.match(prompts[4], /Narrative length: at most 750 words; 600 to 750/, 'a requested lower bound must stay a lower bound');
+    assert(await h.turn('Look around', { director: 'Read the 100 words on the plaque aloud.' }), 'incidental word-count turn did not finish');
+    assert.doesNotMatch(prompts[5], /at most 100 words/, 'a word count mentioned for another reason must not set the length');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -74,8 +78,11 @@ async function main() {
       'romance must use the rich band even when standard density is selected');
     assert.deepEqual(Array.from(savedTurns[1].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
       'ordinary scenes must continue to honor the selected standard density');
-    assert.deepEqual(Array.from(savedTurns[3].band), [480, 600],
+    assert.deepEqual(Array.from(savedTurns[3].band), [510, 660],
       'a director-requested length must set the band the length fit uses');
+    assert.deepEqual(Array.from(savedTurns[4].band), [600, 750], 'a requested lower bound must reach the saved band');
+    assert.deepEqual(Array.from(savedTurns[5].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
+      'an incidental word count must leave the selected band alone');
 
     const worlds = h.window.WINDLASS_WORLDS;
     for (const id of ['sundered', 'mythaven', 'halloway']) {
