@@ -641,6 +641,9 @@
     const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '. ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
     const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
+    // A drawn or typed name that is an authored character's means the roommate is that person: they are not listed twice.
+    const twin = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((nm) => String(nm || '').trim().toLowerCase() === p.name.trim().toLowerCase()));
+    if (twin) r.replaces = twin.key;
     r.intro = composeIntro(r);
     return r;
   }
@@ -1740,10 +1743,7 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
-    // The memory after a fold is kept on the newest turn only (its successor's memBefore carries the same memory), so a
-    // fold does not leave a full copy of the memory on every turn it touched.
-    if (adv.turns.length > 1) adv.turns[adv.turns.length - 2].memAfter = null;
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = clone(adv.memory); } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
@@ -2234,6 +2234,9 @@
       const last = recoveredTail[recoveredTail.length - 1];
       adv.state = clone(last.stateAfter);
       let replayFrom = recoveredTail.length;
+      // memAfter is the fold's result (summary, beats, facts) recorded on the turn that folded; an older save may hold a
+      // whole memory there. Replay starts from the newest usable memory and applies each turn's events and any fold.
+      const foldRecord = (m) => record(m) && typeof m.summary === 'string' && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && !Array.isArray(m.events);
       for (let i = recoveredTail.length - 1; i >= 0; i--) {
         if (validMemory(recoveredTail[i].memAfter)) { adv.memory = clone(recoveredTail[i].memAfter); replayFrom = i + 1; break; }
         if (validMemory(recoveredTail[i].memBefore)) { adv.memory = clone(recoveredTail[i].memBefore); replayFrom = i; break; }
@@ -2246,6 +2249,7 @@
         if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
         if (Array.isArray(turn.beats)) adv.memory.beats.push(...turn.beats);
         if (Array.isArray(turn.facts)) adv.memory.facts.push(...turn.facts);
+        if (foldRecord(turn.memAfter)) { adv.memory.summary = turn.memAfter.summary; adv.memory.beats = clone(turn.memAfter.beats); adv.memory.facts = clone(turn.memAfter.facts || []); }
       }
       if (Array.isArray(last.pendingAfter)) adv.pendingNotes = clone(last.pendingAfter);
     }
