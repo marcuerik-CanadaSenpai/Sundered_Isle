@@ -16,6 +16,11 @@ http.createServer((req, res) => {
   }
   if (p === '/__mock-claude.js') { res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' }); return res.end(fs.readFileSync(path.join(__dirname, 'mock-claude.js'))); }
   const m = /^\/worlds\/([\w.-]+\.js)$/.exec(p);
-  if (m) { res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' }); return res.end(fs.readFileSync(path.join(process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds'), m[1]))); }
+  if (m) {
+    // Read before answering, so a world file that does not exist is a 404 rather than an exception that stops the server.
+    let body; try { body = fs.readFileSync(path.join(process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds'), m[1])); }
+    catch (e) { res.writeHead(e && e.code === 'ENOENT' ? 404 : 500); return res.end(e && e.code === 'ENOENT' ? 'not found' : 'read error'); }
+    res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' }); return res.end(body);
+  }
   res.writeHead(404); res.end('not found');
 }).listen(port, '127.0.0.1', () => console.log('windlass harness on http://127.0.0.1:' + port));

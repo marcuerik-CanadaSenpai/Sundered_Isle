@@ -2,7 +2,7 @@
 // A strict mock of the artifact runtime (contract 0.2.60): db, sample, downloads, claude.use().
 // It enforces the documented limits so contract violations show up as recorded `violations`.
 //   mock.violations   : [{kind, detail}]  every contract breach the page committed
-//   mock.sampleCalls  : [{label, bytes, input, opts, outcome}]
+//   mock.sampleCalls  : [{label, bytes, input, opts, outcome}]  label: the kind of call, read off the prompt (turn, memory fold, …)
 //   mock.dbLog        : [{op, path, bytes?}]
 //   mock.store        : Map path -> {data, version}
 //   mock.downloadsLog : [{filename, bytes}]
@@ -21,6 +21,9 @@ function depthOf(o, d = 1) { if (o && typeof o === 'object') { let m = d; for (c
 function deepFreeze(o) { if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.freeze(o); for (const v of Object.values(o)) deepFreeze(v); } return o; }
 function mergeDeep(a, b) { const out = Object.assign({}, a); for (const [k, v] of Object.entries(b)) { if (v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])) out[k] = mergeDeep(out[k], v); else out[k] = v; } return out; }
 const err = (code, message, extra) => Object.assign({ code, message }, extra || {});
+
+// A plain object from any realm (the page's jsdom window or Node): not an array, a Date, a Map or a class instance.
+const isPlain = (o) => !!o && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null || (Object.getPrototypeOf(Object.getPrototypeOf(o)) === null && o.constructor && o.constructor.name === 'Object'));
 
 function install(window, opts) {
   opts = opts || {};
@@ -62,7 +65,7 @@ function install(window, opts) {
     } finally { mock.pending--; }
   }
   function checkBody(data, path) {
-    if (data === null || typeof data !== 'object' || Array.isArray(data)) throw reject('bad-body', 'invalid_argument', 'body must be a plain object: ' + path);
+    if (!isPlain(data)) throw reject('bad-body', 'invalid_argument', 'body must be a plain object: ' + path);
     let json; try { json = JSON.stringify(data); } catch (e) { throw reject('bad-body', 'invalid_argument', 'body not serialisable: ' + path + ': ' + e.message); }
     const bytes = utf8(json);
     if (bytes > MAX_DOC) throw reject('doc-too-large', 'invalid_argument', path + ' is ' + bytes + ' bytes (cap ' + MAX_DOC + ')');
@@ -86,7 +89,7 @@ function install(window, opts) {
   function query(path, st) {
     const q = {
       where: (f, o, v) => { if (st.filters.length >= 10) throw badPath('db: more than 10 filters on ' + path); return query(path, Object.assign({}, st, { filters: st.filters.concat([[f, o, v]]) })); },
-      orderBy: (f, d) => { if (st.order) violate('two-orderBy', path); return query(path, Object.assign({}, st, { order: [f, d || 'asc'] })); },
+      orderBy: (f, d) => { if (st.order) { violate('two-orderBy', path); throw err('invalid_argument', 'only one orderBy per query: ' + path); } return query(path, Object.assign({}, st, { order: [f, d || 'asc'] })); },
       limit: (n) => { if (!(n >= 1 && n <= 1000)) violate('bad-limit', String(n)); return query(path, Object.assign({}, st, { lim: n })); },
       get: () => op('query', path, () => {
         if (st.lim != null && !(st.lim >= 1 && st.lim <= 1000)) throw err('invalid_argument', 'limit out of range');  // already recorded by limit()
@@ -125,10 +128,21 @@ function install(window, opts) {
   });
 
   // ---------- sample ----------
-  const isPlain = (o) => o && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null || (o.constructor && o.constructor.name === 'Object'));
+  // The page strips its own label before calling the runtime (an unknown option would be refused), so the kind of call is
+  // read off the prompt itself for the trace and the diagnostics.
+  function kindOf(input) {
+    const p = typeof input === 'string' ? input : (Array.isArray(input) ? input.map((m) => (m && m.content) || '').join('\n') : '');
+    if (/<output_format>/.test(p)) return 'turn';
+    if (/You maintain the long-term memory/.test(p)) return 'memory fold';
+    if (/Rewrite it to between/.test(p)) return 'length fit';
+    if (/Write the roommate's first appearance/.test(p)) return 'roommate introduction';
+    if (/Invent the people listed in <people>/.test(p)) return 'cast invention';
+    if (/Reply with the single word pong/.test(p)) return 'ping';
+    return p.slice(0, 40).replace(/\s+/g, ' ');
+  }
   async function sampleImpl(input, options, asJson) {
     mock.calls.sample++;
-    const label = (options && options.__label) || '';
+    const label = kindOf(input);
     const call = { label, input, opts: options, bytes: 0, outcome: 'pending', t0: Date.now() };
     mock.sampleCalls.push(call);
     const fail = (code, message, text) => { call.outcome = code; throw err(code, message, text != null ? { text } : undefined); };
@@ -141,7 +155,7 @@ function install(window, opts) {
     if (options.cache !== undefined && !(typeof options.cache === 'boolean' || isPlain(options.cache))) { violate('sample-bad-cache', String(options.cache)); fail('invalid_request', 'bad cache'); }
     if (options.tools && options.cache !== undefined && options.cache !== false) { violate('sample-cache-with-tools', String(options.cache)); fail('invalid_request', 'cache with tools'); }
     const known = new Set(['onText', 'signal', 'tools', 'images', 'modelTier', 'cache']);
-    for (const k of Object.keys(options)) if (!known.has(k)) { violate('sample-unknown-option', k); }
+    for (const k of Object.keys(options)) if (!known.has(k)) { violate('sample-unknown-option', k); fail('invalid_request', 'unknown option ' + k); }
     let text;
     if (typeof input === 'string') { if (!input.trim()) { violate('sample-empty-input', 'empty prompt'); fail('invalid_request', 'empty input'); } text = input; }
     else if (Array.isArray(input) && input.length && input[0].role === 'user' && input[input.length - 1].role === 'user' && input.every((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content)) text = input.map((m) => m.content).join('');
@@ -152,7 +166,9 @@ function install(window, opts) {
     await wait(mock.sampleLatency);
     if (options.signal && options.signal.aborted) fail('cancelled', 'aborted');
     let res;
-    try { res = await (mock.sampleHandler || defaultHandler)(input, options, call); }
+    // The runtime rejects an aborted call at once, so a slow or held handler is raced against the signal.
+    const aborted = options.signal ? new Promise((_, rej) => { const on = () => rej(err('cancelled', 'aborted')); if (options.signal.aborted) on(); else options.signal.addEventListener('abort', on, { once: true }); }) : null;
+    try { const work = Promise.resolve().then(() => (mock.sampleHandler || defaultHandler)(input, options, call)); res = await (aborted ? Promise.race([work, aborted]) : work); }
     catch (e) { call.outcome = (e && e.code) || 'handler-threw'; throw (e && e.code) ? e : err('upstream_error', String(e && e.message || e)); }
     if (typeof res === 'string') res = { text: res, truncated: false };
     if (!res || !res.text || !String(res.text).trim()) fail('empty_completion', 'no text');

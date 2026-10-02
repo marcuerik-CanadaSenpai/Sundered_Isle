@@ -120,7 +120,7 @@ async function continueEsc(bk, sd, kind) {
   const aJ = JSON.stringify(advJson(store, sd.A));
   const aGot = aJ.includes(mk) ? 'got-turn' : (aJ === JSON.stringify(advJson(sd.store, sd.A)) ? 'untouched' : 'changed');
   const reload = await reloadCheck(bk, store, 'Bravo');
-  const pass = !bHasA && !/Alpha Quay/.test(pageAfter === '?' ? '' : (title === 'Bravo' ? pageAfter : '')) && h.errors.length === 0 && h.mock.violations.length === 0;
+  const pass = landed && slow.hits.length === 1 && !sendEnabled && !regenEnabled && title === 'Bravo' && /Bravo Hall/.test(pageAfter) && !bHasA && h.errors.length === 0 && h.mock.violations.length === 0;
   const r = { build: bk, route: kind, start: startClock, dlgOpenAfterEsc: dlgOpen, sendEnabled, regenEnabled, held: held + ':' + heldKind, landedBeforeRelease, landed, slowHits: slow.hits.length, midStatus, endStatus, page: title, pageStateAfterRelease: pageAfter, follow, Bstored: st(bDoc) + ' tc ' + (bDoc && bDoc.turnCount), BhasAlphaMaterial: bHasA, A: aGot, reload, errors: h.errors.length, viol: h.mock.violations.length, pass };
   h.close();
   return r;
