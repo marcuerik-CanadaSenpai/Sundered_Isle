@@ -21,6 +21,9 @@ const { boot } = require('./boot');
     expect(/^saved/.test(h.$('#summaryNote').textContent), 'the save note reads "' + h.$('#summaryNote').textContent + '"');
     const doc = [...h.mock.store.entries()].find(([k]) => /^adventures\/[^/]+$/.test(k));
     expect(doc && doc[1].data.turnCount === 1, 'the stored adventure has turnCount ' + (doc && doc[1].data.turnCount));
+    // The turn record itself, not just the count on the adventure document, must be in the store.
+    const stored = [...h.mock.store.entries()].filter(([k]) => doc && k.startsWith(doc[0] + '/turns/')).reduce((n, [, v]) => n + ((v.data && v.data.turns) || []).length, 0);
+    expect(stored === 1, 'the store holds ' + stored + ' turn record(s), expected 1');
     const d = h.diagnostics();
     expect(!d.errors.length, d.errors.length + ' page error(s): ' + d.errors.map((e) => e.message.split('\n')[0]).join(' | '));
     expect(!d.violations.length, d.violations.length + ' contract violation(s): ' + JSON.stringify(d.violations));

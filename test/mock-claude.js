@@ -89,7 +89,7 @@ function install(window, opts) {
   function query(path, st) {
     const q = {
       where: (f, o, v) => { if (st.filters.length >= 10) throw badPath('db: more than 10 filters on ' + path); return query(path, Object.assign({}, st, { filters: st.filters.concat([[f, o, v]]) })); },
-      orderBy: (f, d) => { if (st.order) violate('two-orderBy', path); return query(path, Object.assign({}, st, { order: [f, d || 'asc'] })); },
+      orderBy: (f, d) => { if (st.order) { violate('two-orderBy', path); throw err('invalid_argument', 'only one orderBy per query: ' + path); } return query(path, Object.assign({}, st, { order: [f, d || 'asc'] })); },
       limit: (n) => { if (!(n >= 1 && n <= 1000)) violate('bad-limit', String(n)); return query(path, Object.assign({}, st, { lim: n })); },
       get: () => op('query', path, () => {
         if (st.lim != null && !(st.lim >= 1 && st.lim <= 1000)) throw err('invalid_argument', 'limit out of range');  // already recorded by limit()

@@ -1326,7 +1326,7 @@
     const turns = [openingTurn()].concat(adv.turns);
     const win = Math.max(1, (limits && limits.window) || Number(adv.settings.window) || 3);
     const eventsN = (limits && limits.events) || 40;
-    const earlierN = (limits && limits.earlier) || 24;
+    const earlierN = (limits && limits.earlier != null) ? limits.earlier : 24;   // 0 means none at all
     const recent = turns.slice(-win);
     const older = turns.slice(0, Math.max(0, turns.length - win));
     const recentText = recent.map((t) => t.narrative).join('\n');
@@ -1379,7 +1379,7 @@
     if (factsShown.length) parts.push(x('facts', factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f)).join('\n'), 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
-    if (older.length) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
+    if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
     const recentChars = limits && limits.recentChars;
     const recentNarr = (t) => (recentChars && t.narrative.length > recentChars) ? t.narrative.slice(-recentChars) : t.narrative;
     parts.push(x('recent_turns', recent.map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : '') + ', oldest first"'));
@@ -1731,10 +1731,11 @@
       lastDebug = { prompt: '(no prompt: reply applied from Override)', raw: replyText, notes, meta: 'Turn ' + turn.n + ' · applied manually' };
       renderAll(); setStatus(''); const saved = await persist(); return saved ? 'Applied as turn ' + turn.n + '.' : 'Applied as turn ' + turn.n + ', but it is not saved yet.';
     } catch (e) {
+      setStatus('');
       mine.turns.length = turnsBefore;
       mine.state = stateBefore; mine.memory = memBefore; mine.pendingNotes = pendingBefore;
       return 'Could not apply: ' + ((e && e.message) || (e && e.code) || 'error');
-    } finally { busy = false; setBusyUI(false); renderAll(); setStatus(''); }
+    } finally { busy = false; setBusyUI(false); renderAll(); }   // a failed save keeps the status (and Retry/Export) persist() set
   }
   // A previous version shares its starting point (stateBefore, memBefore, pendingBefore) with the turn that replaced it,
   // so only what differs is kept; usePreviousVersion takes the shared part back from the current turn.
@@ -1946,7 +1947,7 @@
       dirty = false;
       // Best effort: the turns just out of Undo's reach were saved whole in the previous chunk; store them trimmed now.
       const trimmedChunk = Math.floor((n - 1 - UNDO_DEPTH) / CHUNK);
-      if (n > UNDO_DEPTH && trimmedChunk < chunkIdx && trimmedChunk <= mine._savedUpToChunk) { try { live(); await chunkRef(trimmedChunk).set(chunkBody(trimmedChunk)); } catch (e) {} }
+      if (n > UNDO_DEPTH && trimmedChunk < chunkIdx && trimmedChunk <= mine._savedUpToChunk) { try { live(); await chunkRef(trimmedChunk).set(chunkBody(trimmedChunk)); } catch (e) { if ((mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk) >= trimmedChunk) mine._savedUpToChunk = trimmedChunk - 1; } }   // a failed rewrite is retried by the next save
       if (adv !== mine) return true;
       const hadSaveError = !!saveError;
       saveError = null;
@@ -2019,13 +2020,14 @@
   const ALT_LISTS = ['events', 'beats', 'facts', 'suggestions', 'notes', 'diff', 'exposures', 'pendingAfter'];
   function validAlt(a, owner) {
     const rec = (x) => !!x && typeof x === 'object' && !Array.isArray(x); const st = a && a.stateAfter;
-    return rec(a) && Number.isInteger(a.n) && a.n === owner.n && typeof a.narrative === 'string' && rec(st) && rec(st.items) && rec(st.attitudes) && rec(st.flags) && Array.isArray(st.present) && Number.isFinite(Number(st.day)) && typeof st.time === 'string' && typeof st.location === 'string' && ALT_LISTS.every((k) => a[k] == null || Array.isArray(a[k]));
+    return rec(a) && typeof a.id === 'string' && !!a.id && typeof a.action === 'string' && Number.isInteger(a.n) && a.n === owner.n && typeof a.narrative === 'string' && rec(st) && rec(st.items) && rec(st.attitudes) && rec(st.flags) && Array.isArray(st.present) && Number.isFinite(Number(st.day)) && typeof st.time === 'string' && typeof st.location === 'string' && ALT_LISTS.every((k) => a[k] == null || Array.isArray(a[k]));
   }
   // The before-state a version shares with its turn is always taken from the turn (usePreviousVersion), never from the save.
   function cleanAlts(turns) {
     for (const t of turns) {
       t.alts = Array.isArray(t.alts) ? t.alts.filter((a) => validAlt(a, t)) : [];
       for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
+      t.alts = capAlts(t.alts);
     }
   }
   // Loads a save and returns a warning for the player when something had to be repaired or is missing (null otherwise).
