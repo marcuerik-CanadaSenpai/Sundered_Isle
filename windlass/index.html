@@ -806,7 +806,9 @@
   // ---------- clock and schedule ----------
   const nextWeekday = (d) => { const wd = W.calendar.weekdays; return wd[(wd.indexOf(d) + 1) % wd.length]; };
   function daySchedule(weekday, day) {
-    return W.schedule.filter((e) => (!e.days || e.days.includes(weekday)) && (e.day == null || e.day === day)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
+    const entries = W.schedule.filter((e) => (!e.days || e.days.includes(weekday)) && (e.day == null || e.day === day));
+    const overrides = new Set(entries.filter((e) => e.day != null).map((e) => e.time));
+    return entries.filter((e) => e.day != null || !overrides.has(e.time)).slice().sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
   }
   function slotInfo(state) {
     const sch = daySchedule(state.weekday, state.day), now = timeToMin(state.time);
@@ -1572,19 +1574,21 @@
   function actionExposures(action) {
     const text = String(action || '');
     if (!W.transformation || !text) return [];
-    const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const dairy = /\bI\s+(?:drank|sipped|tasted|ate|consumed|had)\s+(?:(?:a|some|the)\s+)?(?:(?:sip|taste|cup|glass|serving)\s+of\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text);
+    const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
+    const dairy = /^[\s]*[Ii]\s+(?:drank|sipped|tasted|ate|consumed|had)\s+(?:(?:a|some|the|a glass of|a cup of)\s+)?(?:(?:sip|taste|cup|glass|serving)\s+of\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });
     };
-    for (const person of activeCharacters().filter((c) => c && c.species !== 'human')) {
+    for (const person of activeCharacters()) {
+      if (!person || person.species === 'human') continue;
       const names = [person.name, person.first, person.name && person.name.split(' ').pop()].concat(person.aliases || []).filter(Boolean);
-      const did = (phrase) => names.some((name) => new RegExp('(?:^|[.!?]\\s*)I\\s+' + phrase + '\\s+' + escapeRegExp(name) + '\\b', 'i').test(text));
-      const sleep = names.some((name) => new RegExp('(?:^|[.!?]\\s*)I\\s+(?:slept\\s+(?:with|beside|next\\s+to)|shared\\s+(?:a\\s+)?bed\\s+with|spent\\s+(?:the\\s+)?night\\s+with)\\s+' + escapeRegExp(name) + '\\b', 'i').test(text));
-      const kiss = did('kissed');
-      const embrace = did('(?:hugged|embraced|cuddled|snuggled|held hands with)') || names.some((name) => new RegExp("(?:^|[.!?]\\s*)I\\s+held\\s+" + escapeRegExp(name) + "[’']s hand\\b", 'i').test(text));
-      const touch = did('(?:touched|stroked|caressed|groomed|brushed|preened)');
+      const matches = (phrases) => names.some((name) => phrases.some((phrase) => namedAfter(phrase, name)));
+      const sleep = matches(['(?:sleep|slept)\\s+(?:with|beside|next to)\\s+(?:the\\s+)?', '(?:share|shared)\\s+(?:a\\s+)?bed\\s+with\\s+(?:the\\s+)?', '(?:spend|spent)\\s+the\\s+night\\s+(?:with|beside)\\s+(?:the\\s+)?']);
+      const kiss = matches(['kiss(?:ed)?\\s+', '(?:make|made)\\s+out\\s+with\\s+']);
+      const hand = names.some((name) => new RegExp('^[\\s]*[Ii]\\s+(?:hold|held)\\s+' + escRe(String(name)) + "['’]s hand(?=$|[^A-Za-z])").test(text));
+      const embrace = matches(['hug(?:ged)?\\s+', 'embrace(?:d)?\\s+', 'cuddle(?:d)?\\s+', 'snuggle(?:d)?\\s+', '(?:hold|held)\\s+hands\\s+with\\s+']) || hand;
+      const touch = matches(['touch(?:ed)?\\s+', 'stroke(?:d)?\\s+', 'caress(?:ed)?\\s+', 'groom(?:ed)?\\s+', 'brush(?:ed)?\\s+', 'preen(?:ed)?\\s+']);
       if (!sleep && !kiss && !embrace && !touch) continue;
       const species = speciesKeyOf(person), sp = species && W.transformation.species[species];
       if (!sp) continue;
@@ -1593,8 +1597,7 @@
         (sleep && /\bsleep|night\b/.test(method)) ||
         (kiss && /\bkiss/.test(method)) ||
         (embrace && /\b(hug\w*|cuddl\w*|touch\w*|warmth)\b/.test(method)) ||
-        (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method)) ||
-        (dairy && species === 'cow' && /\b(dairy|milk|cream|cocoa|cheese|butter)\b/.test(method));
+        (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method));
       if (!supported) continue;
       const intensity = sleep ? 3 : /\b(long|for hours|all evening|all afternoon|for a while)\b/i.test(text) ? 2 : 1;
       add(species, intensity);
@@ -1863,10 +1866,11 @@
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
   function trimState(s) { return s ? { day: s.day, time: s.time, location: s.location, present: s.present } : s; }
   function trimTurnHistory(t) {
-    if (t._trimmed) return;
+    if (t._trimmed) return false;
     t.stateBefore = trimState(t.stateBefore); t.stateAfter = trimState(t.stateAfter);
     t.memBefore = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
+    return true;
   }
   // How many of the newest turns keep their full history, i.e. how far Undo (and Regenerate after an Undo) can go back.
   const UNDO_DEPTH = 2;
@@ -2185,7 +2189,7 @@
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
     const warnings = [];
-    if (renumbered) warnings.push((hadDuplicateNumbers ? 'Repeated' : 'Non-sequential') + ' turn numbers were repaired in saved order; the next save stores the fix.');
+    if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
     if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
@@ -2337,7 +2341,7 @@
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
-      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? ' Turn numbers were repaired in saved order' + (hadDuplicateNumbers ? ' because duplicates were present.' : '.') : ''), !!renumbered);
+      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? (hadDuplicateNumbers ? ' Turn numbers were repaired in chronological order because duplicates were present.' : ' Turn numbers were repaired in saved order.') : ''), !!renumbered);
     } catch (e) {
       adv = oldAdv; setWorld(oldWorldId);
       setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);
