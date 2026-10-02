@@ -22,6 +22,9 @@ function deepFreeze(o) { if (o && typeof o === 'object' && !Object.isFrozen(o)) 
 function mergeDeep(a, b) { const out = Object.assign({}, a); for (const [k, v] of Object.entries(b)) { if (v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' && !Array.isArray(out[k])) out[k] = mergeDeep(out[k], v); else out[k] = v; } return out; }
 const err = (code, message, extra) => Object.assign({ code, message }, extra || {});
 
+// A plain object from any realm (the page's jsdom window or Node): not an array, a Date, a Map or a class instance.
+const isPlain = (o) => !!o && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null || (Object.getPrototypeOf(Object.getPrototypeOf(o)) === null && o.constructor && o.constructor.name === 'Object'));
+
 function install(window, opts) {
   opts = opts || {};
   const mock = {
@@ -62,7 +65,7 @@ function install(window, opts) {
     } finally { mock.pending--; }
   }
   function checkBody(data, path) {
-    if (data === null || typeof data !== 'object' || Array.isArray(data)) throw reject('bad-body', 'invalid_argument', 'body must be a plain object: ' + path);
+    if (!isPlain(data)) throw reject('bad-body', 'invalid_argument', 'body must be a plain object: ' + path);
     let json; try { json = JSON.stringify(data); } catch (e) { throw reject('bad-body', 'invalid_argument', 'body not serialisable: ' + path + ': ' + e.message); }
     const bytes = utf8(json);
     if (bytes > MAX_DOC) throw reject('doc-too-large', 'invalid_argument', path + ' is ' + bytes + ' bytes (cap ' + MAX_DOC + ')');
@@ -125,7 +128,6 @@ function install(window, opts) {
   });
 
   // ---------- sample ----------
-  const isPlain = (o) => o && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null || (o.constructor && o.constructor.name === 'Object'));
   async function sampleImpl(input, options, asJson) {
     mock.calls.sample++;
     const label = (options && options.__label) || '';
@@ -141,7 +143,7 @@ function install(window, opts) {
     if (options.cache !== undefined && !(typeof options.cache === 'boolean' || isPlain(options.cache))) { violate('sample-bad-cache', String(options.cache)); fail('invalid_request', 'bad cache'); }
     if (options.tools && options.cache !== undefined && options.cache !== false) { violate('sample-cache-with-tools', String(options.cache)); fail('invalid_request', 'cache with tools'); }
     const known = new Set(['onText', 'signal', 'tools', 'images', 'modelTier', 'cache']);
-    for (const k of Object.keys(options)) if (!known.has(k)) { violate('sample-unknown-option', k); }
+    for (const k of Object.keys(options)) if (!known.has(k)) { violate('sample-unknown-option', k); fail('invalid_request', 'unknown option ' + k); }
     let text;
     if (typeof input === 'string') { if (!input.trim()) { violate('sample-empty-input', 'empty prompt'); fail('invalid_request', 'empty input'); } text = input; }
     else if (Array.isArray(input) && input.length && input[0].role === 'user' && input[input.length - 1].role === 'user' && input.every((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content)) text = input.map((m) => m.content).join('');
