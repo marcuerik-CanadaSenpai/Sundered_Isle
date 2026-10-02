@@ -57,6 +57,14 @@ async function main() {
       'the generic short-scene instruction must not undermine a director note');
     assert.match(prompts[2], /ending at the binding director note's requested ending/,
       'the output format must not contradict the director-note ending');
+    assert.match(prompts[2], /Actions the note gives \S+ are the player's own instruction for this turn/,
+      'protagonist actions in a director note must count as part of the stated player action');
+    assert.match(prompts[2], /still add no desire, consent, dialogue or further action/,
+      'a director note must not license unstated choices for the protagonist');
+    assert(await h.turn('Keep talking', { director: 'Tell it in about 600 words.' }), 'director length turn did not finish');
+    assert(prompts.length > 3, 'the director-length storyteller prompt was not captured');
+    assert.match(prompts[3], /Narrative length: at most 600 words/, 'a director-requested length must set the prompt ceiling');
+    assert.match(prompts[3], /"narrative": string, at most 600 words/, 'the output format must use the director-requested length');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -66,6 +74,8 @@ async function main() {
       'romance must use the rich band even when standard density is selected');
     assert.deepEqual(Array.from(savedTurns[1].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
       'ordinary scenes must continue to honor the selected standard density');
+    assert.deepEqual(Array.from(savedTurns[3].band), [480, 600],
+      'a director-requested length must set the band the length fit uses');
 
     const worlds = h.window.WINDLASS_WORLDS;
     for (const id of ['sundered', 'mythaven', 'halloway']) {
