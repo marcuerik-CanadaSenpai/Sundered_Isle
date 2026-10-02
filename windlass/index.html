@@ -1968,7 +1968,7 @@
     try {
       if (await syncFromStore()) return;
       if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
-      const keep = { alts: t.alts.slice(), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
+      const keep = { alts: clone(t.alts), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };   // deep: prev is mutated below
       const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
       prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
       adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
@@ -1990,7 +1990,9 @@
   // So each save carries a revision number; before writing, and whenever the page comes back into view, the store is checked
   // and a newer save is reloaded instead of overwritten.
   // dirty: this page holds a change the store does not (a refused or failed save); loadingAdv: a Continue from Adventures is still loading
-  let syncing = false, dirty = false, loadingAdv = false;
+  let syncing = false, dirty = false, loadingAdv = false, deletingAdv = false;
+  // Why the page is refusing an action while it is held.
+  const busyMsg = () => deletingAdv ? 'An adventure is being removed.' : loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.';
   async function newerInStore() {
     if (!db || !adv || !adv.id) return null;
     const snap = await db.doc('adventures/' + adv.id).get();
@@ -2224,7 +2226,7 @@
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
           '<span class="acts"><button data-act="open"' + (WORLDS[aw] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
-        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus(loadingAdv ? 'An adventure is already loading.' : 'A turn is already running.', true); return; }
+        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus(busyMsg(), true); return; }
           // Until the load lands, the page is held as it is during a turn: every control that changes or saves the adventure is off.
           loadingAdv = true; busy = true; setBusyUI(true); $('#stop').hidden = true; setStatus('loading…');
           try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning || '', !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); }
@@ -2232,7 +2234,7 @@
         };
         row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
           if (!t) return;
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+          if (busy) { setStatus(busyMsg(), true); return; }
           if (isCur) { adv.title = t; const saved = await persist(); if (saved) setStatus('Adventure renamed.'); }
           else {
             const ref = db.doc('adventures/' + a.id), s = await ref.get();
@@ -2243,23 +2245,30 @@
         });
         row.querySelector('[data-act="copy"]').onclick = () => inlineConfirm(row, 'Title for the copy', a.title + ' (copy)', async (t) => {
           if (!t) return;
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+          if (busy) { setStatus(busyMsg(), true); return; }
           const newId = uid('adv'); const stamp = Date.parse(adv.updatedAt || new Date().toISOString());
           const updatedAt = new Date((Number.isFinite(stamp) ? stamp : Date.now()) - 1).toISOString();
           await persistAll(newId, { title: t, updatedAt, cleanupOnFailure: true });
           setStatus('Saved a copy: ' + t); listAdventures();
         });
         row.querySelector('[data-act="delete"]').onclick = () => inlineConfirm(row, 'Remove "' + a.title + '" for good?', null, async () => {
-          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
-          const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
-          for (const c of chunks.docs) await db.doc('adventures/' + a.id + '/turns/' + c.id).delete();
-          try { const fl = await db.collection('adventures/' + a.id + '/failures').limit(100).get(); for (const c of fl.docs) await db.doc('adventures/' + a.id + '/failures/' + c.id).delete(); } catch (e) {}
-          await db.doc('adventures/' + a.id).delete();
-          if (isCur) {
-            let left = null; try { left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { left = null; }
-            if (left && !left.empty) await loadAdventure(left.docs[0].id);
-            else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
-          }
+          if (busy) { setStatus(busyMsg(), true); return; }
+          // The page is held for the whole removal, as it is for a load: nothing can open or save this adventure while its
+          // blocks and document are being deleted.
+          deletingAdv = true; busy = true; setBusyUI(true); $('#stop').hidden = true; setStatus('removing…');
+          try {
+            const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
+            for (const c of chunks.docs) await db.doc('adventures/' + a.id + '/turns/' + c.id).delete();
+            try { const fl = await db.collection('adventures/' + a.id + '/failures').limit(100).get(); for (const c of fl.docs) await db.doc('adventures/' + a.id + '/failures/' + c.id).delete(); } catch (e) {}
+            await db.doc('adventures/' + a.id).delete();
+            setStatus('');
+            if (isCur) {
+              let left = null; try { left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { left = null; }
+              if (left && !left.empty) await loadAdventure(left.docs[0].id);
+              else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
+            }
+          } catch (e) { setStatus('Could not remove that adventure: ' + ((e && e.message) || 'error'), true); }
+          finally { deletingAdv = false; busy = false; setBusyUI(false); try { renderAll(); } catch (e2) {} }
           listAdventures();
         });
         el.appendChild(row);
@@ -2297,7 +2306,7 @@
     } finally { $('#exportAdv').disabled = false; }
   }
   async function importFile(file) {
-    if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
+    if (busy) { setStatus(busyMsg(), true); return; }
     const oldAdv = adv, oldWorldId = W.id;
     busy = true; setBusyUI(true); $('#stop').hidden = true;   // an import swaps and saves the open adventure: hold the page meanwhile
     try {
