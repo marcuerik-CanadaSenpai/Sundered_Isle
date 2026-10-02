@@ -162,7 +162,8 @@ async function checkStaleChunkRecovery() {
 
     assert(await h.turn('After stale repair'), 'the adventure did not continue after stale history was removed');
     assert.deepEqual(turnsIn(h, id).map((turn) => turn.action), Array.from({ length: 10 }, (_, i) => 'Stored turn ' + (i + 1)).concat(['After stale repair']));
-    assert(!h.mock.store.has('adventures/' + id + '/turns/0001'), 'the extra chunk should be removed on the next save');
+    const repairedChunk = h.mock.store.get('adventures/' + id + '/turns/0001');
+    assert.deepEqual(repairedChunk.data.turns.map((turn) => turn.action), ['After stale repair'], 'the stale chunk should be rewritten with the new valid turn');
 
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
@@ -190,7 +191,8 @@ async function checkGeneratedRoommateReplacement() {
     h.click('#cBegin');
     assert(await h.idle(30000), 'creating the Mythaven adventure did not finish');
 
-    const [, entry] = adventureEntry(h);
+    const [, entry] = [...h.mock.store.entries()].find(([path, value]) => /^adventures\/[^/]+$/.test(path) && value.data.worldId === 'mythaven');
+    assert(entry, 'the Mythaven adventure was not persisted');
     assert.equal(entry.data.roommate.replaces, 'marisol', 'an explicitly chosen authored name should replace that same cast member');
     h.click('#btnCast');
     assert.equal(h.$('#castList [data-key="marisol"]'), null, 'the authored Marisol should not appear twice in the cast');
