@@ -1847,17 +1847,20 @@
   }
   async function usePreviousVersion(turnId) {
     const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
-    if (await syncFromStore()) return;
-    if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
-    const keep = { alts: t.alts.slice(), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
-    const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
-    prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
-    adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
-    adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...(prev.events || [])); adv.memory.beats.push(...(prev.beats || [])); adv.memory.facts.push(...(prev.facts || []));
-    adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
-    try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
-    catch (e) { t.alts = keep.alts; adv.turns[adv.turns.length - 1] = t; adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not switch to the previous version: it is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
-    await persist();
+    actionDispatching = true;   // held through the swap and its save, as Undo and Regenerate do
+    try {
+      if (await syncFromStore()) return;
+      if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
+      const keep = { alts: t.alts.slice(), state: adv.state, memory: adv.memory, pending: adv.pendingNotes };
+      const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
+      prev.stateBefore = t.stateBefore; prev.memBefore = t.memBefore; prev.pendingBefore = t.pendingBefore;
+      adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
+      adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...(prev.events || [])); adv.memory.beats.push(...(prev.beats || [])); adv.memory.facts.push(...(prev.facts || []));
+      adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
+      try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
+      catch (e) { t.alts = keep.alts; adv.turns[adv.turns.length - 1] = t; adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not switch to the previous version: it is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+      await persist();
+    } finally { actionDispatching = false; }
   }
 
   // ---------- persistence ----------
@@ -2009,7 +2012,8 @@
   // Unique numbers are sorted; repeated ones keep the stored order and are renumbered 1..N. Returns how many were renumbered.
   function orderTurns(turns) {
     if (new Set(turns.map((t) => t.n)).size === turns.length) { turns.sort((a, b) => a.n - b.n); return 0; }
-    let changed = 0; turns.forEach((t, i) => { if (t.n !== i + 1) { t.n = i + 1; changed++; } });
+    // A turn's previous versions carry its number too, so they are renumbered with it (and are not then dropped as mismatched).
+    let changed = 0; turns.forEach((t, i) => { if (t.n !== i + 1) { const was = t.n; t.n = i + 1; changed++; if (Array.isArray(t.alts)) for (const a of t.alts) if (a && a.n === was) a.n = t.n; } });
     return changed;
   }
   // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
@@ -2128,7 +2132,7 @@
           setStatus('Saved a copy: ' + t); listAdventures();
         });
         row.querySelector('[data-act="delete"]').onclick = () => inlineConfirm(row, 'Remove "' + a.title + '" for good?', null, async () => {
-          if (isCur && busy) { setStatus('A turn is already running.', true); return; }
+          if (busy) { setStatus(loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.', true); return; }
           const chunks = await db.collection('adventures/' + a.id + '/turns').limit(500).get();
           for (const c of chunks.docs) await db.doc('adventures/' + a.id + '/turns/' + c.id).delete();
           try { const fl = await db.collection('adventures/' + a.id + '/failures').limit(100).get(); for (const c of fl.docs) await db.doc('adventures/' + a.id + '/failures/' + c.id).delete(); } catch (e) {}
