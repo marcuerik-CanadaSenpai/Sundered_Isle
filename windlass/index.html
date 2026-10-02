@@ -1905,7 +1905,7 @@
   }
   // A previous version shares its starting point (stateBefore, memBefore, pendingBefore) with the turn that replaced it,
   // so only what differs is kept; usePreviousVersion takes the shared part back from the current turn.
-  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.pendingBefore; return c; }
+  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.memAfter; delete c.pendingBefore; return c; }   // a previous version keeps no fold record: only the live newest turn does
   const ALTS_MAX_BYTES = 48000;
   const jsonBytes = (o) => new TextEncoder().encode(JSON.stringify(o)).length;
   // Keeps the newest previous versions that fit in ALTS_MAX_BYTES; a single version bigger than that is not kept either.
@@ -2012,6 +2012,10 @@
       // A restored snapshot that still cannot be shown is put back rather than left half-applied.
       try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
       catch (e) { adv.turns.push(last); adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not undo this turn: its saved history is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+      // The turn that is newest again gave up its fold record when the undone turn committed; the undone turn's memBefore is
+      // the memory after it, so the record is rebuilt from that (recovery may need it if the next save is interrupted).
+      const prev = adv.turns[adv.turns.length - 1];
+      if (prev && !prev._trimmed && last.memBefore) prev.memAfter = { summary: last.memBefore.summary || '', beats: clone(last.memBefore.beats || []), facts: clone(last.memBefore.facts || []) };
       await persist({ removedTurn: true });
     } finally { actionDispatching = false; }
   }
