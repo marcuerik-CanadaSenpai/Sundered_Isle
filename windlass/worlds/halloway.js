@@ -30,7 +30,8 @@ window.WINDLASS_WORLDS.halloway = {
     'Attitudes: an attitude value moves at most one point per turn and only for a cause shown in the narrative.',
     'Fresh detail: show people and places through details and images not already used in <recent_turns> or <style_examples>.',
     'Suggested actions are things {first} would plausibly do next, in keeping with the personality in <player>: ordinary, specific, sensible options with different aims, never stunts or whimsy. When {first} speaks in the narrative because the action implies it, the words fit that personality.',
-    'Content: no sexual content. Violence at the level of a school story. secret_info holds only facts the player does not yet know, 60 words at most, no backstory padding.'
+    'Romance: non-explicit romance is allowed only between clearly adult characters; affection and kissing may be described, but sex is not depicted and remains off-page.',
+    'Anatomy: describe relevant, established kin traits in accurate, neutral terms when visible, touched or changing; do not hide them behind euphemisms or invent sexual anatomy. Violence at the level of a school story. secret_info holds only facts the player does not yet know, 60 words at most, no backstory padding.'
   ],
 
   // Sent every turn as <world>.

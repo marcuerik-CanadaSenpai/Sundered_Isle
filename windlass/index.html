@@ -1279,15 +1279,22 @@
     return out;
   }
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
+  function isRomanceScene(input) {
+    const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
+    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug\w*|hold(?:ing)? hands|intimat\w*|tender\w*|court\w*|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+  }
+  function transformationSceneActive() {
+    return !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
+      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+  }
   function isTransition(input) {
     const a = String(input.action || '').trim();
     return /^(i\s+)?(go|walk|head|return|leave|unpack|sleep|go to bed|lie down|wait|follow|sit|get up|wake|eat|shower|wash|dress|take the stairs|climb|cross)\b/i.test(a) && wc(a) <= 9 && !input.director && !input.rewrite;
   }
   function sceneDensity(input) {
     const a = String(input.action || '');
-    const romance = /\b(date|romance|romantic|flirt|confess|kiss|kissing|kissed|cuddle|cuddling|cuddled|embrace|embraced|hug|hugged|hold hands|holding hands|intimate|tender|court|courtship|love|sleep with|share a bed|ask .{0,20} out|slow dance|affection)\b/i.test(a);
-    const tf = !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
-      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+    const romance = isRomanceScene(input);
+    const tf = transformationSceneActive();
     const firstMeeting = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i.test(a) &&
       activeCharacters().some((c) => {
         const names = [c.first, c.name].concat(c.aliases || []).filter(Boolean);
@@ -1299,7 +1306,9 @@
   }
   // Auto keeps transitions concise and reserves the richest band for romance, first meetings and active changes.
   function sceneBand(input) {
-    const density = adv.settings.density === 'auto' ? sceneDensity(input) : adv.settings.density;
+    const preferred = sceneDensity(input);
+    const density = adv.settings.density === 'auto' ? preferred :
+      ((isRomanceScene(input) || transformationSceneActive()) ? 'rich' : adv.settings.density);
     input.sceneDensity = density;
     let [lo, hi] = (W.wordBands || {})[density] || wordBand();
     if (isTransition(input) && density !== 'rich') hi = lo + Math.round((hi - lo) * 0.45);
@@ -1453,6 +1462,8 @@
     if (turnInput.director) actionLines.push('Director note (binding): ' + turnInput.director);
     if (turnInput.rewrite) actionLines.push('Regeneration note (binding, for this rewrite only): ' + turnInput.rewrite);
     if (adv.settings.testNote) actionLines.push('Test instruction (binding): ' + adv.settings.testNote);
+    if (isRomanceScene(turnInput)) actionLines.push('Romance scene pacing (binding): use the rich scene band, give the requested closeness one specific reciprocal beat at a time, and render the actual sequence of gesture, response, pause, dialogue and relevant physical sensation rather than summarizing it as warmth or skipping ahead. Describe established bodies and the contact between them with calm, concrete anatomical detail; anatomy is not inherently sexual. Do not decide the player\'s desire, feelings or next action. If the request reaches sex, finish the non-explicit romantic lead-in and fade to black at that boundary; do not depict sex or append a morning-after/time-skip in this turn.');
+    if (isRomanceScene(turnInput) || transformationSceneActive()) actionLines.push('Body detail (binding): where touch or change makes anatomy relevant, use the exact visible/contacting features and their location, movement, texture and practical effect as established in <characters>, <lore> and <transformation>. Do not replace a named feature with generic warmth, hide it behind a euphemism, or invent structures or functions absent from those sources.');
     if (turnInput.roll && turnInput.roll.d6) {
       const D = W.difficulty; const st = p.stats;
       // The totals are worked out here, so the narrator reads the outcome off a table instead of adding and comparing itself.
