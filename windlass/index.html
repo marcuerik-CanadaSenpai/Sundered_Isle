@@ -715,7 +715,9 @@
     const name = typedName || (Array.isArray(pool) ? rand(pool) : pool);
     // "replaces" drops a standalone cast member who is this same authored character; only safe when the roommate
     // actually is them, i.e. the player kept the template's own name rather than typing a different one.
-    const replaces = species && t.replaces && t.replaces[gender] && !typedName ? t.replaces[gender] : null;
+    // The creation dialog prefills the template's own name, so a typed name equal to it still means the template character.
+    const keptTemplateName = !typedName || (Array.isArray(pool) ? pool : [pool]).some((nm) => String(nm || '').trim().toLowerCase() === typedName.toLowerCase());
+    const replaces = species && t.replaces && t.replaces[gender] && keptTemplateName ? t.replaces[gender] : null;
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
     const race = species ? speciesRace(W, species) : cap(typed);
     return { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender, pronouns: g.pronouns, name, first: name.split(' ')[0], last: name.split(' ').slice(1).join(' '), replaces, brief: t.brief, sheet: t.sheet, where: t.where, aims: t.aims, attitude: t.attitude == null ? 5 : t.attitude, intro: t.intro, aliases: [name.split(' ')[0]] };
@@ -1335,7 +1337,10 @@
     const band = turnInput.band || sceneBand(turnInput);
     const P = W.progression;
     const stageN = P ? Number(S.items[P.stateKey]) || 0 : 0;
-    const x = (tag, body, attrs) => '<' + tag + (attrs ? ' ' + attrs : '') + '>\n' + body + '\n</' + tag + '>';
+    // Later shedding stages also clip blocks that normally go whole (L.blockChars) and keep only the tail of the summary.
+    const L = limits || {};
+    const clip = (t, n) => (n && t.length > n) ? t.slice(0, n).replace(/\s+\S*$/, '') + ' […]' : t;
+    const x = (tag, body, attrs) => '<' + tag + (attrs ? ' ' + attrs : '') + '>\n' + (L.blockChars && tag !== 'output_format' && tag !== 'action' && tag !== 'recent_turns' ? clip(body, L.blockChars) : body) + '\n</' + tag + '>';
     const parts = [];
     parts.push('You are the storyteller for an interactive text adventure. Read every section, then write the next turn exactly as <output_format> specifies.');
     parts.push(x('rules', W.rules.map((r) => '- ' + fill(r)).join('\n')));
@@ -1352,7 +1357,8 @@
       const where = (c.where && (c.where[slot] || c.where.default)) || 'unknown';
       const aim = (c.aims && ((slot === 'evening' && S.day > 1 && /mixer/i.test(c.aims[slot] || '') ? '' : c.aims[slot]) || c.aims.default)) || '';
       const att = S.attitudes[c.key];
-      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet)) + (c.looks && (full || !c.gen) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
+      const sheet = L.briefCast ? clip(fill(c.brief || c.sheet), 240) : fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet));
+      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + sheet + (!L.briefCast && c.looks && (full || !c.gen) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '') + (!L.briefCast && c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
     parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
@@ -1367,8 +1373,10 @@
     for (const d of W.trackedItems) if (d.visibility !== 'player-only') stateForModel.items[d.key] = S.items[d.key];
     parts.push(x('state', JSON.stringify(stateForModel, null, 1) + (hiddenKeys.length ? '\nHidden from the player: ' + hiddenKeys.join(', ') + '.' : ''), 'note="update through state_updates using these paths: location, present, items.<key>, attitudes.<key>, flags.<key>"'));
     parts.push(x('clock', clockLine(S) + '\n' + calendarLine(S), 'note="authoritative; the engine keeps the calendar"'));
-    parts.push(x('summary', M.summary || '(nothing yet)', 'note="the distant past, in brief"'));
-    if (M.facts.length) parts.push(x('facts', M.facts.map((f) => '- ' + f).join('\n'), 'note="established facts that stay true; contradict none of them"'));
+    const summary = String(M.summary || ''); const summaryShown = (L.summaryChars && summary.length > L.summaryChars) ? '[…] ' + summary.slice(-L.summaryChars).replace(/^\S*\s+/, '') : summary;
+    parts.push(x('summary', summaryShown || '(nothing yet)', 'note="the distant past, in brief' + (summaryShown !== summary ? '; only its most recent part (the prompt was near its size cap)' : '') + '"'));
+    const factsShown = L.facts != null ? (L.facts ? M.facts.slice(-L.facts) : []) : M.facts;
+    if (factsShown.length) parts.push(x('facts', factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f)).join('\n'), 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
     if (older.length) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
@@ -1387,7 +1395,7 @@
       actionLines.push('Dice this turn: d6 rolled ' + turnInput.roll.d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> that the attempt relies on (' + Object.keys(st).map((k) => k + ' ' + st[k]).join(', ') + ')' + skillOpts + ', add its value to the die for the total, choose a difficulty from the ladder (' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + ') and decide: total at or above the difficulty is success, one or two below is partial, further below is failure. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
     }
     actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + band[0] + ' to ' + band[1] + ' when the scene earns it, and shorter whenever ' + p.first + ' reaches a choice sooner' + (arcActive() ? ' (a change is under way; give it room)' : '') + '. Stop at the first moment ' + p.first + ' would speak or choose.');
-    for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + n);
+    for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
       'Reply with only one JSON object and nothing else, no code fence. Inside every string, escape double quotes as \\" and write paragraph breaks as \\n; never put a raw line break inside a string. Fields, in this order:',
@@ -1551,9 +1559,14 @@
     const M = adv.memory; M.facts = M.facts || [];
     const foldBeatsNow = M.beats.length > 36, foldFactsNow = M.facts.length > 60;
     if (!foldBeatsNow && !foldFactsNow) return null;
-    const oldestBeats = foldBeatsNow ? M.beats.slice(0, 18) : [];
-    const oldestFacts = foldFactsNow ? M.facts.slice(0, 20) : [];
-    const prompt = 'You maintain the long-term memory of an interactive story. Merge the following material (oldest first) into the existing summary. Keep the result under 300 words, plain past tense, no adjectives. Keep every name, day number, place and standing arrangement that could matter later; drop repetition. Return only the new summary.\n\n<existing_summary>\n' + (M.summary || '(empty)') + '\n</existing_summary>\n\n<beats>\n' + (oldestBeats.join('\n') || '(none)') + '\n</beats>\n\n<facts>\n' + (oldestFacts.join('\n') || '(none)') + '\n</facts>';
+    // Each line and the old summary are clipped so the fold prompt stays well under the runtime's 64 KiB input cap however
+    // long the player's summary or a fact is; a fold that would still be too big is never sent.
+    const clipTo = (t, n) => { t = String(t || ''); return t.length > n ? t.slice(0, n) + ' […]' : t; };
+    const oldestBeats = foldBeatsNow ? M.beats.slice(0, 18).map((b) => clipTo(b, 400)) : [];
+    const oldestFacts = foldFactsNow ? M.facts.slice(0, 20).map((f) => clipTo(f, 400)) : [];
+    const summaryIn = String(M.summary || ''); const summaryClip = summaryIn.length > 8000 ? '[…] ' + summaryIn.slice(-8000) : summaryIn;
+    const prompt = 'You maintain the long-term memory of an interactive story. Merge the following material (oldest first) into the existing summary. Keep the result under 300 words, plain past tense, no adjectives. Keep every name, day number, place and standing arrangement that could matter later; drop repetition. Return only the new summary.\n\n<existing_summary>\n' + (summaryClip || '(empty)') + '\n</existing_summary>\n\n<beats>\n' + (oldestBeats.join('\n') || '(none)') + '\n</beats>\n\n<facts>\n' + (oldestFacts.join('\n') || '(none)') + '\n</facts>';
+    if (new TextEncoder().encode(prompt).length > 63000) throw { code: 'prompt_too_large', message: 'memory fold material is too large to send' };
     const res = await sample(prompt, { label: 'memory fold', modelTier: adv.settings.utilTier, cache: false, signal: ctl ? ctl.signal : undefined });
     const s = res.text.trim();
     if (res.truncated || wc(s) < 20 || wc(s) > 400 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s)) throw { code: 'invalid_summary', message: 'memory fold returned an unusable summary' };
@@ -1578,6 +1591,7 @@
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
+    if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     const state = clone(adv.state);
     const applied = applyUpdates(state, out.updates, stateBefore); notes.push(...applied.notes);
     const metNow = recordMet(state, out.kindsMet); if (metNow.length) { notes.push('kinds met: ' + metNow.join(', ')); applied.diff.push({ path: 'met', from: '', to: metNow.map(kindLabel).join(', ') }); }
@@ -1601,17 +1615,20 @@
       stateBefore, stateAfter: clone(state), memBefore, pendingBefore, pendingAfter: clone(adv.pendingNotes),
       words, band, timing: timing || { first: 0, total: 0 }, notes, alts: []
     };
-    if (regen) { turn.alts = (regen.alts || []).concat([stripAlts(regen)]); turn.n = regen.n; }
-    // Only the last turn is ever read again for memBefore/pendingBefore/alts (regen, undo, previous version) or the full
-    // stateBefore/stateAfter (only day/time/location/present survive into the prompt, the renderer and migration). Trimming
-    // the turn that is about to stop being last is what keeps a long adventure's stored turns from growing without bound.
-    if (adv.turns.length) trimTurnHistory(adv.turns[adv.turns.length - 1]);
+    if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
     if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
+    // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
+    // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
+    // renderer and migration). Trimming the turn that has just dropped out of reach keeps a long adventure's stored turns
+    // from growing without bound; it runs after the fold so a cancelled turn rolls back with nothing trimmed.
+    trimBeyondUndo(adv.turns);
     return turn;
   }
   async function takeTurn(input, opts) {
     if (busy) { setStatus('A turn is already running.', true); return false; }
+    if (loadingAdv) { setStatus('An adventure is still loading; try again in a moment.', true); return false; }
     if (!sample) { setStatus('Not connected to Claude in this view. Use Retry connection, or reload the page.', true); return false; }
     const regen = opts && opts.regen;
     const mine = adv;   // guards against a different adventure being loaded while this turn's model calls are in flight
@@ -1637,10 +1654,14 @@
         { window: 1, events: 10, earlier: 6 },
         { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 6000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000 }
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000 },
+        // Then what normally always goes whole: older facts, the summary's oldest part, long engine notes and full character sheets.
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, briefCast: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, briefCast: true, blockChars: 8000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, briefCast: true, blockChars: 3000 }
       ]) { if (fits()) break; built = buildPrompt(input, lim); guard = lim; }
-      if (guard) notes.push('prompt near the size cap: ' + (guard.window ? 'verbatim window reduced to ' + guard.window + ', ' : '') + 'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats' + (guard.noLore ? ', lore and extra style examples dropped' : '') + (guard.recentChars ? ', recent turns cut to their last ' + guard.recentChars + ' characters' : ''));
-      if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage; the current turn is unusually long. Try a shorter action, or lower the verbatim window in Settings.' };
+      if (guard) notes.push('prompt near the size cap: ' + (guard.window ? 'verbatim window reduced to ' + guard.window + ', ' : '') + 'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats' + (guard.noLore ? ', lore and extra style examples dropped' : '') + (guard.recentChars ? ', recent turns cut to their last ' + guard.recentChars + ' characters' : '') + (guard.facts != null ? ', facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes and character sheets shortened' : '') + (guard.blockChars ? ', every other block cut to ' + guard.blockChars + ' characters' : ''));
+      if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
       showDraft(input, '');
       setStatus('thinking on ' + adv.settings.narrTier + ' tier…');
       const ask = () => sample(built.prompt, {
@@ -1662,7 +1683,7 @@
       }
       if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
       if (adv !== mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
-      const turn = await commitReply(data, input, { stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: adv.settings.narrTier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
+      const turn = await commitReply(data, input, { mine, stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: adv.settings.narrTier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
       lastDebug = { prompt: built.prompt, raw, notes, meta: 'Turn ' + turn.n + ' · asked ' + turn.tierAsked + ', answered ' + (turn.tierApplied || '?') + ' · first word ' + (turn.timing.first / 1000).toFixed(1) + ' s, total ' + (turn.timing.total / 1000).toFixed(1) + ' s · ' + turn.words + ' words (band ' + input.band.join('–') + ') · prompt ' + built.prompt.length.toLocaleString() + ' chars (~' + Math.round(built.prompt.length / 4).toLocaleString() + ' tokens) · lore: ' + (built.lore.join(', ') || 'none') };
       hideDraft(); renderAll(); if (!regen) { $('#action').value = ''; $('#director').value = ''; }
       setStatus('');
@@ -1679,15 +1700,15 @@
       else if (code === 'invalid_json') msg = 'The reply was unusable after two attempts. Try the turn again, or see Debug.';
       else if (code === 'truncated') msg = 'The reply was cut off after two attempts. Try again; if it keeps happening, choose a shorter length in Settings.';
       else if (code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared' || /^capability_/.test(code)) { sample = null; setConn('bad', 'Claude unavailable'); msg = 'This page is not allowed to use Claude in this view.'; statusAction = { label: 'Retry connection', run: connectSample }; }
-      else if (code === 'prompt_too_large') msg = 'Prompt too large for the runtime; lower the verbatim window in Settings.';
+      else if (code === 'prompt_too_large') msg = 'The prompt is too large for the runtime even with everything optional shed. Shorten the action or the director note and try again (Debug shows the prompt).';
       else if (code === 'upstream_error') msg = 'The service failed mid-turn. Try again.';
       else if (code === 'page_error') msg = 'Page error: ' + (e.message || 'unknown') + ' (see Debug).';
       else msg = 'Error: ' + code + (e && e.message ? ' — ' + e.message : '');
       setStatus(msg, true, statusAction);
       lastDebug = { prompt: built ? built.prompt : '(prompt was not built)', raw: (e && e.text) || raw || '', notes: notes.concat(['failed: ' + code + (e && e.message ? ' — ' + e.message : ''), (e && e.stack) ? String(e.stack).slice(0, 600) : '']), meta: 'Failed turn · asked ' + adv.settings.narrTier };
-      // Only roll back this turn's own stateBefore if this is still the adventure it belongs to; a different, already-loaded
-      // adventure's live state must never be clobbered with a stale snapshot from the turn that just failed.
-      if (adv === mine && stateBefore) { adv.turns.length = turnsBefore; adv.state = stateBefore; adv.memory = memBefore; adv.pendingNotes = pendingBefore; }
+      // Roll back the adventure this turn belongs to; a different, already-loaded adventure's live state must never be
+      // clobbered with a stale snapshot from the turn that just failed.
+      if (stateBefore) { mine.turns.length = turnsBefore; mine.state = stateBefore; mine.memory = memBefore; mine.pendingNotes = pendingBefore; }
       return false;
     } finally {
       busy = false; ctl = null; stopTimer(); setBusyUI(false);
@@ -1697,23 +1718,31 @@
   // Override: run a pasted reply through the same pipeline with no model call.
   async function applyManualReply(action, replyText) {
     if (busy) { return 'A turn is already running.'; }
+    if (loadingAdv) { return 'An adventure is still loading; try again in a moment.'; }
     const data = tolerantJson(replyText); if (!usableReply(data)) return 'That must be a JSON object with a non-empty narrative.';
     busy = true; setBusyUI(true);
+    const mine = adv;
     const notes = ['applied from Override, no model call'];
     const stateBefore = clone(adv.state), memBefore = clone(adv.memory), pendingBefore = (adv.pendingNotes || []).slice();
     const turnsBefore = adv.turns.length;
     try {
       const input = { action: action || '(override)', director: '', roll: { d6: Number(data.evaluation && data.evaluation.d6) || (1 + Math.floor(Math.random() * 6)) } };
-      const turn = await commitReply(data, input, { stateBefore, memBefore, pendingBefore, notes, regen: null, raw: replyText, tierAsked: 'manual', tierApplied: 'manual', timing: { first: 0, total: 0 }, truncated: false, allowFit: false });
+      const turn = await commitReply(data, input, { mine, stateBefore, memBefore, pendingBefore, notes, regen: null, raw: replyText, tierAsked: 'manual', tierApplied: 'manual', timing: { first: 0, total: 0 }, truncated: false, allowFit: false });
       lastDebug = { prompt: '(no prompt: reply applied from Override)', raw: replyText, notes, meta: 'Turn ' + turn.n + ' · applied manually' };
       renderAll(); setStatus(''); const saved = await persist(); return saved ? 'Applied as turn ' + turn.n + '.' : 'Applied as turn ' + turn.n + ', but it is not saved yet.';
     } catch (e) {
-      adv.turns.length = turnsBefore;
-      adv.state = stateBefore; adv.memory = memBefore; adv.pendingNotes = pendingBefore;
+      mine.turns.length = turnsBefore;
+      mine.state = stateBefore; mine.memory = memBefore; mine.pendingNotes = pendingBefore;
       return 'Could not apply: ' + ((e && e.message) || (e && e.code) || 'error');
     } finally { busy = false; setBusyUI(false); renderAll(); setStatus(''); }
   }
-  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; return c; }
+  // A previous version shares its starting point (stateBefore, memBefore, pendingBefore) with the turn that replaced it,
+  // so only what differs is kept; usePreviousVersion takes the shared part back from the current turn.
+  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.pendingBefore; return c; }
+  const ALTS_MAX_BYTES = 48000;
+  const jsonBytes = (o) => new TextEncoder().encode(JSON.stringify(o)).length;
+  // Keeps the newest previous versions that fit in ALTS_MAX_BYTES (always at least the newest one).
+  function capAlts(alts) { const out = alts.slice(); while (out.length > 1 && jsonBytes(out) > ALTS_MAX_BYTES) out.shift(); return out; }
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
   function trimState(s) { return s ? { day: s.day, time: s.time, location: s.location, present: s.present } : s; }
   function trimTurnHistory(t) {
@@ -1722,6 +1751,12 @@
     t.memBefore = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
   }
+  // How many of the newest turns keep their full history, i.e. how far Undo (and Regenerate after an Undo) can go back.
+  const UNDO_DEPTH = 2;
+  function trimBeyondUndo(turns) { for (let i = 0; i < turns.length - UNDO_DEPTH; i++) trimTurnHistory(turns[i]); }
+  // A turn whose history was trimmed (or never stored) cannot be undone or regenerated: restoring it would leave a partial state.
+  const restorable = (t) => !!(t && !t._trimmed && t.memBefore && Array.isArray(t.memBefore.events) && Array.isArray(t.memBefore.beats) && t.stateBefore && t.stateBefore.items && t.stateBefore.attitudes && t.stateBefore.flags);
+  const notRestorableMsg = () => 'This turn can no longer be undone or regenerated: only the last ' + UNDO_DEPTH + ' turns keep the history needed to step back.';
   let timerId = null;
   function startTimer(t0) { stopTimer(); timerId = setInterval(() => { const s = Math.round((performance.now() - t0) / 1000); $('#elapsed').textContent = s + ' s'; if (s === 150) setStatus('Still waiting for the first word after 150 s. You can Stop and try again.', true); }, 1000); $('#elapsed').textContent = '0 s'; $('#elapsed').hidden = false; }
   function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; $('#elapsed').hidden = true; }
@@ -1731,7 +1766,7 @@
   }
   // Turn 0's roommate paragraphs, written by the narrator from the generated roommate (the composed fallback stands if it cannot).
   async function writeRoommateIntro() {
-    const r = adv.roommate; if (!r || !r.gen || !sample || !adv.opening || adv.opening.introWritten || busy) return false;
+    const r = adv.roommate; if (!r || !r.gen || !sample || !adv.opening || adv.opening.introWritten || busy || loadingAdv) return false;
     const p = adv.player; const g = r.gen; const t0 = performance.now();
     const mine = adv;   // guards against a different adventure being loaded while the model call is in flight
     busy = true; ctl = new AbortController(); setBusyUI(true); setStatus('Writing your roommate on the ' + adv.settings.narrTier + ' tier…');
@@ -1780,11 +1815,13 @@
     try {
       if (summaryDirty && !(await saveSummary())) return;
       if (await syncFromStore()) return;
-      const old = adv.turns.pop();
-      const restore = { state: clone(adv.state), memory: clone(adv.memory), pending: (adv.pendingNotes || []).slice() };
-      adv.state = clone(old.stateBefore); adv.memory = clone(old.memBefore); adv.pendingNotes = (old.pendingBefore || []).slice();
+      if (!restorable(adv.turns[adv.turns.length - 1])) { setStatus(notRestorableMsg(), true); return; }
+      const mine = adv;   // a failed or stale regenerate is put back into this adventure, never into one loaded meanwhile
+      const old = mine.turns.pop();
+      const restore = { state: clone(mine.state), memory: clone(mine.memory), pending: (mine.pendingNotes || []).slice() };
+      mine.state = clone(old.stateBefore); mine.memory = clone(old.memBefore); mine.pendingNotes = (old.pendingBefore || []).slice();
       const ok = await takeTurn({ action: old.action, director: old.director, rewrite: rewrite || '', roll: { d6: (old.roll && old.roll.d6) || (1 + Math.floor(Math.random() * 6)) } }, { regen: old });
-      if (!ok) { adv.turns.push(old); adv.state = restore.state; adv.memory = restore.memory; adv.pendingNotes = restore.pending; renderAll(); }
+      if (!ok) { mine.turns.push(old); mine.state = restore.state; mine.memory = restore.memory; mine.pendingNotes = restore.pending; if (adv === mine) renderAll(); }
     } finally { actionDispatching = false; }
   }
   async function onUndo() {
@@ -1793,6 +1830,7 @@
     try {
       if (summaryDirty && !(await saveSummary())) return;
       if (await syncFromStore()) return;
+      if (!restorable(adv.turns[adv.turns.length - 1])) { setStatus(notRestorableMsg(), true); return; }
       const last = adv.turns.pop();
       adv.state = clone(last.stateBefore); adv.memory = clone(last.memBefore); adv.pendingNotes = (last.pendingBefore || []).slice();
       renderAll(); await persist({ removedTurn: true });
@@ -1801,9 +1839,11 @@
   async function usePreviousVersion(turnId) {
     const t = adv.turns[adv.turns.length - 1]; if (actionDispatching || !t || t.id !== turnId || !t.alts || !t.alts.length || busy) return;
     if (await syncFromStore()) return;
-    const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = t.alts.concat([cur]);
+    if (!restorable(t)) { setStatus(notRestorableMsg(), true); return; }
+    const prev = t.alts.pop(); const cur = stripAlts(t); prev.alts = capAlts(t.alts.concat([cur]));
+    prev.stateBefore = prev.stateBefore || t.stateBefore; prev.memBefore = prev.memBefore || t.memBefore; prev.pendingBefore = prev.pendingBefore || t.pendingBefore;
     adv.turns[adv.turns.length - 1] = prev; adv.state = clone(prev.stateAfter);
-    adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...prev.events); adv.memory.beats.push(...prev.beats); adv.memory.facts.push(...(prev.facts || []));
+    adv.memory = clone(prev.memBefore); adv.memory.facts = adv.memory.facts || []; adv.memory.events.push(...(prev.events || [])); adv.memory.beats.push(...(prev.beats || [])); adv.memory.facts.push(...(prev.facts || []));
     adv.pendingNotes = clone(prev.pendingAfter || adv.pendingNotes || []);
     renderAll(); await persist();
   }
@@ -1817,7 +1857,8 @@
   // page left open: it keeps showing the save it loaded, and a turn taken on it would overwrite newer turns from elsewhere.
   // So each save carries a revision number; before writing, and whenever the page comes back into view, the store is checked
   // and a newer save is reloaded instead of overwritten.
-  let syncing = false, dirty = false;   // dirty: this page holds a change the store does not (a refused or failed save)
+  // dirty: this page holds a change the store does not (a refused or failed save); loadingAdv: a Continue from Adventures is still loading
+  let syncing = false, dirty = false, loadingAdv = false;
   async function newerInStore() {
     if (!db || !adv || !adv.id) return null;
     const snap = await db.doc('adventures/' + adv.id).get();
@@ -1836,14 +1877,14 @@
       const n = await newerInStore(); if (!n) return false;
       if (n.deleted) { setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true); return true; }
       if (dirty) { offerConflict(n); return true; }
-      const was = adv.turns.length; await loadAdventure(adv.id);
-      setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). Carry on from here.');
+      const was = adv.turns.length; const warning = await loadAdventure(adv.id);
+      setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). ' + (warning || 'Carry on from here.'), !!warning);
       return true;
     } catch (e) { return false; } finally { syncing = false; }
   }
   function offerConflict(n) {
     setStatus('This adventure was saved from another device after this page last saved (' + n.turnCount + ' turns there, ' + adv.turns.length + ' here). Load that save, or overwrite it with this page\'s version?', true, [
-      { label: 'Load the newer save', run: async () => { try { await loadAdventure(adv.id); dirty = false; setStatus('Loaded the newer save.'); } catch (e) { setStatus('Could not load it: ' + ((e && e.code) || (e && e.message)), true); } } },
+      { label: 'Load the newer save', run: async () => { try { const warning = await loadAdventure(adv.id); dirty = false; setStatus('Loaded the newer save.' + (warning ? ' ' + warning : ''), !!warning); } catch (e) { setStatus('Could not load it: ' + ((e && e.code) || (e && e.message)), true); } } },
       { label: 'Overwrite with this page', run: () => overwriteStore() }
     ]);
   }
@@ -1876,29 +1917,56 @@
       // Chunks are written before the adventure doc, and any earlier chunk a previous persist() failed to write is
       // retried first: this way the doc is never updated to claim a turn count that is not actually backed by saved
       // chunks, and a one-off write failure is repaired on the very next save instead of silently losing turns for good.
-      const confirmed = adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk;
-      for (let i = confirmed + 1; i < chunkIdx; i++) { await chunkRef(i).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); adv._savedUpToChunk = i; }
-      const start = chunkIdx * CHUNK; const slice = adv.turns.slice(start, start + CHUNK);
-      if (slice.length) { await chunkRef(chunkIdx).set({ c: chunkIdx, turns: slice }); if (slice.length === CHUNK) adv._savedUpToChunk = chunkIdx; }
+      // The chunk about to be written stops counting as saved until the write succeeds, so a failed rewrite of a full chunk
+      // (Regenerate or Undo of a chunk-closing turn) is retried on a later save instead of being skipped for good.
+      const confirmed = Math.min(adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk, chunkIdx - 1); adv._savedUpToChunk = confirmed;
+      for (let i = confirmed + 1; i < chunkIdx; i++) { await chunkRef(i).set(chunkBody(i)); adv._savedUpToChunk = i; }
+      const start = chunkIdx * CHUNK; const sliceLen = adv.turns.slice(start, start + CHUNK).length;
+      if (sliceLen) { await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) adv._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { await chunkRef(n / CHUNK).delete(); if ((adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk) >= n / CHUNK) adv._savedUpToChunk = n / CHUNK - 1; }
       const doc = advDoc();
       await db.doc('adventures/' + adv.id).set(doc);
       adv.updatedAt = doc.updatedAt; adv.rev = doc.rev;
       dirty = false;
+      // Best effort: the turns just out of Undo's reach were saved whole in the previous chunk; store them trimmed now.
+      const trimmedChunk = Math.floor((n - 1 - UNDO_DEPTH) / CHUNK);
+      if (n > UNDO_DEPTH && trimmedChunk < chunkIdx && trimmedChunk <= adv._savedUpToChunk) { try { await chunkRef(trimmedChunk).set(chunkBody(trimmedChunk)); } catch (e) {} }
       const hadSaveError = !!saveError;
       saveError = null;
       setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       if (hadSaveError) setStatus('');
       return true;
-    } catch (e) { dirty = true; saveError = 'Save failed (' + ((e && e.code) || (e && e.message) || 'unknown') + '). Your changes remain here; retry by saving again.'; setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, { label: 'Retry save', run: () => persist() }); return false; }
+    } catch (e) { dirty = true; saveError = saveFailedText(e); setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus(saveError, true, tooBigCode(e) ? { label: 'Export a copy', run: () => exportAdventure() } : { label: 'Retry save', run: () => persist() }); return false; }
+  }
+  // The store refuses documents over 256 KiB. A chunk that would be too big first sheds previous versions (oldest turn
+  // first), then the Undo history of its older turns; what is shed is only what Regenerate's "Previous version" and Undo
+  // would have used. Returns the body to write (it may still be too big, and then the write fails with a clear message).
+  const CHUNK_MAX_BYTES = 250000;
+  function chunkBody(i) {
+    const turns = adv.turns.slice(i * CHUNK, (i + 1) * CHUNK); const body = { c: i, turns };
+    if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body;
+    for (const t of turns) { if (t.alts && t.alts.length) { t.alts = []; if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body; } }
+    const last = adv.turns[adv.turns.length - 1];
+    for (const t of turns) { if (t !== last && !t._trimmed) { trimTurnHistory(t); if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body; } }
+    const bytes = jsonBytes(body);
+    if (bytes > STORE_DOC_MAX_BYTES) throw { code: 'too_large', message: 'turns ' + (i * CHUNK + 1) + '–' + (i * CHUNK + turns.length) + ' come to ' + Math.round(bytes / 1024) + ' KiB, and the store takes at most 256 KiB per block of ' + CHUNK + ' turns' };
+    return body;
+  }
+  const STORE_DOC_MAX_BYTES = 260000;
+  const tooBigCode = (e) => { const c = (e && e.code) || ''; return c === 'too_large' || c === 'invalid_argument' || c === 'quota_exceeded' || c === 'resource_exhausted' || /too.?large|quota/i.test((e && e.message) || ''); };
+  function saveFailedText(e) {
+    const code = (e && e.code) || (e && e.message) || 'unknown';
+    if (tooBigCode(e)) return 'Save refused (' + code + (e && e.code === 'too_large' ? ': ' + e.message : '') + '): the store will not take this much data. Retrying will not help; export a copy now to keep your progress.';
+    return 'Save failed (' + code + '). Your changes remain here; retry by saving again.';
   }
   async function persistAll(id, opts) {
     // Writes every chunk, then the adventure document (used when copying an adventure and when overwriting a save).
     const written = [];
     try {
+      for (let i = 0; i * CHUNK < adv.turns.length; i++) chunkBody(i);   // size check every block before writing any
       for (let i = 0; i * CHUNK < adv.turns.length; i++) {
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
-        await db.doc(path).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); written.push(path);
+        await db.doc(path).set(chunkBody(i)); written.push(path);
       }
       const doc = advDoc(); doc.id = id;
       if (opts && opts.title != null) doc.title = opts.title;
@@ -1914,10 +1982,26 @@
       throw e;
     }
   }
+  // Saves made before turn numbers were kept unique (an import that dropped turns, then more play) can repeat a number.
+  // Unique numbers are sorted; repeated ones keep the stored order and are renumbered 1..N. Returns how many were renumbered.
+  function orderTurns(turns) {
+    if (new Set(turns.map((t) => t.n)).size === turns.length) { turns.sort((a, b) => a.n - b.n); return 0; }
+    let changed = 0; turns.forEach((t, i) => { if (t.n !== i + 1) { t.n = i + 1; changed++; } });
+    return changed;
+  }
+  // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
+  const LEGACY_WORLD = 'halloway';
+  // A previous version becomes the live turn and state on "Previous version", so only well-formed ones are kept from a save.
+  function validAlt(a) {
+    const rec = (x) => !!x && typeof x === 'object' && !Array.isArray(x); const st = a && a.stateAfter;
+    return rec(a) && Number.isInteger(a.n) && a.n >= 1 && typeof a.narrative === 'string' && rec(st) && rec(st.items) && rec(st.attitudes) && rec(st.flags) && Array.isArray(st.present) && Number.isFinite(Number(st.day)) && typeof st.time === 'string' && typeof st.location === 'string' && (a.events == null || Array.isArray(a.events)) && (a.beats == null || Array.isArray(a.beats)) && (a.facts == null || Array.isArray(a.facts));
+  }
+  function cleanAlts(turns) { for (const t of turns) t.alts = Array.isArray(t.alts) ? t.alts.filter(validAlt) : []; }
+  // Loads a save and returns a warning for the player when something had to be repaired or is missing (null otherwise).
   async function loadAdventure(id) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
     const d = snap.data();
-    const wid = d && d.worldId;
+    const wid = d && (d.worldId || LEGACY_WORLD);
     if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
     if (d.id && d.id !== id) throw new Error('save id does not match its document path');
     const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -1926,13 +2010,13 @@
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
     const turns = []; chunks.docs.forEach((c) => { const b = c.data(); if (b && Array.isArray(b.turns)) turns.push(...clone(b.turns)); });
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
-    turns.sort((a, b) => a.n - b.n);
-    if (new Set(turns.map((t) => t.n)).size !== turns.length) throw new Error('save contains duplicate turn numbers');
+    const renumbered = orderTurns(turns); cleanAlts(turns);
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const turnCountMismatch = (d.turnCount || 0) !== turns.length;
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
-    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: Math.floor(turns.length / CHUNK) - 1 };
+    // A renumbered save rewrites every chunk on its next save (the stored chunks still hold the repeated numbers).
+    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -1944,7 +2028,12 @@
     }
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
-    if (turnCountMismatch) setStatus('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
+    const warnings = [];
+    if (renumbered) warnings.push('This save repeated some turn numbers (left by an older import); its ' + turns.length + ' turns were renumbered in their saved order, and the next save stores the fix.');
+    if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
+    const warning = warnings.length ? warnings.join(' ') : null;
+    if (warning) setStatus(warning, true);
+    return warning;
   }
   function newAdventure(choices, worldId, prep) {
     setWorld(worldId || (W && W.id) || DEFAULT_WORLD);
@@ -1976,11 +2065,11 @@
       if (snap.empty) { el.innerHTML = '<div class="small">No saved adventures yet.</div>'; return; }
       snap.docs.forEach((d) => {
         const a = d.data(); const row = document.createElement('div'); row.className = 'advrow';
-        const wt = WORLDS[a.worldId] ? WORLDS[a.worldId].title : (a.worldId || 'unknown world');
+        const aw = a.worldId || LEGACY_WORLD; const wt = WORLDS[aw] ? WORLDS[aw].title : aw;
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
-          '<span class="acts"><button data-act="open"' + (WORLDS[a.worldId] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
-        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus('A turn is already running.', true); return; } setStatus('loading…'); try { await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(''); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); } };
+          '<span class="acts"><button data-act="open"' + (WORLDS[aw] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
+        row.querySelector('[data-act="open"]').onclick = async () => { if (isCur) { closeDlg('dlgAdventures'); return; } if (busy) { setStatus('A turn is already running.', true); return; } if (loadingAdv) { setStatus('An adventure is already loading.', true); return; } loadingAdv = true; setStatus('loading…'); try { const warning = await loadAdventure(a.id); closeDlg('dlgAdventures'); setStatus(warning || '', !!warning); } catch (e) { setStatus('Could not load that adventure: ' + ((e && e.message) || 'error'), true); } finally { loadingAdv = false; } };
         row.querySelector('[data-act="rename"]').onclick = () => inlineConfirm(row, 'New title', a.title, async (t) => {
           if (!t) return;
           if (isCur) { adv.title = t; const saved = await persist(); if (saved) setStatus('Adventure renamed.'); }
@@ -2052,7 +2141,7 @@
       const text = await file.text(); const p = JSON.parse(text);
       if (!p || p.format !== 'windlass-save-1' || !p.adventure) throw new Error('not a Windlass save');
       const a = p.adventure, record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
-      const wid = a.worldId || (p.world && p.world.id);
+      const wid = a.worldId || (p.world && p.world.id) || LEGACY_WORLD;
       if (!Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('this save needs a world that is not loaded');
       const validPlayer = (x) => record(x) && typeof x.name === 'string' && typeof x.first === 'string' && record(x.pronouns) && record(x.stats);
       if (!record(a.state) || !record(a.state.items) || !record(a.state.attitudes) || !record(a.state.flags) || !Array.isArray(a.state.present) || !Number.isFinite(Number(a.state.day)) || typeof a.state.time !== 'string' || typeof a.state.location !== 'string') throw new Error('save state is incomplete');
@@ -2061,23 +2150,23 @@
       if (a.settings != null && !record(a.settings)) throw new Error('save settings are invalid');
       const turns = p.turns == null ? [] : p.turns;
       if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
-      if (new Set(turns.map((t) => t.n)).size !== turns.length) throw new Error('save contains duplicate turn numbers');
       const settings = normaliseSettings(clone(a.settings || {}));
       const next = { id: uid('adv'), title: (typeof a.title === 'string' ? a.title : 'Imported') + ' (imported)', createdAt: a.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), settings, player: record(a.player) ? clone(a.player) : null, roommate: record(a.roommate) ? clone(a.roommate) : null, opening: record(a.opening) ? clone(a.opening) : null, creation: record(a.creation) ? clone(a.creation) : null, cast: record(a.cast) ? clone(a.cast) : null, state: clone(a.state), memory: Object.assign({ summary: '', events: [], beats: [], facts: [] }, clone(a.memory)), pendingNotes: Array.isArray(a.pendingNotes) ? clone(a.pendingNotes) : [], turns: clone(turns) };
+      const renumbered = orderTurns(next.turns); cleanAlts(next.turns);
       if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
       next.memory.facts = next.memory.facts || [];
       // Imported turns may predate the history-trimming fix (every turn still carrying its full memBefore/pendingBefore/alts);
-      // trim everything but the last turn now so the import does not reintroduce the same unbounded growth.
-      for (let i = 0; i < next.turns.length - 1; i++) trimTurnHistory(next.turns[i]);
+      // trim everything Undo cannot reach now so the import does not reintroduce the same unbounded growth.
+      trimBeyondUndo(next.turns);
       setWorld(wid); adv = next; summaryDirty = false; ensureTf(adv.state); migrateAdv();
       renderAll();
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
-      closeDlg('dlgAdventures'); setStatus(db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.');
+      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? ' Some turn numbers in the file repeated, so its ' + adv.turns.length + ' turns were renumbered in file order.' : ''), !!renumbered);
     } catch (e) {
       adv = oldAdv; setWorld(oldWorldId); renderAll();
-      setStatus('Import failed: ' + ((e && e.message) || 'invalid save'), true);
+      setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);
     }
   }
 
@@ -2593,14 +2682,14 @@
     const outcome = r.stat && ev.outcome && ev.outcome !== 'none' ? ' vs ' + esc(ev.difficulty || '') + ' → ' + esc(ev.outcome) : '';
     const warn = (t.notes || []).filter((n) => /clamped|capped|ignored|trimmed|outside|failed|cut short|missing|corrected|disagrees/.test(n)).length;
     el.innerHTML =
-      '<div class="turn-meta"><span class="n">Turn ' + t.n + '</span><span>Day ' + num(t.stateBefore.day) + ' ' + esc(t.stateBefore.time) + ' → ' + esc(t.stateAfter.time) + (t.stateAfter.day !== t.stateBefore.day ? ' (Day ' + num(t.stateAfter.day) + ')' : '') + '</span><span>' + esc(t.stateBefore.location) + '</span><span>' + esc(rollTxt) + outcome + '</span></div>' +
+      '<div class="turn-meta"><span class="n">Turn ' + num(t.n) + '</span><span>Day ' + num(t.stateBefore.day) + ' ' + esc(t.stateBefore.time) + ' → ' + esc(t.stateAfter.time) + (t.stateAfter.day !== t.stateBefore.day ? ' (Day ' + num(t.stateAfter.day) + ')' : '') + '</span><span>' + esc(t.stateBefore.location) + '</span><span>' + esc(rollTxt) + outcome + '</span></div>' +
       '<div class="turn-action">' + esc(t.action) + (t.director ? '<span class="dir">Director: ' + esc(t.director) + '</span>' : '') + (t.rewrite ? '<span class="dir">Rewrite note: ' + esc(t.rewrite) + '</span>' : '') + '</div>' +
       '<div class="narr">' + paragraphs(t.narrative) + '</div>' +
       '<div class="turn-foot">' +
         (showHidden ? '<button class="quiet" data-reveal="changes">Changes (' + (t.diff || []).length + ')</button>' +
         '<button class="quiet" data-reveal="secret">Secret</button>' +
         '<button class="quiet" data-reveal="eval">Evaluation</button>' : '') +
-        (t.alts && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + t.alts.length + ')</button>' : '') +
+        (t.alts && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + num(t.alts.length) + ')</button>' : '') +
         '<span class="spacer"></span>' +
         (warn && showHidden ? '<span class="pill warn" title="' + esc((t.notes || []).join('\n')) + '">' + warn + ' note' + (warn > 1 ? 's' : '') + '</span>' : '') +
         '<span class="pill">' + esc(t.tierApplied || t.tierAsked) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
@@ -2643,7 +2732,7 @@
       const keys = Object.keys(T.species).sort((a, b) => (S.tf.influence[b] || 0) - (S.tf.influence[a] || 0));
       $('#influence').innerHTML = keys.map((k) => { const v = num(S.tf.influence[k]); return '<div class="bar"><span>' + esc(T.species[k].short) + '</span><div class="track"><div class="fill" style="width:' + v + '%"></div></div><span class="num">' + v + '</span></div>'; }).join('');
       $('#tfNote').textContent = T.thresholdsNote || '';
-      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · under way, step ' + bt.i + ' of ' + bt.steps.length : ' · beginning'; };
+      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · under way, step ' + num(bt.i) + ' of ' + num(bt.steps && bt.steps.length) : ' · beginning'; };
       $('#traits').innerHTML = (S.tf.traits.length ? S.tf.traits.slice().reverse().map((t) => '<li><span>Day ' + num(t.day) + ' · ' + esc(T.species[t.species].short) + (t.settled === false ? trackLabel(t) : '') + '</span>' + esc(t.trait) + '</li>').join('') : '<li class="small">None yet.</li>') + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '') + Object.keys(S.tf.paths || {}).filter((k) => S.tf.paths[k] && S.tf.paths[k].sex && !(S.tf.sex && S.tf.sex.species === k)).map((k) => '<li class="small"><span>' + esc(T.species[k].short) + ' path</span>also going toward ' + (S.tf.paths[k].sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body</li>').join('');
     }
     const items = $('#items'); items.innerHTML = '';
@@ -2665,7 +2754,9 @@
     const facts = adv.memory.facts || [];
     $('#facts').innerHTML = facts.length ? facts.slice().reverse().map((f) => '<li>' + esc(f) + '</li>').join('') : '<li class="small">None recorded yet.</li>';
     $('#factCount').textContent = facts.length + ' facts';
-    $('#regen').disabled = busy || !sample || !adv.turns.length; $('#regenWith').disabled = busy || !sample || !adv.turns.length; $('#undo').disabled = busy || !adv.turns.length;
+    const canStepBack = restorable(adv.turns[adv.turns.length - 1]); const stepBackTip = adv.turns.length && !canStepBack ? notRestorableMsg() : '';
+    $('#regen').disabled = busy || !sample || !canStepBack; $('#regenWith').disabled = busy || !sample || !canStepBack; $('#undo').disabled = busy || !canStepBack;
+    ['#regen', '#regenWith', '#undo'].forEach((id) => { const el = $(id); if (stepBackTip) { if (!el.dataset.tip) el.dataset.tip = el.title; el.title = stepBackTip; } else if (el.dataset.tip != null) { el.title = el.dataset.tip; delete el.dataset.tip; } });
   }
   function renderSettingsForm() {
     $('#setNarrTier').value = adv.settings.narrTier; $('#setUtilTier').value = adv.settings.utilTier; $('#setDensity').value = adv.settings.density; $('#setWindow').value = String(adv.settings.window); $('#setAutoFit').value = adv.settings.autoFit ? '1' : '0'; $('#setThoughts').value = adv.settings.thoughts === false ? '0' : '1'; $('#setInventTier').value = inventTier(); $('#setPace').value = adv.settings.pace in PACE_PER_DAY ? adv.settings.pace : 'standard';
@@ -2886,14 +2977,21 @@
     } catch (e) { listError = e; }
     const ids = (snap && snap.docs ? snap.docs.map((d) => d.id) : []);
     if (bootLast && !ids.includes(bootLast)) ids.push(bootLast);
+    const skipped = [];
     for (const id of ids) {
       try {
-        await loadAdventure(id);
+        const warning = await loadAdventure(id);
         setSaveNote('loaded');
-        setStatus('Welcome back. Pick up where you left off.');
+        // A newer save that could not be opened is said out loud, so the player does not take an older one for the latest.
+        const skippedNote = skipped.length ? (skipped.length === 1 ? 'Your most recent save' : skipped.length + ' more recent saves') + ' could not be opened (' + skipped[0].why + '; see Debug), so this is the newest one that could. ' : '';
+        if (skippedNote || warning) setStatus(skippedNote + (warning || 'Pick up where you left off.'), true);
+        else setStatus('Welcome back. Pick up where you left off.');
         return;
       } catch (e) {
-        lastDebug = { prompt: '', raw: '', notes: ['load failed for ' + id + ': ' + ((e && e.message) || 'invalid save'), (e && e.stack) ? String(e.stack).slice(0, 800) : ''], meta: 'Boot load failure' };
+        const why = (e && e.message) || 'invalid save';
+        let title = id; try { const doc = snap && snap.docs && snap.docs.find((x) => x.id === id); const dd = doc && doc.data(); if (dd && typeof dd.title === 'string' && dd.title) title = dd.title; } catch (e2) {}
+        skipped.push({ id, title, why });
+        lastDebug = { prompt: '', raw: '', notes: skipped.map((x) => 'load failed for ' + x.title + ' (' + x.id + '): ' + x.why).concat([(e && e.stack) ? String(e.stack).slice(0, 800) : '']), meta: 'Boot load failure' };
       }
     }
     if (listError) {
