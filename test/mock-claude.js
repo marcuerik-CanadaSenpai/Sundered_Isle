@@ -2,7 +2,7 @@
 // A strict mock of the artifact runtime (contract 0.2.60): db, sample, downloads, claude.use().
 // It enforces the documented limits so contract violations show up as recorded `violations`.
 //   mock.violations   : [{kind, detail}]  every contract breach the page committed
-//   mock.sampleCalls  : [{label, bytes, input, opts, outcome}]
+//   mock.sampleCalls  : [{label, bytes, input, opts, outcome}]  label: the kind of call, read off the prompt (turn, memory fold, …)
 //   mock.dbLog        : [{op, path, bytes?}]
 //   mock.store        : Map path -> {data, version}
 //   mock.downloadsLog : [{filename, bytes}]
@@ -128,9 +128,21 @@ function install(window, opts) {
   });
 
   // ---------- sample ----------
+  // The page strips its own label before calling the runtime (an unknown option would be refused), so the kind of call is
+  // read off the prompt itself for the trace and the diagnostics.
+  function kindOf(input) {
+    const p = typeof input === 'string' ? input : (Array.isArray(input) ? input.map((m) => (m && m.content) || '').join('\n') : '');
+    if (/<output_format>/.test(p)) return 'turn';
+    if (/You maintain the long-term memory/.test(p)) return 'memory fold';
+    if (/Rewrite it to between/.test(p)) return 'length fit';
+    if (/Write the roommate's first appearance/.test(p)) return 'roommate introduction';
+    if (/Invent the people listed in <people>/.test(p)) return 'cast invention';
+    if (/Reply with the single word pong/.test(p)) return 'ping';
+    return p.slice(0, 40).replace(/\s+/g, ' ');
+  }
   async function sampleImpl(input, options, asJson) {
     mock.calls.sample++;
-    const label = (options && options.__label) || '';
+    const label = kindOf(input);
     const call = { label, input, opts: options, bytes: 0, outcome: 'pending', t0: Date.now() };
     mock.sampleCalls.push(call);
     const fail = (code, message, text) => { call.outcome = code; throw err(code, message, text != null ? { text } : undefined); };
