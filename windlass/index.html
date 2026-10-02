@@ -1740,6 +1740,9 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
+    // The memory after a fold is kept on the newest turn only (its successor's memBefore carries the same memory), so a
+    // fold does not leave a full copy of the memory on every turn it touched.
+    if (adv.turns.length > 1) adv.turns[adv.turns.length - 2].memAfter = null;
     if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = clone(adv.memory); } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
@@ -1897,7 +1900,7 @@
   function trimTurnHistory(t) {
     if (t._trimmed) return false;
     t.stateBefore = trimState(t.stateBefore); t.stateAfter = trimState(t.stateAfter);
-    t.memBefore = null; t.pendingBefore = null; t.alts = [];
+    t.memBefore = null; t.memAfter = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
     return true;
   }
@@ -1941,6 +1944,8 @@
       const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
+      // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
+      if (!properWordIn(text, r.first) && !properWordIn(text, r.name)) throw new Error('the roommate is not named');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
       adv.opening.narrative = openingNarrative(text); adv.opening.introWritten = true; adv.roommate.intro = text;
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
