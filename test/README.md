@@ -10,6 +10,7 @@ The mock enforces the documented limits: 256 KiB per db document, 5,000 document
 npm install
 npm run smoke          # create an adventure, take one turn, check it was shown and saved
 npm run turns          # twelve turns, each shown and stored
+npm run schedule-precedence # day-specific events take precedence over generic slots
 npm run romance-anatomy # romance pacing, anatomical guidance and world-boundary regressions
 npm run long-game      # realistic long game; on the snapshot it shows the chunk-size save failure (review/REVIEW.md H1)
 npm run import-export  # export then import a 25-turn save (chunks 0000-0002); on the snapshot the imported copy keeps only 0002 (H2)
