@@ -37,6 +37,7 @@ async function main() {
     assert.match(prompt, /Do not replace a named feature with generic warmth or euphemism/, 'established anatomy must not be euphemized');
     assert.match(prompt, /Narrative length:.*640 words/i, 'the rich scene band must be enforced for romance');
     assert(await h.turn('I read the program quietly in the huge courtyard'), 'ordinary turn did not finish');
+    assert(prompts.length > 1, 'the ordinary storyteller prompt was not captured');
     assert.doesNotMatch(prompts[1], /Romance scene pacing \(binding\)/,
       'ordinary words containing romance roots must not trigger romance pacing');
 

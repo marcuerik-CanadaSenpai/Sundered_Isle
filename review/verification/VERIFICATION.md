@@ -1,6 +1,6 @@
 # Windlass verification results
 
-The differential probes in this folder compare the published snapshot in `review/published/` with the current `windlass/` build after integrating PR #22 and PR #23.
+The differential probes in this folder compare the published snapshot in `review/published/` with the current `windlass/` build after integrating PRs #22, #23, and #25.
 
 ## Results
 
@@ -15,8 +15,8 @@ The differential probes in this folder compare the published snapshot in `review
 | Roommate identity | PASS: in the differential set, the published build had 71/81 wrong-name Turn 0 cases without sample responses and 35/41 with them; the current build had 0 in both sets. The current build also had no missing names, duplicate/mismatched cast entries, wrong prompt names, page errors, or contract violations. |
 | Legacy saves | PASS: published saves continued to load and play in all three worlds, including saves without `worldId`. Undo, Regenerate, and previous-version flows remained usable. |
 
-The full-name guard rejects an intro that omits any part of the roommate's name and uses the existing plain introduction fallback. The original published build reproduces the documented failures, confirming the probes exercise the regressions rather than merely passing on both builds. Prompt regressions are covered by the jsdom mock harness; this does not claim to test a live model response.
+The roommate-name guard rejects an intro that omits the roommate's first or full name and uses the existing plain introduction fallback. The original published build reproduces the documented failures, confirming the probes exercise the regressions rather than merely passing on both builds. Prompt regressions are covered by the jsdom mock harness; this does not claim to test a live model response.
 
 ## Test commands
 
-From `test/`, run `npm ci`, then `npm run smoke`, `npm run turns`, `npm run review-regressions`, `npm run exposure-fallback`, `npm run name-matcher`, `npm run schedule-precedence`, and `npm run romance-anatomy`. The harness checks the scene-specific romance prompts, ordinary-scene density, and world anatomy guidance. The differential scenarios are `review/verification/<finding>.js`; each compares `src` (published) with `main` (current build). The `*-challenge.js` scripts cover additional routes.
+From `test/`, run `npm ci`, then `npm run smoke`, `npm run turns`, `npm run review-regressions`, `npm run undo-recovery`, `npm run exposure-fallback`, `npm run name-matcher`, `npm run schedule-precedence`, and `npm run romance-anatomy`. The harness checks the scene-specific romance prompts, ordinary-scene density, and world anatomy guidance. `npm run long-game` and `npm run import-export` run longer save/history probes. The differential scenarios are `review/verification/<finding>.js`; each compares `src` (published) with `main` (current build). The `*-challenge.js` scripts cover additional routes.
