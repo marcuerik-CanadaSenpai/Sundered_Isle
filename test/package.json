@@ -3,6 +3,7 @@
   "private": true,
   "description": "Runs the real Windlass page in jsdom against a strict mock of the artifact runtime (db, sample, downloads).",
   "scripts": {
+    "exposure-fallback": "node exposure-fallback.js",
     "smoke": "node smoke.js",
     "turns": "node turnsmoke.js",
     "long-game": "node probe2.js",
