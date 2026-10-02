@@ -2285,6 +2285,11 @@
       }
       if (Array.isArray(last.pendingAfter)) adv.pendingNotes = clone(last.pendingAfter);
     }
+    // Only the newest turn needs a fold record. A save written by 1.0 keeps a whole memory copy on every turn that folded;
+    // those are dropped once recovery has used what it needs, and the blocks that held them are written again on the next save.
+    let firstStale = -1;
+    adv.turns.forEach((t, i) => { if (i < adv.turns.length - 1 && t && t.memAfter != null) { delete t.memAfter; if (firstStale < 0) firstStale = Math.floor(i / CHUNK); } });
+    if (firstStale >= 0) adv._savedUpToChunk = Math.min(adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk, firstStale - 1);
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
