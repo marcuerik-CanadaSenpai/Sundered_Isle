@@ -154,7 +154,9 @@ function install(window, opts) {
     await wait(mock.sampleLatency);
     if (options.signal && options.signal.aborted) fail('cancelled', 'aborted');
     let res;
-    try { res = await (mock.sampleHandler || defaultHandler)(input, options, call); }
+    // The runtime rejects an aborted call at once, so a slow or held handler is raced against the signal.
+    const aborted = options.signal ? new Promise((_, rej) => { const on = () => rej(err('cancelled', 'aborted')); if (options.signal.aborted) on(); else options.signal.addEventListener('abort', on, { once: true }); }) : null;
+    try { const work = Promise.resolve().then(() => (mock.sampleHandler || defaultHandler)(input, options, call)); res = await (aborted ? Promise.race([work, aborted]) : work); }
     catch (e) { call.outcome = (e && e.code) || 'handler-threw'; throw (e && e.code) ? e : err('upstream_error', String(e && e.message || e)); }
     if (typeof res === 'string') res = { text: res, truncated: false };
     if (!res || !res.text || !String(res.text).trim()) fail('empty_completion', 'no text');
