@@ -2,7 +2,7 @@
 // 1. Fold at turn F, two more turns (F is trimmed), two Undos (F is newest again), then a reload from the record as it was
 //    after turn F-1: turn F and its folded summary must be recovered.
 // 2. A save whose newest turn ahead of the record is trimmed opens at the record's turns, with a warning, and plays on.
-// 3 and 4 are below.
+// 3 to 5 are below.
 const { boot } = require('./boot');
 const J = (x) => JSON.parse(JSON.stringify(x));
 const copy = (store) => new Map([...store].map(([k, v]) => [k, J(v)]));
@@ -46,6 +46,9 @@ async function trimmedTail(fail) {
   if (shown !== 2) fail('trimmed tail: reload shows ' + shown + ' turns, expected 2 (' + statusOf(h2).slice(0, 120) + ')');
   if (!/could not be recovered/.test(statusOf(h2))) fail('trimmed tail: no warning about the turn that could not be recovered');
   if (!(await h2.turn('Four.'))) fail('trimmed tail: the next turn did not finish');
+  const after = turnsOf(h2.mock.store, dk); const rec = h2.mock.store.get(dk).data;
+  if (h2.document.querySelectorAll('#feed .turn').length - 1 !== 3) fail('trimmed tail: the page does not show 3 turns after playing on');
+  if (rec.turnCount !== 3 || after.length !== 3 || after[2].action !== 'Four.') fail('trimmed tail: the next turn was not saved as turn 3 (record ' + rec.turnCount + ', stored ' + after.length + ', last action ' + JSON.stringify(after[after.length - 1] && after[after.length - 1].action) + ')');
   if (h2.errors.length || h2.mock.violations.length) fail('trimmed tail: page errors or contract violations');
   h2.close();
 }
@@ -75,10 +78,27 @@ async function altRecordDropped(fail) {
   if (h2.errors.length || h2.mock.violations.length) fail('alt record: page errors or contract violations');
   h2.close();
 }
+// 5. A save written by 1.0 keeps a whole memory copy on every turn that folded. On load all but the newest are dropped, and
+//    an older, full block that held one is written again on the next save.
+async function legacyRecordsDropped(fail) {
+  const h = await newGame();
+  for (let i = 1; i <= 12; i++) await h.turn('Step ' + i + '.');
+  const store = copy(h.mock.store); const dk = advKey(store); h.close();
+  const ck = chunks(store, dk); const first = store.get(ck[0]).data;
+  const mem = J(store.get(dk).data.memory);
+  first.turns[2].memAfter = J(mem); first.turns[2]._trimmed = true; first.turns[6].memAfter = J(mem);
+  const h2 = await boot({ setup(w, m) { m.store = store; } }); await h2.settle(150, 8000); await h2.idle(10000);
+  await h2.turn('Step 13.');
+  const left = turnsOf(h2.mock.store, dk).filter((t) => t.memAfter).map((t) => t.n);
+  if (left.length) fail('legacy records: turns ' + left.join(', ') + ' still carry a fold record after load and a save');
+  if (turnsOf(h2.mock.store, dk).length !== 13) fail('legacy records: expected 13 stored turns after playing on');
+  if (h2.errors.length || h2.mock.violations.length) fail('legacy records: page errors or contract violations');
+  h2.close();
+}
 (async () => {
   const failures = []; const fail = (m) => failures.push(m);
-  try { await twoUndos(fail); await trimmedTail(fail); await retrimAfterUndo(fail); await altRecordDropped(fail); } catch (e) { failures.push('threw: ' + ((e && e.stack) || e)); }
+  try { await twoUndos(fail); await trimmedTail(fail); await retrimAfterUndo(fail); await altRecordDropped(fail); await legacyRecordsDropped(fail); } catch (e) { failures.push('threw: ' + ((e && e.stack) || e)); }
   if (failures.length) { console.error('UNDO RECOVERY FAILED\n- ' + failures.join('\n- ')); process.exit(1); }
-  console.log('undo recovery passed: two Undos then a stale record recover the folded turn; a trimmed tail opens with a warning; restored state is re-trimmed; old fold records leave previous versions');
+  console.log('undo recovery passed: two Undos then a stale record recover the folded turn; a trimmed tail opens with a warning; restored state is re-trimmed; old fold records leave previous versions and older turns');
   process.exit(0);
 })();
