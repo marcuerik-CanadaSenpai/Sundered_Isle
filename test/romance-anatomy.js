@@ -31,8 +31,12 @@ async function main() {
     const prompt = prompts[0];
     assert.match(prompt, /Romance scene pacing \(binding\)/, 'the scene-specific romance directive must reach the narrator');
     assert.match(prompt, /one specific reciprocal beat at a time/, 'intimacy must be paced as discrete beats');
-    assert.match(prompt, /fade to black at that boundary/, 'sex must remain off-page without skipping the lead-in');
-    assert.match(prompt, /do not depict sex or append a morning-after\/time-skip in this turn/, 'the turn must not jump past the intimate scene');
+    assert.match(prompt, /Consensual adult sex may be depicted on-page when requested/,
+      'the romance prompt must not require sex to remain off-page');
+    assert.match(prompt, /do not fade to black, cut away, or end the scene merely because requested consensual sex begins/,
+      'the romance prompt must explicitly prohibit reintroducing a sex-triggered cutaway');
+    assert.doesNotMatch(prompt, /sex is not depicted|sex remains off-page/i,
+      'the romance prompt must not reinstate the off-page restriction');
     assert.match(prompt, /Body detail \(binding\)/, 'scene-specific anatomical guidance must reach the narrator');
     assert.match(prompt, /Do not replace a named feature with generic warmth or euphemism/, 'established anatomy must not be euphemized');
     assert.match(prompt, /Narrative length:.*640 words/i, 'the rich scene band must be enforced for romance');
@@ -40,6 +44,19 @@ async function main() {
     assert(prompts.length > 1, 'the ordinary storyteller prompt was not captured');
     assert.doesNotMatch(prompts[1], /Romance scene pacing \(binding\)/,
       'ordinary words containing romance roots must not trigger romance pacing');
+    assert(await h.turn('Stay at the table', { director: 'Walk with Luna to the quad and stop there.' }),
+      'director-note turn did not finish');
+    assert(prompts.length > 2, 'the director-note storyteller prompt was not captured');
+    assert.match(prompts[2], /Director note \(binding\): Walk with Luna to the quad and stop there\./,
+      'the exact director note must reach the narrator');
+    assert.match(prompts[2], /Treat its concrete actions, requested people, and ending as required for this turn/,
+      'the narrator must treat concrete director-note instructions as required');
+    assert.match(prompts[2], /overrides prior-scene momentum, default pacing, and the generic stop-at-choice instruction/,
+      'a director note must take precedence over generic scene pacing');
+    assert.doesNotMatch(prompts[2], /shorter whenever .* reaches a choice sooner/,
+      'the generic short-scene instruction must not undermine a director note');
+    assert.match(prompts[2], /ending at the binding director note's requested ending/,
+      'the output format must not contradict the director-note ending');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -54,7 +71,12 @@ async function main() {
     for (const id of ['sundered', 'mythaven', 'halloway']) {
       const rules = worlds[id].rules.join('\n');
       assert.match(rules, /romance/i, id + ' must permit romance');
-      assert.match(rules, /sex (?:is )?(?:not|off-page)|sex remains off-page/i, id + ' must keep sex off-page');
+      assert.match(rules, /consensual adult sex may be (?:described|depicted) on-page when requested/i,
+        id + ' must permit consensual adult sex on-page when requested');
+      assert.match(rules, /do not fade to black or cut away merely because requested consensual sex begins/i,
+        id + ' must prevent a sex-triggered fade-out');
+      assert.doesNotMatch(rules, /sex is not|sex remains off-page/i,
+        id + ' must not require sex to remain off-page');
       assert.match(rules, /accurate, neutral terms|anatomical accuracy/i, id + ' must have an affirmative anatomy rule');
       assert.doesNotMatch(rules, /Content: no sexual content/i, id + ' must not blanket-suppress romance');
     }
