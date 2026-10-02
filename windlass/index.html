@@ -689,7 +689,7 @@
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
   const wordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^a-z])' + escRe(String(name).toLowerCase()) + '([^a-z]|$)').test(hay);
-  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)', 'i').test(hay);
+  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)').test(hay);
   // Minor figures: one line each, and their looks only when they are on the page or were just mentioned.
   function minorCharactersText(mentioned) {
     const gen = adv && adv.cast && adv.cast.generated;
