@@ -689,7 +689,7 @@
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
   const wordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^a-z])' + escRe(String(name).toLowerCase()) + '([^a-z]|$)').test(hay);
-  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)', 'i').test(hay);
+  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)').test(hay);
   // Minor figures: one line each, and their looks only when they are on the page or were just mentioned.
   function minorCharactersText(mentioned) {
     const gen = adv && adv.cast && adv.cast.generated;
@@ -1550,22 +1550,21 @@
   function actionExposures(action) {
     const text = String(action || '');
     if (!W.transformation || !text) return [];
-    const sleep = /\b(sleep(?:s|ing)?|slept|overnight|share(?:s|d)? (?:a )?bed|spend(?:s|ing)? the night)\b/i.test(text);
-    const kiss = /\b(kiss(?:es|ed|ing)?|make out|mouth to mouth)\b/i.test(text);
-    const embrace = /\b(hug(?:s|ged|ging)?|embrac(?:e|es|ed|ing)|cuddl(?:e|es|ed|ing)|snuggl(?:e|es|ed|ing)|hold(?:s|ing)? hands)\b/i.test(text);
-    const touch = /\b(touch(?:es|ed|ing)?|stroke(?:s|d|ing)?|caress(?:es|ed|ing)|groom(?:s|ed|ing)|brush(?:es|ed|ing)|preen(?:s|ed|ing))\b/i.test(text);
-    const dairy = /\b(cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text) && /\b(drink|drank|drinking|sip|sipped|taste|tasted|eat|ate|eating|consume|consumed|have|had)\b/i.test(text);
-    if (!sleep && !kiss && !embrace && !touch && !dairy) return [];
-    const people = activeCharacters().filter((c) => {
-      if (!c || c.species === 'human') return false;
-      const names = [c.name, c.first, c.name && c.name.split(' ').pop()].concat(c.aliases || []).filter(Boolean);
-      return names.some((name) => properWordIn(text, String(name)));
-    });
+    const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
+    const dairy = /^[\s]*[Ii]\s+(?:drank|sipped|tasted|ate|consumed|had)\s+(?:(?:some|a glass of|a cup of)\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/.test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });
     };
-    for (const person of people) {
+    for (const person of activeCharacters()) {
+      if (!person || person.species === 'human') continue;
+      const names = [person.name, person.first, person.name && person.name.split(' ').pop()].concat(person.aliases || []).filter(Boolean);
+      const matches = (phrases) => names.some((name) => phrases.some((phrase) => namedAfter(phrase, name)));
+      const sleep = matches(['slept\\s+(?:with|beside|next to)\\s+(?:the\\s+)?', 'shared\\s+(?:a\\s+)?bed\\s+with\\s+(?:the\\s+)?', 'spent\\s+the\\s+night\\s+(?:with|beside)\\s+(?:the\\s+)?']);
+      const kiss = matches(['kissed\\s+', 'made\\s+out\\s+with\\s+']);
+      const embrace = matches(['hugged\\s+', 'embraced\\s+', 'cuddled\\s+', 'snuggled\\s+', 'held\\s+hands\\s+with\\s+']);
+      const touch = matches(['touched\\s+', 'stroked\\s+', 'caressed\\s+', 'groomed\\s+', 'brushed\\s+', 'preened\\s+']);
+      if (!sleep && !kiss && !embrace && !touch) continue;
       const species = speciesKeyOf(person), sp = species && W.transformation.species[species];
       if (!sp) continue;
       const method = String(sp.method || '').toLowerCase();
@@ -1573,8 +1572,7 @@
         (sleep && /\bsleep|night\b/.test(method)) ||
         (kiss && /\bkiss/.test(method)) ||
         (embrace && /\b(hug\w*|cuddl\w*|touch\w*|warmth)\b/.test(method)) ||
-        (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method)) ||
-        (dairy && species === 'cow' && /\b(dairy|milk|cream|cocoa|cheese|butter)\b/.test(method));
+        (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method));
       if (!supported) continue;
       const intensity = sleep ? 3 : /\b(long|for hours|all evening|all afternoon|for a while)\b/i.test(text) ? 2 : 1;
       add(species, intensity);
@@ -1674,7 +1672,13 @@
     };
     if (regen) { turn.alts = (regen.alts || []).concat([stripAlts(regen)]); turn.n = regen.n; }
     // Keep two complete turns so Undo and Regenerate can restore a short recent window; compact older snapshots to bound save size.
-    if (adv.turns.length >= 2) trimTurnHistory(adv.turns[adv.turns.length - 2]);
+    if (adv.turns.length >= 2) {
+      const compactedIdx = adv.turns.length - 2;
+      if (trimTurnHistory(adv.turns[compactedIdx]) && Math.floor(compactedIdx / CHUNK) !== Math.floor(adv.turns.length / CHUNK)) {
+        adv._dirtyChunks = adv._dirtyChunks || new Set();
+        adv._dirtyChunks.add(Math.floor(compactedIdx / CHUNK));
+      }
+    }
     adv.turns.push(turn);
     if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     return turn;
@@ -1786,10 +1790,11 @@
   // Collapses a state snapshot to the only fields ever read off a turn once it is no longer the last one.
   function trimState(s) { return s ? { day: s.day, time: s.time, location: s.location, present: s.present } : s; }
   function trimTurnHistory(t) {
-    if (t._trimmed) return;
+    if (t._trimmed) return false;
     t.stateBefore = trimState(t.stateBefore); t.stateAfter = trimState(t.stateAfter);
     t.memBefore = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
+    return true;
   }
   let timerId = null;
   function startTimer(t0) { stopTimer(); timerId = setInterval(() => { const s = Math.round((performance.now() - t0) / 1000); $('#elapsed').textContent = s + ' s'; if (s === 150) setStatus('Still waiting for the first word after 150 s. You can Stop and try again.', true); }, 1000); $('#elapsed').textContent = '0 s'; $('#elapsed').hidden = false; }
@@ -1951,6 +1956,8 @@
       // chunks, and a one-off write failure is repaired on the very next save instead of silently losing turns for good.
       const confirmed = adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk;
       for (let i = confirmed + 1; i < chunkIdx; i++) { await chunkRef(i).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); adv._savedUpToChunk = i; }
+      const dirtyChunks = adv._dirtyChunks || new Set();
+      for (const i of Array.from(dirtyChunks).sort((a, b) => a - b)) { await chunkRef(i).set({ c: i, turns: adv.turns.slice(i * CHUNK, (i + 1) * CHUNK) }); dirtyChunks.delete(i); }
       const start = chunkIdx * CHUNK; const slice = adv.turns.slice(start, start + CHUNK);
       if (slice.length) { await chunkRef(chunkIdx).set({ c: chunkIdx, turns: slice }); if (slice.length === CHUNK) adv._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { await chunkRef(n / CHUNK).delete(); if ((adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk) >= n / CHUNK) adv._savedUpToChunk = n / CHUNK - 1; }
@@ -2001,7 +2008,7 @@
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
-    turns.sort((a, b) => a.n - b.n);
+    if (!hadDuplicateNumbers) turns.sort((a, b) => a.n - b.n);
     const renumberedTurns = turns.some((t, i) => t.n !== i + 1);
     if (renumberedTurns) turns.forEach((t, i) => { t.n = i + 1; });
     const turnCountMismatch = (d.turnCount || 0) !== turns.length;
@@ -2142,7 +2149,7 @@
       const turns = p.turns == null ? [] : p.turns;
       if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
       const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
-      turns.sort((a, b) => a.n - b.n);
+      if (!hadDuplicateNumbers) turns.sort((a, b) => a.n - b.n);
       const renumberedTurns = turns.some((t, i) => t.n !== i + 1);
       if (renumberedTurns) turns.forEach((t, i) => { t.n = i + 1; });
       const settings = normaliseSettings(clone(a.settings || {}));

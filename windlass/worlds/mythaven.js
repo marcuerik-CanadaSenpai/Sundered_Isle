@@ -63,7 +63,7 @@ window.WINDLASS_WORLDS.mythaven = {
           { at: 30, trait: 'ears lengthen and soften; small horn buds under the hair' },
           { at: 50, trait: 'a tufted tail; a broader, heavier frame; a settled, unhurried calm' },
           { at: 70, trait: 'hooves in place of feet and a new stance; patches of hide' },
-          { at: 85, trait: 'the body fills toward a broad bovine form; the feminine body path develops an udder; a herd-sense for who is near' },
+          { at: 85, trait: 'the body fills toward a broad bovine form; an udder develops; a herd-sense for who is near' },
           { at: 100, trait: 'fully bovine mythkin: horns, hooves, a placid contentment' }
         ] },
       wolf: { name: 'werewolves', short: 'Wolf', race: 'Werewolf', rate: 4, method: 'running with the pack at dusk, sharing their meals, sleeping in the pack pile, a playful nip or scratch (which they consider forward)',
