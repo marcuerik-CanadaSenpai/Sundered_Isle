@@ -1417,8 +1417,9 @@
     if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
     const recentChars = limits && limits.recentChars, olderChars = limits && limits.olderRecentChars;
     // Near the cap the older verbatim turns keep only their tail (olderRecentChars) before any turn is dropped; later every turn does (recentChars).
-    const recentNarr = (t, isLast) => { let n = t.narrative; if (!isLast && olderChars && n.length > olderChars) n = '[…] ' + n.slice(-olderChars).replace(/^\S*\s+/, ''); if (recentChars && n.length > recentChars) n = n.slice(-recentChars); return n; };
-    parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (olderChars ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
+    let abridgedOlder = false;
+    const recentNarr = (t, isLast) => { let n = t.narrative; if (!isLast && olderChars && n.length > olderChars) { n = '[…] ' + n.slice(-olderChars).replace(/^\S*\s+/, ''); abridgedOlder = true; } if (recentChars && n.length > recentChars) n = n.slice(-recentChars); return n; };
+    parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (abridgedOlder ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
     const actionLines = ['Player action: ' + turnInput.action];
     const named = focusedNames;
     if (named.length) actionLines.push('Focus: the action names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action invites it.');
@@ -1432,14 +1433,14 @@
       const d6 = turnInput.roll.d6;
       const totals = Object.keys(st).map((k) => k + ' ' + (d6 + st[k])).join(', ');
       const skillTotals = W.skills ? '; skills, for magic and craft: ' + Object.keys(W.skills).map((k) => k + ' ' + (d6 + skillLevel((S.skills || {})[k]))).join(', ') : '';
-      actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total and the outcome from the table, do not recompute them; the engine checks them against these numbers, and the narrative must show the outcome the table gives, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
+      actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
     }
     actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + band[0] + ' to ' + band[1] + ' when the scene earns it, and shorter whenever ' + p.first + ' reaches a choice sooner' + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. Stop at the first moment ' + p.first + ' would speak or choose.');
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
       'Reply with only one JSON object and nothing else, no code fence. Inside every string, escape double quotes as \\" and write paragraph breaks as \\n; never put a raw line break inside a string. Fields, in this order:',
-      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the dice table gives for that total, "reason": one sentence},',
+      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the outcome rule gives for that total against the difficulty, "reason": one sentence},',
       '"narrative": string, at most ' + band[1] + ' words, second person present tense, ending at the first moment ' + p.first + ' would speak or choose' + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
       '"suggested_actions": exactly three strings, 12 words or fewer each: plausible things ' + p.first + ' would actually consider doing next, given who ' + p.first + ' is (<player>) and what just happened (speak, ask, move, accept or refuse what was offered, leave, act); each doable at the exact moment and place where the narrative ends, with the people present then, never a moment already passed; no two alike in kind; nothing odd, whimsical or out of character,',
       '"secret_info": string, 60 words or fewer, facts the player does not yet know that follow from this turn,',
@@ -1649,16 +1650,19 @@
       // A label or code fence the model adds despite being asked not to is stripped; the summary itself is what is kept.
       const s = String(res.text || '').trim().replace(/^```[a-z]*\s*|\s*```$/g, '').replace(/^(?:new |updated )?summary\s*[:\-–]\s*/i, '').trim();
       const words = wc(s);
-      return { s, words, truncated: !!res.truncated, bad: !!res.truncated || words < 20 || words > 600 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s) };
+      return { s, words, limit: strict ? 250 : 300, truncated: !!res.truncated, bad: !!res.truncated || words < 20 || words > 600 || /^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(s) };
     };
     // A fold that comes back cut off, over 600 words or as a refusal is asked for once more with a tighter limit; so is one
     // the service failed on. A long summary that still will not condense is kept as it is rather than thrown away.
-    let r;
-    try { r = await ask(false); } catch (e) { if (e && (e.code === 'cancelled' || e.code === 'prompt_too_large')) throw e; r = await ask(true); }
-    if (r.bad) r = await ask(true);
+    // Only one retry in all: a service failure followed by an unusable strict reply gives up, and so does a failure that
+    // took Claude access away (sample is cleared by then).
+    let r, retried = false;
+    const retry = () => { retried = true; return ask(true); };
+    try { r = await ask(false); } catch (e) { if (!sample || (e && (e.code === 'cancelled' || e.code === 'prompt_too_large'))) throw e; r = await retry(); }
+    if (r.bad && !retried) r = await retry();
     if (r.bad) throw { code: 'invalid_summary', message: 'memory fold returned an unusable summary (' + (r.truncated ? 'cut off' : r.words + ' words') + ')' };
     M.summary = r.s; if (foldBeatsNow) M.beats = M.beats.slice(18); if (foldFactsNow) M.facts = M.facts.slice(20);
-    return 'folded ' + (foldBeatsNow ? '18 beats' : '') + (foldBeatsNow && foldFactsNow ? ' and ' : '') + (foldFactsNow ? '20 facts' : '') + ' into the summary' + (r.words > 300 ? ' (' + r.words + ' words, over the 300 asked for)' : '');
+    return 'folded ' + (foldBeatsNow ? '18 beats' : '') + (foldBeatsNow && foldFactsNow ? ' and ' : '') + (foldFactsNow ? '20 facts' : '') + ' into the summary' + (r.words > r.limit ? ' (' + r.words + ' words, over the ' + r.limit + ' asked for)' : '');
   }
 
   // ---------- turn ----------
@@ -1735,14 +1739,15 @@
       stateBefore = clone(adv.state); memBefore = clone(adv.memory); pendingBefore = (adv.pendingNotes || []).slice();
       input.band = sceneBand(input);
       built = buildPrompt(input);
-      // Stay under the runtime's 64 KiB input cap: shorten the timeline and the older beats first, then the verbatim
-      // window, then the lore and style examples, and finally the recent turns' own text — each stage re-measured, so a
-      // pathologically long single turn cannot fall through every stage still oversized and get sent to the runtime anyway.
+      // Stay under the runtime's 64 KiB input cap by shedding in stages, each re-measured, so a pathologically long single
+      // turn cannot fall through every stage still oversized and get sent to the runtime anyway.
       let guard = null;
+      const setWin = Math.max(1, Number(adv.settings.window) || 3);
       const fits = () => new TextEncoder().encode(built.prompt).length <= 63000;
       // First what the story misses least: fewer timeline lines and older beats, one style example, a smaller lore budget,
       // one-line sheets for people who are not in the scene, then the older verbatim turns abridged to their tail ends.
       // Only after that are verbatim turns dropped, and only at the very end is anything cut that normally goes whole.
+      // A stage whose window is wider than the player's own setting is skipped: it would only repeat the stage before it.
       for (const lim of [
         { events: 20, earlier: 12 },
         { events: 20, earlier: 12, exemplars: 1 },
@@ -1762,9 +1767,9 @@
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
         { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
-      ]) { if (fits()) break; built = buildPrompt(input, lim); guard = lim; }
+      ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
-        guard.window ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
+        guard.window && guard.window < setWin ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
         'timeline ' + guard.events + ' events, ' + guard.earlier + ' older beats',
         guard.exemplars ? 'one style example' : '',
         guard.noLore ? 'lore dropped' : (guard.loreBudget ? 'lore budget ' + guard.loreBudget + ' characters' : ''),
