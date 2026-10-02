@@ -640,7 +640,12 @@
     const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.';
     const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '. ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
-    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
+    const template = species && W.roommates && W.roommates[species];
+    const replacementKey = template && template.replaces && template.replaces[p.gender];
+    const replacement = replacementKey && (W.characters || []).find((c) => c.key === replacementKey);
+    const normName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : null;
+    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
     r.intro = composeIntro(r);
     return r;
   }
@@ -2065,6 +2070,10 @@
       const start = chunkIdx * CHUNK; const sliceLen = mine.turns.slice(start, start + CHUNK).length;
       if (sliceLen) { live(); await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) mine._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { live(); await chunkRef(n / CHUNK).delete(); if ((mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk) >= n / CHUNK) mine._savedUpToChunk = n / CHUNK - 1; }
+      for (const id of mine._staleChunks || []) {
+        if (Number.isInteger(Number(id)) && Number(id) < Math.ceil(n / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== id); continue; }
+        live(); await db.doc('adventures/' + mine.id + '/turns/' + id).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== id);
+      }
       live(); const doc = advDoc();
       await db.doc('adventures/' + mine.id).set(doc);
       mine.updatedAt = doc.updatedAt; mine.rev = doc.rev;
@@ -2115,6 +2124,10 @@
       for (let i = 0; i * CHUNK < mine.turns.length; i++) {
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
         live(); await db.doc(path).set(chunkBody(i)); written.push(path);
+      }
+      if (id === mine.id) for (const chunkId of mine._staleChunks || []) {
+        if (Number.isInteger(Number(chunkId)) && Number(chunkId) < Math.ceil(mine.turns.length / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId); continue; }
+        live(); await db.doc('adventures/' + id + '/turns/' + chunkId).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId);
       }
       live(); const doc = advDoc(); doc.id = id;
       if (opts && opts.title != null) doc.title = opts.title;
@@ -2171,12 +2184,19 @@
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
+    const declaredTurnCount = Number.isInteger(d.turnCount) && d.turnCount >= 0 ? d.turnCount : null;
+    const staleTurnCount = declaredTurnCount == null ? 0 : Math.max(0, turns.length - declaredTurnCount);
+    if (staleTurnCount) turns.length = declaredTurnCount;
+    const turnCountMismatch = declaredTurnCount != null && declaredTurnCount !== turns.length;
+    const staleChunks = staleTurnCount ? chunks.docs.filter((c) => {
+      const b = c.data(); const index = Number.isInteger(b && b.c) ? b.c : Number(c.id);
+      return Number.isInteger(index) && index >= Math.ceil(declaredTurnCount / CHUNK);
+    }).map((c) => c.id) : [];
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
-    const turnCountMismatch = (d.turnCount || 0) !== turns.length;
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
     // A renumbered save rewrites every chunk on its next save (the stored chunks still hold the repeated numbers).
-    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
+    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered || staleTurnCount ? -1 : Math.floor(turns.length / CHUNK) - 1, _staleChunks: staleChunks };
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -2190,7 +2210,8 @@
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
     const warnings = [];
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
-    if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
+    if (staleTurnCount) warnings.push('Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record; the next save will repair the extra history.');
+    else if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + declaredTurnCount + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
     return warning;

@@ -144,9 +144,70 @@ async function checkDuplicateChronology() {
   }
 }
 
+async function checkStaleChunkRecovery() {
+  const h = await startAdventure();
+  try {
+    useTurnHandler(h);
+    for (let i = 1; i <= 11; i++) assert(await h.turn('Stored turn ' + i), 'turn did not finish: ' + i);
+    const [mainPath, mainEntry] = adventureEntry(h);
+    const id = mainPath.split('/')[1];
+    mainEntry.data.turnCount = 10;
+
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle');
+    h.click('#reloadAdv');
+    assert(await h.settle(100, 8000), 'reloading the stale-chunk save did not finish');
+    assert.deepEqual(visibleActions(h), Array.from({ length: 10 }, (_, i) => 'Stored turn ' + (i + 1)));
+    assert.match(h.$('#status').textContent, /Ignored 1 stale turn beyond the save record/);
+
+    assert(await h.turn('After stale repair'), 'the adventure did not continue after stale history was removed');
+    assert.deepEqual(turnsIn(h, id).map((turn) => turn.action), Array.from({ length: 10 }, (_, i) => 'Stored turn ' + (i + 1)).concat(['After stale repair']));
+    assert(!h.mock.store.has('adventures/' + id + '/turns/0001'), 'the extra chunk should be removed on the next save');
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
+async function checkGeneratedRoommateReplacement() {
+  const h = await startAdventure();
+  try {
+    h.mock.disable.sample = true;
+    h.click('#btnAdventures');
+    assert(await h.settle(80, 4000), 'adventure list did not settle');
+    h.$('#newWorld').value = 'mythaven';
+    h.click('#newAdv');
+    assert(await h.settle(80, 4000), 'Mythaven creation dialog did not open');
+    h.$('#cRmSpecies').value = 'cow';
+    h.$('#cRmSpecies').dispatchEvent(new h.window.Event('input', { bubbles: true }));
+    h.$('#cRmSpecies').dispatchEvent(new h.window.Event('change', { bubbles: true }));
+    h.$('#cRmGender').value = 'female';
+    h.$('#cRmName').value = 'Marisol Vega';
+    h.$('#cRmName').dispatchEvent(new h.window.Event('input', { bubbles: true }));
+    h.click('#cBegin');
+    assert(await h.idle(30000), 'creating the Mythaven adventure did not finish');
+
+    const [, entry] = adventureEntry(h);
+    assert.equal(entry.data.roommate.replaces, 'marisol', 'an explicitly chosen authored name should replace that same cast member');
+    h.click('#btnCast');
+    assert.equal(h.$('#castList [data-key="marisol"]'), null, 'the authored Marisol should not appear twice in the cast');
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
 (async () => {
   await checkInferenceAndCompaction();
   await checkDuplicateChronology();
+  await checkStaleChunkRecovery();
+  await checkGeneratedRoommateReplacement();
   console.log('review regressions passed');
 })().catch((error) => {
   console.error('REVIEW REGRESSIONS FAILED\n' + (error && error.stack || error));
