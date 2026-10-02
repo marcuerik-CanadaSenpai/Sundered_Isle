@@ -689,7 +689,7 @@
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
   const wordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^a-z])' + escRe(String(name).toLowerCase()) + '([^a-z]|$)').test(hay);
-  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)', 'i').test(hay);
+  const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)').test(hay);
   // Minor figures: one line each, and their looks only when they are on the page or were just mentioned.
   function minorCharactersText(mentioned) {
     const gen = adv && adv.cast && adv.cast.generated;
@@ -1573,22 +1573,20 @@
   function actionExposures(action) {
     const text = String(action || '');
     if (!W.transformation || !text) return [];
-    const sleep = /\b(sleep(?:s|ing)?|slept|overnight|share(?:s|d)? (?:a )?bed|spend(?:s|ing)? the night)\b/i.test(text);
-    const kiss = /\b(kiss(?:es|ed|ing)?|make out|mouth to mouth)\b/i.test(text);
-    const embrace = /\b(hug(?:s|ged|ging)?|embrac(?:e|es|ed|ing)|cuddl(?:e|es|ed|ing)|snuggl(?:e|es|ed|ing)|hold(?:s|ing)? hands)\b/i.test(text);
-    const touch = /\b(touch(?:es|ed|ing)?|stroke(?:s|d|ing)?|caress(?:es|ed|ing)|groom(?:s|ed|ing)|brush(?:es|ed|ing)|preen(?:s|ed|ing))\b/i.test(text);
-    const dairy = /\b(cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text) && /\b(drink|drank|drinking|sip|sipped|taste|tasted|eat|ate|eating|consume|consumed|have|had)\b/i.test(text);
-    if (!sleep && !kiss && !embrace && !touch && !dairy) return [];
-    const people = activeCharacters().filter((c) => {
-      if (!c || c.species === 'human') return false;
-      const names = [c.name, c.first, c.name && c.name.split(' ').pop()].concat(c.aliases || []).filter(Boolean);
-      return names.some((name) => properWordIn(text, String(name)));
-    });
+    const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const dairy = /\bI\s+(?:drank|sipped|tasted|ate|consumed|had)\s+(?:(?:a|some|the)\s+)?(?:(?:sip|taste|cup|glass|serving)\s+of\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });
     };
-    for (const person of people) {
+    for (const person of activeCharacters().filter((c) => c && c.species !== 'human')) {
+      const names = [person.name, person.first, person.name && person.name.split(' ').pop()].concat(person.aliases || []).filter(Boolean);
+      const did = (phrase) => names.some((name) => new RegExp('(?:^|[.!?]\\s*)I\\s+' + phrase + '\\s+' + escapeRegExp(name) + '\\b', 'i').test(text));
+      const sleep = names.some((name) => new RegExp('(?:^|[.!?]\\s*)I\\s+(?:slept\\s+(?:with|beside|next\\s+to)|shared\\s+(?:a\\s+)?bed\\s+with|spent\\s+(?:the\\s+)?night\\s+with)\\s+' + escapeRegExp(name) + '\\b', 'i').test(text));
+      const kiss = did('kissed');
+      const embrace = did('(?:hugged|embraced|cuddled|snuggled|held hands with)') || names.some((name) => new RegExp("(?:^|[.!?]\\s*)I\\s+held\\s+" + escapeRegExp(name) + "[’']s hand\\b", 'i').test(text));
+      const touch = did('(?:touched|stroked|caressed|groomed|brushed|preened)');
+      if (!sleep && !kiss && !embrace && !touch) continue;
       const species = speciesKeyOf(person), sp = species && W.transformation.species[species];
       if (!sp) continue;
       const method = String(sp.method || '').toLowerCase();
