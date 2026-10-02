@@ -1361,9 +1361,8 @@
     const focusedNames = focusNames(turnInput.action);
     const publicErrand = /\b(cocoa|creamery|market|library|dining hall|tea|coffee|walk|study|class|club|pool|shore|garden)\b/i.test(turnInput.action || '');
     const initiativeWindow = ((adv.turns.length + 1) % 3 === 0) || publicErrand;
-    // Who counts as "in the scene" for a full character sheet: anyone present or named in the verbatim turns; at the 'lean'
-    // cast level, only the newest verbatim turn is read for names, so people from earlier turns get their one-line brief.
-    const mentioned = (((limits && limits.castLevel === 'lean') ? recent[recent.length - 1].narrative : recentText) + ' ' + S.present.join(' ')).toLowerCase();
+    // At the 'lean' cast level, only the newest verbatim turn is read for names; include the current action too.
+    const mentioned = (((limits && limits.castLevel === 'lean') ? recent[recent.length - 1].narrative : recentText) + ' ' + turnInput.action + ' ' + focusedNames.join(' ') + ' ' + S.present.join(' ')).toLowerCase();
     const band = turnInput.band || sceneBand(turnInput);
     const P = W.progression;
     const stageN = P ? Number(S.items[P.stateKey]) || 0 : 0;
@@ -2128,9 +2127,9 @@
     }
   }
   // Saves made before turn numbers were kept unique (an import that dropped turns, then more play) can repeat a number.
-  // Unique numbers are sorted; repeated ones keep the stored order and are renumbered 1..N. Returns how many were renumbered.
+  // Unique numbers are sorted; repeated ones keep the stored order. All turns are then renumbered 1..N.
   function orderTurns(turns) {
-    if (new Set(turns.map((t) => t.n)).size === turns.length) { turns.sort((a, b) => a.n - b.n); return 0; }
+    if (new Set(turns.map((t) => t.n)).size === turns.length) turns.sort((a, b) => a.n - b.n);
     // A turn's previous versions carry its number too, so they are renumbered with it (and are not then dropped as mismatched).
     let changed = 0; turns.forEach((t, i) => { if (t.n !== i + 1) { const was = t.n; t.n = i + 1; changed++; if (Array.isArray(t.alts)) for (const a of t.alts) if (a && a.n === was) a.n = t.n; } });
     return changed;
@@ -2166,9 +2165,9 @@
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
     const turns = []; chunks.docs.forEach((c) => { const b = c.data(); if (b && Array.isArray(b.turns)) turns.push(...clone(b.turns)); });
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
+    const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
-    turns.sort((a, b) => a.n - b.n);
     const turnCountMismatch = (d.turnCount || 0) !== turns.length;
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
@@ -2186,7 +2185,7 @@
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
     const warnings = [];
-    if (renumbered) warnings.push('This save repeated some turn numbers (left by an older import); its ' + turns.length + ' turns were renumbered in their saved order, and the next save stores the fix.');
+    if (renumbered) warnings.push((hadDuplicateNumbers ? 'Repeated' : 'Non-sequential') + ' turn numbers were repaired in saved order; the next save stores the fix.');
     if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + (d.turnCount || 0) + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
@@ -2326,6 +2325,7 @@
       const next = { id: uid('adv'), title: (typeof a.title === 'string' ? a.title : 'Imported') + ' (imported)', createdAt: a.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), settings, player: record(a.player) ? clone(a.player) : null, roommate: record(a.roommate) ? clone(a.roommate) : null, opening: record(a.opening) ? clone(a.opening) : null, creation: record(a.creation) ? clone(a.creation) : null, cast: record(a.cast) ? clone(a.cast) : null, state: clone(a.state), memory: Object.assign({ summary: '', events: [], beats: [], facts: [] }, clone(a.memory)), pendingNotes: Array.isArray(a.pendingNotes) ? clone(a.pendingNotes) : [], turns: clone(turns) };
       for (const k of ['events', 'beats', 'facts']) if (!Array.isArray(next.memory[k])) next.memory[k] = [];
       if (next.memory.summary == null) next.memory.summary = '';
+      const hadDuplicateNumbers = new Set(next.turns.map((t) => t.n)).size !== next.turns.length;
       const renumbered = orderTurns(next.turns); cleanAlts(next.turns);
       if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
       next.memory.facts = next.memory.facts || [];
@@ -2337,7 +2337,7 @@
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
-      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? ' Some turn numbers in the file repeated, so its ' + adv.turns.length + ' turns were renumbered in file order.' : ''), !!renumbered);
+      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? ' Turn numbers were repaired in saved order' + (hadDuplicateNumbers ? ' because duplicates were present.' : '.') : ''), !!renumbered);
     } catch (e) {
       adv = oldAdv; setWorld(oldWorldId);
       setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);
