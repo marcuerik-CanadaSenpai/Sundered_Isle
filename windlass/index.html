@@ -1652,11 +1652,11 @@
     };
     // A fold that comes back cut off, over 600 words or as a refusal is asked for once more with a tighter limit; so is one
     // the service failed on. A long summary that still will not condense is kept as it is rather than thrown away.
-    // Only one retry in all: a service failure followed by an unusable strict reply gives up, and so does a failure that
-    // took Claude access away (sample is cleared by then).
+    // Only one retry in all: a service failure followed by an unusable strict reply gives up. No retry after a failure
+    // that took Claude access away (sample is cleared by then), nor straight after a rate limit or a refusal.
     let r, retried = false;
     const retry = () => { retried = true; return ask(true); };
-    try { r = await ask(false); } catch (e) { if (!sample || (e && (e.code === 'cancelled' || e.code === 'prompt_too_large'))) throw e; r = await retry(); }
+    try { r = await ask(false); } catch (e) { if (!sample || (e && (e.code === 'cancelled' || e.code === 'prompt_too_large' || e.code === 'rate_limited' || e.code === 'refused'))) throw e; r = await retry(); }
     if (r.bad && !retried) r = await retry();
     if (r.bad) throw { code: 'invalid_summary', message: 'memory fold returned an unusable summary (' + (r.truncated ? 'cut off' : r.words + ' words') + ')' };
     M.summary = r.s; if (foldBeatsNow) M.beats = M.beats.slice(18); if (foldFactsNow) M.facts = M.facts.slice(20);
