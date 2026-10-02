@@ -1704,7 +1704,7 @@
     // Keep two complete turns so Undo and Regenerate can restore a short recent window; compact older snapshots to bound save size.
     if (adv.turns.length >= 2) trimTurnHistory(adv.turns[adv.turns.length - 2]);
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = clone(adv.memory); } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     return turn;
   }
   async function takeTurn(input, opts) {
@@ -2061,6 +2061,7 @@
     if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
     if (d.id && d.id !== id) throw new Error('save id does not match its document path');
     const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+    const validMemory = (m) => record(m) && Array.isArray(m.events) && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && (m.summary == null || typeof m.summary === 'string');
     const validPlayer = (p) => record(p) && typeof p.name === 'string' && typeof p.first === 'string' && record(p.pronouns) && record(p.stats);
     if (!record(d.state) || !record(d.state.items) || !record(d.state.attitudes) || !record(d.state.flags) || !Array.isArray(d.state.present) || !Number.isFinite(Number(d.state.day)) || typeof d.state.time !== 'string' || typeof d.state.location !== 'string' || !record(d.memory) || !Array.isArray(d.memory.events) || !Array.isArray(d.memory.beats) || (d.memory.facts != null && !Array.isArray(d.memory.facts)) || (d.memory.summary != null && typeof d.memory.summary !== 'string') || (d.settings != null && !record(d.settings)) || (d.player != null && !validPlayer(d.player)) || (d.roommate != null && (!record(d.roommate) || !record(d.roommate.pronouns))) || (d.opening != null && !record(d.opening)) || (d.cast != null && !record(d.cast)) || (d.turnCount != null && (!Number.isInteger(d.turnCount) || d.turnCount < 0))) throw new Error('save data is incomplete');
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
@@ -2081,11 +2082,16 @@
       const sequential = trailing.every((t, i) => t.n === expectedTurns + i + 1);
       if (sequential && last && record(last.stateAfter)) {
         adv.state = clone(last.stateAfter);
-        adv.memory = clone(record(trailing[0].memBefore) ? trailing[0].memBefore : d.memory);
+        let replayFrom = trailing.length;
+        adv.memory = clone(d.memory);
+        for (let i = trailing.length - 1; i >= 0; i--) {
+          if (validMemory(trailing[i].memAfter)) { adv.memory = clone(trailing[i].memAfter); replayFrom = i + 1; break; }
+          if (validMemory(trailing[i].memBefore)) { adv.memory = clone(trailing[i].memBefore); replayFrom = i; break; }
+        }
         adv.memory.events = Array.isArray(adv.memory.events) ? adv.memory.events : [];
         adv.memory.beats = Array.isArray(adv.memory.beats) ? adv.memory.beats : [];
         adv.memory.facts = Array.isArray(adv.memory.facts) ? adv.memory.facts : [];
-        for (const t of trailing) {
+        for (const t of trailing.slice(replayFrom)) {
           if (Array.isArray(t.events)) adv.memory.events.push(...t.events);
           if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
           if (Array.isArray(t.beats)) adv.memory.beats.push(...t.beats);
