@@ -1333,8 +1333,8 @@
     const band = (a, b) => { a = lim(a); b = lim(b); return a <= b ? [a, b] : [b, a]; };
     const forms = [
       [new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'gi'), (m) => ({ band: band(+m[1], +m[2]), floor: true })],
-      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'gi'), (m) => { const n = +(m[1] || m[2] || m[3]); return { band: band(n, n * 1.25), floor: true }; }],
-      [new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.6, +m[1]), floor: false })],
+      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|not? (?:fewer|less) than|(?<!\\bnot? )more than|(?<!\\bnot? )over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'gi'), (m) => { const n = +(m[1] || m[2] || m[3]); return { band: band(n, n * 1.25), floor: true }; }],
+      [new RegExp('(?:at most|not? more than|not? over|up to|under|(?<!\\bnot? )fewer than|(?<!\\bnot? )less than|a maximum of)\\s+' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.6, +m[1]), floor: false })],
       [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.85, +m[1] * 1.1), floor: false })]
     ];
     const noun = '(?:scene|turn|reply|response|passage|narrative|narration|story|chapter)';
@@ -1756,14 +1756,14 @@
     const rr = resolveRoll(out.evaluation, input.roll); notes.push(...rr.notes);
     let words = wc(out.narrative);
     // The band's top is a ceiling; the bottom is only a guide. A short turn that stops at a choice is right, so only overlong turns are fitted.
-    if (allowFit && adv.settings.autoFit && sample && words > band[1] * 1.12) {
+    if (allowFit && adv.settings.autoFit && sample && words > band[1] * (input.bandFloor ? 1 : 1.12)) {
       setStatus('fitting length (' + words + ' words)…');
-      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= 50 && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= (input.bandFloor ? band[0] : 50) && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
     } else if (allowFit && adv.settings.autoFit && sample && input.bandFloor && words < band[0]) {
       // The director asked for at least this length, so a reply below it is expanded rather than kept.
       setStatus('fitting length (' + words + ' words)…');
-      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= band[0] * 0.9 && wc(fitted) <= band[1] * 1.12 && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length expanded ' + words + ' → ' + wc(fitted) + ' words for the director note'); out.narrative = fitted; words = wc(fitted); } else notes.push('length expansion returned unusable text; kept the original'); }
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= band[0] && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length expanded ' + words + ' → ' + wc(fitted) + ' words for the director note'); out.narrative = fitted; words = wc(fitted); } else notes.push('length expansion returned unusable text; kept the original'); }
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length expansion failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');

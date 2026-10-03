@@ -81,6 +81,12 @@ async function main() {
     assert(await h.turn('Keep talking', { director: 'Read 100 words aloud, then write about 600 words.' }), 'mixed-count turn did not finish');
     assert.match(prompts[9], /Narrative length: at most 660 words; 510 to 660/, 'a later narrative length must win over an earlier incidental count');
     assert.equal(fits.length, 1, 'turns without a requested minimum must not be expanded');
+    assert(await h.turn('Keep talking', { director: 'Keep it not more than 300 words.' }), 'not-more-than turn did not finish');
+    assert.match(prompts[10], /Narrative length: at most 300 words; 180 to 300/, '"not more than" must set a ceiling');
+    assert(await h.turn('Keep talking', { director: 'Write at least 700 words.' }), 'short-expansion turn did not finish');
+    assert.equal(fits.length, 3, 'the overlong reply and the reply below a requested minimum must both be fitted');
+    assert.match(fits[1], /Rewrite it to between 180 and 300 words/, 'an overlong reply must be fitted to the requested ceiling');
+    assert.match(fits[2], /Rewrite it to between 700 and 875 words/, 'the expansion must target the requested band');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -94,6 +100,8 @@ async function main() {
       'a director-requested length must set the band the length fit uses');
     assert.deepEqual(Array.from(savedTurns[4].band), [600, 750], 'a requested lower bound must reach the saved band');
     assert.equal(savedTurns[4].words, 640, 'the expanded reply must be the one saved');
+    const laterTurns = h.mock.store.get('adventures/' + id + '/turns/0001').data.turns;
+    assert.equal(laterTurns[1].words, 380, 'an expansion that stays below the requested minimum must not replace the reply');
     assert.deepEqual(Array.from(savedTurns[5].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
       'an incidental word count must leave the selected band alone');
     assert.deepEqual(Array.from(savedTurns[6].band), [510, 660], 'a plain "write N words" must reach the saved band');
