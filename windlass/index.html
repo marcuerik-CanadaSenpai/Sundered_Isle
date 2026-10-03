@@ -518,6 +518,14 @@
   }
   // Pace of change: the most influence one species can gain in one story day (turns are minutes; days are what a slow burn is measured in).
   const PACE_PER_DAY = { slow: 5, standard: 10, fast: 20, unbounded: 0 };
+  const CORE_RULES = [
+    'Perspective: everything is seen from inside {first}. What is new to {first} is called out as new, through the senses beyond sight (smell, sound, touch, warmth, weight) and an inward reaction: a thought, a noticing, a reflex, a thing not said. Not everything is dialogue; a turn can carry a paragraph of looking and thinking. {first}\'s reflexes and sensations are yours; {first}\'s decisions, words and settled feelings are the player\'s.',
+    'Player knowledge: {first} knows only what the player has read (the "earlier" notes, the opening, the turns) plus <player>. Never have {first} recognise, name or recall a person, place or fact beyond that; when someone mentions one {first} has not met on the page, make clear who or what it is, or leave it for {first} to ask. Invent no surname, family, past, belongings or opinions for {first}: <player> is the whole of it, and any words given to {first} come from the stated action or what the player knows.',
+    'Stopping: a turn ends at the first moment {first} would speak or choose: someone addresses {first}, an offer or a question, arriving somewhere new, a person worth meeting. Never carry {first} through several such moments in one turn (a walk, then a queue, then being served, then sitting down); stop at the first, however short the turn. Ending short is always right; padding never is.',
+    'Variety: aims are directions, not scripts: a character pursues one by different means each scene and lets it rest for a few turns after {first} answers or ignores a bid. A signature habit (a hum, a gesture, a running joke) appears at most once a scene and not in consecutive turns unless {first} engages with it; each turn shows a different side of the people present (a new topic, a want, a mood, a piece of their day). Do not end consecutive turns on the same image.',
+    'Attitudes: an attitude value moves at most one point per turn and only for a cause shown in the narrative.',
+    'Fresh detail: show people and places through details and images not already used in <recent_turns> or <style_examples>.'
+  ];
   const TURN_KEYS = ['evaluation', 'narrative', 'suggested_actions', 'secret_info', 'state_updates', 'time_advance_minutes', 'events', 'beats', 'facts'];
   const CHUNK = 10;
 
@@ -646,10 +654,13 @@
     const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.';
     const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '. ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
-    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
-    // A drawn or typed name that is an authored character's means the roommate is that person: they are not listed twice.
-    const twin = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((nm) => String(nm || '').trim().toLowerCase() === p.name.trim().toLowerCase()));
-    if (twin) r.replaces = twin.key;
+    const template = species && W.roommates && W.roommates[species];
+    const replacementKey = template && template.replaces && template.replaces[p.gender];
+    const replacement = replacementKey && (W.characters || []).find((c) => c.key === replacementKey);
+    const normName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const namedCharacter = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((name) => normName(name) === normName(p.name)));
+    const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : (namedCharacter ? namedCharacter.key : null);
+    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
     r.intro = composeIntro(r);
     return r;
   }
@@ -1087,12 +1098,12 @@
     const sp = W.transformation.species[a.species]; const who = firstName(); const b = a.beats; const inf = tf.influence[a.species] || 0;
     if (!b) {
       if (a.phase === 0) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + a.trait + '. This turn it is only a first sensation, subtle enough that ' + who + ' could doubt it: describe it precisely in the body, from inside, without naming what it is becoming, and let nobody else notice. Among the suggested actions, offer one that leans into it and one that pulls away.';
-      if (a.phase === 1) return 'The change continues (' + sp.name + '): ' + a.trait + '. This turn it becomes unmistakable to ' + who + '. Give it room: close physical detail, what it feels like from inside, and what it does to appetite, habit or mood. ' + who + ' notices fully; nobody else remarks on it unless it is plainly visible and they would have cause. How ' + who + ' feels about it is the player\'s choice: offer suggested actions that include fear and enjoyment.';
+      if (a.phase === 1) return 'The change continues (' + sp.name + '): ' + a.trait + '. This turn it becomes unmistakable to ' + who + '. Give it room: close physical detail, what it feels like from inside, and any bodily or practical effect. ' + who + ' notices fully; nobody else remarks on it unless it is plainly visible and they would have cause. How ' + who + ' feels about it is the player\'s choice; do not presume a reaction in the suggested actions.';
       return 'The change has settled (' + sp.name + '): ' + a.trait + '. It is now part of ' + who + '\'s body. Reflect it in how ' + who + ' moves, eats or reacts, without announcement.';
     }
     if (a.phase === 0) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + a.trait + '. This turn it is only a first sensation, subtle enough that ' + who + ' could put it down to tiredness, the cold or the food, and nothing shows yet. Draw on one or two of these, in your own words: ' + b.feel.slice(0, 2).map((t) => fill(t)).join('; ') + '. Describe it from inside ' + who + '\'s body, precisely, without naming what it is becoming, and let nobody else notice. Among the suggested actions, offer one that leans into it and one that pulls away.';
-    if (a.phase === 1) return 'The change continues (' + sp.name + '): ' + a.trait + '. This turn ' + who + ' finds it and cannot doubt it, in your own words: ' + fill(b.show) + '. Give it room: the finding (caught in the act: a plate, a mirror, a touch, clothes that no longer sit right, a task the body does differently), the sensation (' + fill(b.feel[2] || b.feel[0]) + ') and a drift ' + who + ' may notice only in hindsight (' + fill(b.habits[0] || b.settle) + '). Stay inside ' + who + '\'s perspective: reflexes and sensations are yours to narrate; how ' + who + ' feels about it is the player\'s, so offer suggested actions that include fear, curiosity and enjoyment. Nobody remarks on it unless it is plainly visible and they would have cause; an animal or a keen-nosed mythkin may react without a word (' + fill(b.noticed) + '), never naming it.';
-    return 'The change has settled (' + sp.name + '): ' + a.trait + '. In your own words: ' + fill(b.settle) + '. It is part of ' + who + '\'s body now: let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(b.habits[1] || b.habits[0] || b.settle) + ') without announcement; a new part keeps a mind of its own for a while, and mastering it is a small pride. Hiding it, if ' + who + ' chooses to, costs something practical each time.';
+    if (a.phase === 1) return 'The change continues (' + sp.name + '): ' + a.trait + '. This turn ' + who + ' finds it and cannot doubt it, in your own words: ' + fill(b.show) + '. Give it room: the finding (caught in the act: a plate, a mirror, a touch, clothes that no longer sit right, a task the body does differently), the sensation (' + fill(b.feel[2] || b.feel[0]) + ') and a physical or routine detail ' + who + ' may notice only in hindsight (' + fill(b.habits[0] || b.settle) + '). Stay inside ' + who + '\'s perspective: reflexes and sensations are yours to narrate; how ' + who + ' feels about it is the player\'s. Do not presume a reaction in the suggested actions. Nobody remarks on it unless it is plainly visible and they would have cause; an animal or a keen-nosed mythkin may react without a word (' + fill(b.noticed) + '), never naming it.';
+    return 'The change has settled (' + sp.name + '): ' + a.trait + '. In your own words: ' + fill(b.settle) + '. It is part of ' + who + '\'s body now: let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(b.habits[1] || b.habits[0] || b.settle) + ') without announcement; new parts may move reflexively before their motions are familiar. Do not assign pride or another feeling. Hiding it, if ' + who + ' chooses to, costs something practical each time.';
   }
   // Emits this turn's note for each running arc and advances it. Called once per committed turn.
   function advanceArcs(state, notes) {
@@ -1114,7 +1125,7 @@
       if (isLast && t.rung >= lastSexRung(sp)) return 'The body has finished going over (' + sp.name + ' path): ' + step + '. ' + who + '\'s body is ' + what + ' now, the whole of it. Say so once, plainly, as a fact found in the mirror or in clothes, without ceremony or explanation; then the scene goes on. What ' + who + ' is called and how ' + who + ' feels about it are the player\'s; people who know ' + who + ' go by whatever ' + who + ' has said, and otherwise by what they see.';
       return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). One small thing this turn, in your own words: ' + step + '. A sentence or two, plain, found in passing (a mirror, a shirt, a strap, a voice), with its practical consequence; then the scene goes on. Nobody remarks on it unless it is plainly visible and they would have cause, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
     }
-    if (isLast) return 'The change completes (' + sp.name + '): ' + t.trait + '. In your own words: ' + step + '. What the body is now, to render once in full, plainly, as ' + who + ' would find it by looking and touching, and to keep to afterwards: ' + pathFill(tf, t.species, t.anatomy || sp.name + ' as the kind has it') + ' From here it is part of ' + who + '\'s body: let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(t.habits[0] || t.trait) + ') without announcement; a new part keeps a mind of its own for a while, and mastering it is a small pride. An animal or a keen-nosed mythkin may react without a word (' + fill(t.noticed || 'a look, a sniff, room made') + '), never naming it. Hiding it, if ' + who + ' chooses to, costs something practical each time. How ' + who + ' feels about it is the player\'s: offer suggested actions that include fear, curiosity and enjoyment.';
+    if (isLast) return 'The change completes (' + sp.name + '): ' + t.trait + '. In your own words: ' + step + '. What the body is now, to render once in full, plainly, as ' + who + ' would find it by looking and touching, and to keep to afterwards: ' + pathFill(tf, t.species, t.anatomy || sp.name + ' as the kind has it') + ' From here it is part of ' + who + '\'s body: let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(t.habits[0] || t.trait) + ') without announcement; new parts may move reflexively before their motions are familiar. An animal or a keen-nosed mythkin may react without a word (' + fill(t.noticed || 'a look, a sniff, room made') + '), never naming it. Hiding it, if ' + who + ' chooses to, costs something practical each time. How ' + who + ' feels about it is the player\'s; do not presume a reaction in the suggested actions.';
     if (isFirst) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + t.trait + '. Only one small thing this turn, in your own words: ' + step + '. It is a first sensation, small enough to put down to tiredness, the cold or the food, and nothing shows: a sentence or two from inside ' + who + '\'s body, then the scene goes on and ' + who + ' may forget it. Do not name what it is becoming; nobody else notices. One suggested action may touch it; the others need not.';
     return 'The change continues (' + sp.name + '): ' + t.trait + '. One more small thing this turn, in your own words: ' + step + '. Found in passing (a shoe, a sock, a chair, a sleeve, a mirror, a task the body does differently), with its practical consequence, in a sentence or two; the rest of the turn is the scene. ' + who + ' may attend to it or let it go: that is the player\'s. What was told before stays true (<transformation> lists it). Nobody remarks on it unless it is plainly visible and they would have cause, and nobody names or predicts it.';
   }
@@ -1217,6 +1228,7 @@
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
     lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') + (visibleTraits.length < tf.traits.length ? '; earlier settled changes are reflected in the body summary' : '') : 'none') + '.');
     const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
+    lines.push('World-authored transformation traits, steps and habits are sensory references, not permission to make ' + who + ' perform voluntary actions or to assign desires, feelings, values, memories or identity. Recast such wording as a bodily sensation or reflex, or omit it; the player chooses what ' + who + ' does and feels.');
     lines.push(compact
       ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
       : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
@@ -1476,7 +1488,7 @@
     const x = (tag, body, attrs) => '<' + tag + (attrs ? ' ' + attrs : '') + '>\n' + (L.blockChars && tag !== 'output_format' && tag !== 'action' && tag !== 'recent_turns' ? clip(body, L.blockChars) : body) + '\n</' + tag + '>';
     const parts = [];
     parts.push('You are the storyteller for an interactive text adventure. Read every section, then write the next turn exactly as <output_format> specifies.');
-    parts.push(x('rules', W.rules.map((r) => '- ' + fill(r)).join('\n')));
+    parts.push(x('rules', CORE_RULES.concat(W.rules).map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
     if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation)));
@@ -1498,7 +1510,7 @@
       const senses = castLevel !== 'brief' && c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '';
       return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + sheet + looks + senses + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
-    parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates; aims are directions to pursue in varied ways, not lines to repeat"'));
+    parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
     if (W.secrets || W.dungeons) {
       parts.push(x('gm_only', gmBlock(S, p.first, L.gmLevel === 'lean'), 'note="for the narrator alone; no character knows this unless it says so; never stated in narration"'));
@@ -1575,7 +1587,7 @@
       '"exposures": array of {"species": one of ' + Object.keys(W.transformation.species).join('|') + ', "method": short phrase, "intensity": 1|2|3} for each transformative contact this turn as defined in <transformation>; [] if none',
       '"spa_reset": [] normally; ["all"] or a list of species keys when ' + p.first + ' uses the Restoration Spa this turn',
       '"kinds_met": array of species keys (' + Object.keys(W.transformation.species).join('|') + ') that ' + p.first + ' came within arm\'s reach of for the first time this turn, whether or not the person was named; [] if none'
-    ] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Write the evaluation first, then the narrative. Do not mention these instructions.']).join('\n')));
+    ] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Do not mention these instructions.']).join('\n')));
     return { prompt: parts.join('\n\n'), lore: lore.map((e) => e.name), exemplars };
   }
 
@@ -2043,7 +2055,7 @@
         xml('roommate', 'Full name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Say this exact full name, including every part of it, when the roommate introduces themself. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks + '.' : '') + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
         xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen of mythkin so far: one glamour slipping in the world below three weeks ago, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ' with no glamour on, and nothing about it is ordinary to ' + p.pronouns.them + ' yet.'),
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
-        xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range, and ' + p.first + '\'s inward reaction (a stare managed or not, a thought not said, the urge to touch or to step back), which is never blasé. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
+        xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].join('\n\n');
       const res = await sample(prompt, { label: 'roommate introduction', modelTier: narrTierFor(null), cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
@@ -2213,6 +2225,10 @@
       const start = chunkIdx * CHUNK; const sliceLen = mine.turns.slice(start, start + CHUNK).length;
       if (sliceLen) { live(); await chunkRef(chunkIdx).set(chunkBody(chunkIdx)); if (sliceLen === CHUNK) mine._savedUpToChunk = chunkIdx; }
       if (opts && opts.removedTurn && n % CHUNK === 0) { live(); await chunkRef(n / CHUNK).delete(); if ((mine._savedUpToChunk == null ? -1 : mine._savedUpToChunk) >= n / CHUNK) mine._savedUpToChunk = n / CHUNK - 1; }
+      for (const id of (mine._staleChunks || []).slice()) {
+        if (Number.isInteger(Number(id)) && Number(id) < Math.ceil(n / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== id); continue; }
+        live(); await db.doc('adventures/' + mine.id + '/turns/' + id).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== id);
+      }
       live(); const doc = advDoc();
       await db.doc('adventures/' + mine.id).set(doc);
       mine.updatedAt = doc.updatedAt; mine.rev = doc.rev; settleCreateDraft(mine.id);
@@ -2263,6 +2279,10 @@
       for (let i = 0; i * CHUNK < mine.turns.length; i++) {
         const path = 'adventures/' + id + '/turns/' + String(i).padStart(4, '0');
         live(); await db.doc(path).set(chunkBody(i)); written.push(path);
+      }
+      if (id === mine.id) for (const chunkId of (mine._staleChunks || []).slice()) {
+        if (Number.isInteger(Number(chunkId)) && Number(chunkId) < Math.ceil(mine.turns.length / CHUNK)) { mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId); continue; }
+        live(); await db.doc('adventures/' + id + '/turns/' + chunkId).delete(); mine._staleChunks = mine._staleChunks.filter((x) => x !== chunkId);
       }
       live(); const doc = advDoc(); doc.id = id;
       if (opts && opts.title != null) doc.title = opts.title;
@@ -2345,13 +2365,18 @@
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
-    // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const turnCountMismatch = expectedTurns !== turns.length;
+    const staleTurnCount = Math.max(0, storedTurns.length - expectedTurns - recoveredTail.length);
+    const staleChunks = staleTurnCount ? chunks.docs.filter((c) => {
+      const b = c.data(); const index = Number.isInteger(b && b.c) ? b.c : Number(c.id);
+      return Number.isInteger(index) && index >= Math.ceil(expectedTurns / CHUNK);
+    }).map((c) => c.id) : [];
     if (stillWanted && !stillWanted()) throw Object.assign(new Error('superseded'), { code: 'superseded' });
+    // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
     // A repaired or recovered save rewrites its chunks on the next save.
-    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered ? -1 : Math.floor(turns.length / CHUNK) - 1 };
+    adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered || staleTurnCount ? -1 : Math.floor(turns.length / CHUNK) - 1, _staleChunks: staleChunks };
     if (recoveredTail.length && !renumbered) {
       const last = recoveredTail[recoveredTail.length - 1];
       adv.state = clone(last.stateAfter);
@@ -2399,6 +2424,7 @@
     if (recoveredTail.length && !renumbered) warnings.push('Recovered ' + recoveredTail.length + ' complete saved turn' + (recoveredTail.length === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save' + (recoverySaveFailed ? '; retry the save to sync it' : '') + '.');
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
     if (unrecoverable) warnings.push(unrecoverable + ' newer saved turn' + (unrecoverable === 1 ? ' was' : 's were') + ' found ahead of the adventure record but could not be recovered (the newest of them kept too little of its state), so the game opens at the last turn the record knows. ' + (unrecoverable === 1 ? 'That turn is' : 'Those turns are') + ' not shown, Export will not include ' + (unrecoverable === 1 ? 'it' : 'them') + ', and taking a turn here replaces ' + (unrecoverable === 1 ? 'it' : 'them') + ' in the store.');
+    else if (staleTurnCount) warnings.push('Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record; the next save will repair the extra history.');
     else if (turnCountMismatch && !recoveredTail.length) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + expectedTurns + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
@@ -2532,6 +2558,7 @@
       if (!record(a.memory) || (a.memory.events != null && !Array.isArray(a.memory.events)) || (a.memory.beats != null && !Array.isArray(a.memory.beats)) || (a.memory.facts != null && !Array.isArray(a.memory.facts)) || (a.memory.summary != null && typeof a.memory.summary !== 'string')) throw new Error('save memory is incomplete');
       if ((a.player != null && !validPlayer(a.player)) || (a.roommate != null && (!record(a.roommate) || !record(a.roommate.pronouns))) || (a.opening != null && !record(a.opening)) || (a.cast != null && !record(a.cast))) throw new Error('save character data is invalid');
       if (a.settings != null && !record(a.settings)) throw new Error('save settings are invalid');
+      if (a.turnCount != null && (!Number.isInteger(a.turnCount) || a.turnCount < 0)) throw new Error('save turn count is invalid');
       const turns = p.turns == null ? [] : p.turns;
       if (!Array.isArray(turns) || turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save turns are invalid');
       const settings = normaliseSettings(clone(a.settings || {}));
@@ -2540,6 +2567,10 @@
       if (next.memory.summary == null) next.memory.summary = '';
       const hadDuplicateNumbers = new Set(next.turns.map((t) => t.n)).size !== next.turns.length;
       const renumbered = orderTurns(next.turns); cleanAlts(next.turns);
+      const declaredTurnCount = a.turnCount == null ? null : a.turnCount;
+      const staleTurnCount = declaredTurnCount == null ? 0 : Math.max(0, next.turns.length - declaredTurnCount);
+      const missingTurnCount = declaredTurnCount == null ? 0 : Math.max(0, declaredTurnCount - next.turns.length);
+      if (staleTurnCount) next.turns.length = declaredTurnCount;
       if (!next.player) { setWorld(wid); next.player = defaultPlayer(); }
       next.memory.facts = next.memory.facts || [];
       // Imported turns may predate the history-trimming fix (every turn still carrying its full memBefore/pendingBefore/alts);
@@ -2550,7 +2581,8 @@
       // persist() only ever writes the single newest chunk; an import can bring in many turns at once, so every
       // chunk needs writing, not just the last.
       if (db) { await persistAll(adv.id, { cleanupOnFailure: true }); try { localStorage.setItem('windlass.last', adv.id); } catch (e) {} }
-      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? (hadDuplicateNumbers ? ' Turn numbers were repaired in chronological order because duplicates were present.' : ' Turn numbers were repaired in saved order.') : ''), !!renumbered);
+      const countWarning = staleTurnCount ? ' Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record.' : missingTurnCount ? ' The save record expected ' + declaredTurnCount + ' turns, but only ' + next.turns.length + ' were available.' : '';
+      closeDlg('dlgAdventures'); setStatus((db ? 'Imported and saved ' + adv.title + '.' : 'Imported ' + adv.title + ' for this session; saving is unavailable here.') + (renumbered ? (hadDuplicateNumbers ? ' Turn numbers were repaired in chronological order because duplicates were present.' : ' Turn numbers were repaired in saved order.') : '') + countWarning, !!(renumbered || staleTurnCount || missingTurnCount));
     } catch (e) {
       adv = oldAdv; setWorld(oldWorldId);
       setStatus('Import failed: ' + (e && e.code === 'too_large' ? 'the save is too large to store here (' + e.message + ').' : ((e && e.message) || 'invalid save')), true);
@@ -2621,10 +2653,8 @@
     if (!db) return;
     try { const cur = await recentRead(); const merge = (a, b, cap) => a.concat((b || []).filter(Boolean)).filter((x, i, arr) => arr.lastIndexOf(x) === i).slice(-cap); await db.doc('meta/recent').set({ names: merge(cur.names, add.names, 160), courses: merge(cur.courses, add.courses, 60), quirks: merge(cur.quirks, add.quirks, 60), updatedAt: new Date().toISOString() }); } catch (e) {}
   }
-  // Live trace, 30 Sep: one person on the default tier answered in 4.5 s; nine people per call gave no text in 43 s, three
-  // calls alike, while pings on every tier answered in about a second. The default tier appears to think before it writes,
-  // and nine constrained names at once is a long think; so the invention runs on the quick tier in batches of five.
-  const INVENT_TIMEOUT_MS = 60000, INVENT_BATCH = 5;
+  // Smaller invention batches keep each cast-generation response within a reasonable first-token and completion time.
+  const INVENT_TIMEOUT_MS = 60000, INVENT_BATCH = 3;
   const inventTier = () => (adv && adv.settings && ['quick', 'default', 'complex'].includes(adv.settings.inventTier)) ? adv.settings.inventTier : 'quick';
   // opts.signal stops the call (the player pressing Begin now, or the dialog closing); opts.onProgress hears how many people
   // have arrived as the reply streams. A reply cut short by a stop or the timeout still yields the people it had finished.
@@ -2646,7 +2676,8 @@
     };
     try {
       if (ctl.signal.aborted) throw { code: 'aborted', message: 'stopped' };
-      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (timer == null) timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS); if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
+      timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS);
+      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
       const out = finish(res.text, !!res.truncated); if (!Object.keys(out.given).length) logFailure('invent_empty', { action: label }, res.text, { prompt: prompt.slice(0, 4000) });
       return out;
     } catch (e) {
@@ -3371,7 +3402,7 @@
       const ctl = createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
       const t0 = performance.now(); createT0 = t0; let got = 0, total = 0;
       const calls = Math.ceil((1 + (Wc.castRoles || []).length + (Wc.minorRoles || []).length) / INVENT_BATCH);
-      const note = () => { if (token !== createToken) return; const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call afterwards.' + (createBackTried ? ' Back does not stop it; Cancel at the top does.' : ''); };
+      const note = () => { if (token !== createToken) return; const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; each call is given up after ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s without a complete reply and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call afterwards.' + (createBackTried ? ' Back does not stop it; Cancel at the top does.' : ''); };
       // After Cancel the stop can take a moment to land: by then the draft is dropped and the screen may be open on a new creation.
       note(); const ticker = setInterval(() => { if (token !== createToken) return; note(); draft.tick = Date.now(); draft.secs = Math.round((performance.now() - t0) / 1000); draft.got = got; draft.total = total; saveCreateDraft(draft); }, 1000);
       try { prep = await prepareCreation(Wc, c, ctl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
