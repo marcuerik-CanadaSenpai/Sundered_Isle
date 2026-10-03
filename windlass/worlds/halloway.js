@@ -23,7 +23,11 @@ window.WINDLASS_WORLDS.halloway = {
     'What people know: every character knows only what they could plausibly have seen or been told. Nobody notices a change in {first} before {first} has; afterwards they notice only what is plainly visible, and they do not name or predict what is happening to {first}. If {first} chooses to ignore a change, nobody presses the subject.',
     'Time: the clock in <clock> is authoritative. Report the minutes that pass in time_advance_minutes (10 to 120 in a normal scene; more only for sleep or travel). Respect the bell schedule; if a bell would ring during the scene, it rings.',
     'Consistency: contradict nothing in <state>, <clock>, <timeline> or <recent_turns>. If the action assumes something false, the narrative corrects it in-world.',
-    'Content: no sexual content. Violence at the level of a school story; no backstory padding.'
+    'Romance is allowed only between clearly adult characters. Affection, kissing and consensual adult sex may be depicted on-page when requested; never presume consent or decide the player\'s desire or actions. Violence at the level of a school story; no backstory padding.',
+    'Attitudes: an attitude value moves at most one point per turn and only for a cause shown in the narrative.',
+    'Fresh detail: show people and places through details and images not already used in <recent_turns> or <style_examples>.',
+    'Suggested actions are things {first} would plausibly do next, in keeping with the personality in <player>: ordinary, specific, sensible options with different aims, never stunts or whimsy. When {first} speaks in the narrative because the action implies it, the words fit that personality.',
+    'Anatomy: describe relevant, established kin traits in accurate, neutral terms when visible, touched or changing; do not hide them behind euphemisms or invent sexual anatomy. secret_info holds only facts the player does not yet know, 60 words at most, no backstory padding.'
   ],
 
   // Sent every turn as <world>.

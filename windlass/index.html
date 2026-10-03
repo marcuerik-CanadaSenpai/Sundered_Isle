@@ -652,7 +652,8 @@
     const replacementKey = template && template.replaces && template.replaces[p.gender];
     const replacement = replacementKey && (W.characters || []).find((c) => c.key === replacementKey);
     const normName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-    const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : null;
+    const namedCharacter = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((name) => normName(name) === normName(p.name)));
+    const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : (namedCharacter ? namedCharacter.key : null);
     const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
     r.intro = composeIntro(r);
     return r;
@@ -1186,7 +1187,7 @@
   }
   // What the body is now, for the narrator: the anatomy of the changes complete (the finished shape once a kind has reached it),
   // the steps told so far of any change under way, and where a path has carried the body toward a woman's or a man's.
-  function bodyNowLines(tf, who) {
+  function bodyNowLines(tf, who, compact) {
     const T = W.transformation; const out = [];
     for (const k of Object.keys(T.species)) {
       const sp = T.species[k]; const n = tf.traits.filter((t) => t.species === k && t.settled !== false).length;
@@ -1201,28 +1202,36 @@
           const st = (tf.tracks || []).find((t) => t.species === k && t.kind === 'sex');
           if (st) told.push(...st.steps.slice(0, st.i));
         }
-        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + told.map(pf).join('; ') + '.');
+        if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
-      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + bt.steps.slice(0, bt.i).map(pf).join('; ') + '.');
+      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
     }
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
     return out;
   }
-  function transformationBlock(state) {
+  function transformationBlock(state, compact) {
     const T = W.transformation; if (!T) return '';
     ensureTf(state); const tf = state.tf; const who = firstName();
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
-    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + Object.keys(T.species).map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ') + '.');
-    lines.push('Changes so far: ' + (tf.traits.length ? tf.traits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
-    const body = bodyNowLines(tf, who); if (body.length) lines.push(body.join('\n'));
+    const kinds = Object.keys(T.species);
+    const visibleTraits = compact ? tf.traits.filter((t) => t.settled === false).concat(tf.traits.filter((t) => t.settled !== false).slice(-3)) : tf.traits;
+    const influenceNow = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ') + (kinds.some((k) => !(tf.influence[k] || 0)) ? ' (unlisted kinds 0)' : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
+    lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
+    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') + (visibleTraits.length < tf.traits.length ? '; earlier settled changes are reflected in the body summary' : '') : 'none') + '.');
+    const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
     lines.push('World-authored transformation traits, steps and habits are sensory references, not permission to make ' + who + ' perform voluntary actions or to assign desires, feelings, values, memories or identity. Recast such wording as a bodily sensation or reflex, or omit it; the player chooses what ' + who + ' does and feels.');
-    lines.push('Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Render announced steps in sensory detail (an ache, itch, pressure, clothing, balance or a familiar task done differently); let established physical effects sometimes color later scenes without making every scene about them. The player decides what changes mean; keep this thread varied and proportionate, not a repeated checklist.');
+    lines.push(compact
+      ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
+      : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
-    lines.push('What raises influence:\n' + Object.keys(T.species).map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
-    lines.push('Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+    const methodKinds = kinds;
+    lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
+    lines.push(compact
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep. Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1285,15 +1294,22 @@
     return out;
   }
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
+  function isRomanceScene(input) {
+    const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
+    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender\w*|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+  }
+  function transformationSceneActive() {
+    return !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
+      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+  }
   function isTransition(input) {
     const a = String(input.action || '').trim();
     return /^(i\s+)?(go|walk|head|return|leave|unpack|sleep|go to bed|lie down|wait|follow|sit|get up|wake|eat|shower|wash|dress|take the stairs|climb|cross)\b/i.test(a) && wc(a) <= 9 && !input.director && !input.rewrite;
   }
   function sceneDensity(input) {
     const a = String(input.action || '');
-    const romance = /\b(date|romance|romantic|flirt|confess|kiss|kissing|kissed|cuddle|cuddling|cuddled|embrace|embraced|hug|hugged|hold hands|holding hands|intimate|tender|court|courtship|love|sleep with|share a bed|ask .{0,20} out|slow dance|affection)\b/i.test(a);
-    const tf = !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
-      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+    const romance = isRomanceScene(input);
+    const tf = transformationSceneActive();
     const firstMeeting = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i.test(a) &&
       activeCharacters().some((c) => {
         const names = [c.first, c.name].concat(c.aliases || []).filter(Boolean);
@@ -1305,12 +1321,51 @@
   }
   // Auto keeps transitions concise and reserves the richest band for romance, first meetings and active changes.
   function sceneBand(input) {
-    const density = adv.settings.density === 'auto' ? sceneDensity(input) : adv.settings.density;
+    const preferred = sceneDensity(input);
+    const density = adv.settings.density === 'auto' ? preferred :
+      ((isRomanceScene(input) || transformationSceneActive()) ? 'rich' : adv.settings.density);
     input.sceneDensity = density;
     let [lo, hi] = (W.wordBands || {})[density] || wordBand();
     if (isTransition(input) && density !== 'rich') hi = lo + Math.round((hi - lo) * 0.45);
     if (arcActive()) { lo += 80; hi += 140; }
+    // A director note that asks for a length ("about 600 words", "at least 600 words", "400 to 600 words") sets the band, so the
+    // prompt and the length fit agree with it. A number of words mentioned for any other reason ("the 100 words on the plaque") is not a length.
+    const asked = directorBand(input.director);
+    input.bandFloor = !!(asked && asked.floor); input.bandHard = !!asked;
+    if (asked) [lo, hi] = asked.band;
     return [lo, hi];
+  }
+  // Only a count tied to the narrative counts: one that a write/tell/keep/make verb governs directly ("write about 600 words",
+  // "keep the scene under 300 words"), one that names the narrative ("a 700-word scene", "800 words long"), or a clause that is
+  // nothing but the length ("600 words."). A count of words something in the story holds ("read the 100 words on the plaque",
+  // "describe the plaque containing 100 words") is not one. A range or a minimum is a floor: a reply below it is expanded.
+  function directorBand(note) {
+    const N = '(\\d{2,4})'; const WD = '\\s*-?\\s*words?\\b';
+    const lim = (n) => Math.min(1500, Math.max(60, Math.round(n)));
+    const band = (a, b) => { a = lim(a); b = lim(b); return a <= b ? [a, b] : [b, a]; };
+    const forms = [
+      [new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'gi'), (m) => ({ band: band(+m[1], +m[2]), floor: true })],
+      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|not? (?:fewer|less) than|(?<!\\bnot? )more than|(?<!\\bnot? )over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'gi'), (m) => { const n = +(m[1] || m[2] || m[3]); return { band: band(n, n * 1.25), floor: true }; }],
+      [new RegExp('(?:at most|not? more than|not? over|up to|under|(?<!\\bnot? )fewer than|(?<!\\bnot? )less than|a maximum of)\\s+' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.6, +m[1]), floor: false })],
+      [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.85, +m[1] * 1.1), floor: false })]
+    ];
+    const noun = '(?:scene|turn|reply|response|passage|narrative|narration|story|chapter)';
+    // The verb must open the clause (after at most a polite lead-in), so it is an instruction to the narrator and not something a
+    // character does in the story ("have Luna write 100 words in her journal").
+    const governed = new RegExp('^\\s*(?:(?:please|now|just|ok|okay|and|so|narrator|could you|can you|would you|i want you to|i\'d like you to)[\\s,:]+)*(?:write|tell|narrate|keep|make|give|use|aim for|run|expand|extend|stretch|spend|take)\\b(?:\\s+(?:it|this|me|that|the|whole|' + noun + '|in|to|at|should|must|be|is|just))*\\s*$', 'i');
+    const named = new RegExp('(?:^|\\b' + noun + '\\b(?:\\s+(?:should|must|is|be|at|in|to|just))*)\\s*$', 'i');
+    const after = new RegExp('^\\s*(?:long\\b|in length\\b|' + noun + '\\b)', 'i');
+    for (const clause of String(note || '').split(/[.;!?\n,]+|\band then\b|\bthen\b/i)) {
+      for (const [re, read] of forms) {
+        for (const m of clause.matchAll(re)) {
+          const before = clause.slice(0, m.index), rest = clause.slice(m.index + m[0].length);
+          const bare = !/[a-z]/i.test((before + ' ' + rest).replace(/\b(?:please|just|aim for|keep it to|make it|in)\b/gi, ''));
+          if (/^\s*(?:of|from|on|off|into|onto|in (?:the|a|an|his|her|their|my|your|its|our)|written|carved|printed|engraved)\b/i.test(rest)) continue;
+          if (/-word$/i.test(m[0].trim()) ? after.test(rest) : (bare || governed.test(before) || after.test(rest) || (named.test(before) && before.trim()))) return read(m);
+        }
+      }
+    }
+    return null;
   }
   // The world's premise in two parts: the setting (shown when creating) and the personal part from "You are …" on, which opens
   // the story once the player has a name. The narrator gets the whole premise in <world> as before.
@@ -1374,7 +1429,8 @@
     const lore = (limits && limits.noLore) ? [] : activeLore([turnInput.action, turnInput.director || '', recentText], turnInput.forceLore || [], limits && limits.loreBudget);
     const exemplars = pickExemplars((limits && limits.exemplars) || 2).map((e) => fill(e));
     const slot = slotInfo(S).cur.slot;
-    const focusedNames = focusNames(turnInput.action);
+    // A director note's people are part of the turn too, so they reach the cast and the focus line rather than being shut out by it.
+    const focusedNames = [...new Set(focusNames(turnInput.action).concat(turnInput.director ? focusNames(turnInput.director) : []))];
     const publicErrand = /\b(cocoa|creamery|market|library|dining hall|tea|coffee|walk|study|class|club|pool|shore|garden)\b/i.test(turnInput.action || '');
     const initiativeWindow = ((adv.turns.length + 1) % 3 === 0) || publicErrand;
     // At the 'lean' cast level, only the newest verbatim turn is read for names; include the current action too.
@@ -1391,7 +1447,7 @@
     parts.push(x('rules', CORE_RULES.concat(W.rules).map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
-    if (W.transformation) parts.push(x('transformation', transformationBlock(S)));
+    if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation)));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
     const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
@@ -1426,7 +1482,24 @@
     const summary = String(M.summary || ''); const summaryShown = (L.summaryChars && summary.length > L.summaryChars) ? '[…] ' + summary.slice(-L.summaryChars).replace(/^\S*\s+/, '') : summary;
     parts.push(x('summary', summaryShown || '(nothing yet)', 'note="the distant past, in brief' + (summaryShown !== summary ? '; only its most recent part (the prompt was near its size cap)' : '') + '"'));
     const factsShown = L.facts != null ? (L.facts ? M.facts.slice(-L.facts) : []) : M.facts;
-    if (factsShown.length) parts.push(x('facts', factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f)).join('\n'), 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
+    if (factsShown.length) {
+      let factLines = factsShown.map((f) => '- ' + (L.factChars ? clip(String(f), L.factChars) : f));
+      let factsText = factLines.join('\n');
+      const factsBytes = L.factsBytes;
+      if (factsBytes != null && new TextEncoder().encode(factsText).length > factsBytes) {
+        const omitted = '- Earlier facts omitted from this prompt to fit the runtime limit; the save is unchanged.';
+        const budget = Math.max(0, factsBytes - new TextEncoder().encode(omitted + '\n').length);
+        const selected = [];
+        for (let i = factLines.length - 1; i >= 0; i--) {
+          const candidate = [factLines[i]].concat(selected).join('\n');
+          if (new TextEncoder().encode(candidate).length > budget) break;
+          selected.unshift(factLines[i]);
+        }
+        factLines = selected;
+        factsText = omitted + (factLines.length ? '\n' + factLines.join('\n') : '');
+      }
+      parts.push(x('facts', factsText, 'note="established facts that stay true; contradict none of them' + (factsShown.length < M.facts.length ? '; the most recent ' + factsShown.length + ' of ' + M.facts.length + ' (the prompt was near its size cap)' : '') + '"'));
+    }
     const ev = M.events.slice(-eventsN);
     parts.push(x('timeline', ev.length ? ev.join('\n') : '(no events yet)', 'note="one line per event, oldest first, in-world times"'));
     if (older.length && earlierN > 0) parts.push(x('earlier_turns', older.slice(-earlierN).map((t) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '): ' + (t.beats || []).join(' ')).join('\n'), 'note="beats only, oldest first"'));
@@ -1437,11 +1510,13 @@
     parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (abridgedOlder ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
     const actionLines = ['Player action: ' + turnInput.action];
     const named = focusedNames;
-    if (named.length) actionLines.push('Focus: the action names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action invites it.');
+    if (named.length) actionLines.push('Focus: the action' + (turnInput.director ? ' or director note' : '') + ' names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action' + (turnInput.director ? ' or the director note' : '') + ' invites it.');
     else if (initiativeWindow && !turnInput.director && !turnInput.rewrite) actionLines.push('NPC initiative window: already present: ' + (S.present.join(', ') || 'nobody listed') + '. When it fits an established aim and temperament, one person already here may begin a small interaction or offer to join the stated public errand; at a named public destination, one existing named character whose "Now" schedule in <characters> places them there may already be present and initiate a brief, natural bid. Use no invented named character and do not force anyone to arrive. Do not assume ' + p.first + ' accepts or answers; stop at that choice. Do not initiate if the player asks for solitude, is in a private or intimate moment, or the scene already has a clear focus. This is an occasional possibility, not a required beat.');
-    if (turnInput.director) actionLines.push('Director note (binding): ' + turnInput.director);
+    if (turnInput.director) actionLines.push('Director note (binding): ' + turnInput.director + '\nTreat its concrete actions, requested people, and ending as required for this turn, not optional suggestions. Carry them out now instead of merely acknowledging, quoting, summarizing, delaying, or replacing them with unrelated continuation. Actions the note gives ' + p.first + ' are the player\'s own instruction for this turn: carry them out as part of the stated action, which the agency rule\'s limit to the stated action then includes; still add no desire, consent, dialogue or further action for ' + p.first + ' that the note does not state. This note overrides prior-scene momentum, default pacing, and the generic stop-at-choice instruction, but never world facts, established mechanics, or other rules in this prompt. If part of it conflicts with those limits, fulfill the compatible parts and use the nearest allowed alternative.');
     if (turnInput.rewrite) actionLines.push('Regeneration note (binding, for this rewrite only): ' + turnInput.rewrite);
     if (adv.settings.testNote) actionLines.push('Test instruction (binding): ' + adv.settings.testNote);
+    if (isRomanceScene(turnInput)) actionLines.push('Romance scene pacing (binding): use the rich scene band, give the requested closeness one specific reciprocal beat at a time, and render the actual sequence of gesture, response, pause, dialogue and relevant physical sensation rather than summarizing it as warmth or skipping ahead. Describe established bodies and the contact between them with calm, concrete anatomical detail; anatomy is not inherently sexual. Consensual adult sex may be depicted on-page when requested: depict the requested physical act directly and continuously, with specific reciprocal actions and relevant established anatomy, sensation, dialogue and pauses; do not fade out, cut away, imply, euphemize, summarize or skip the act, and do not jump to its aftermath in the same turn. Use only anatomy and functions established in the world data; do not invent them. Keep the narration in the world rule\'s second-person present-tense perspective and do not insert unrelated events. Do not presume consent or decide the player\'s desire, feelings or next action.');
+    if (isRomanceScene(turnInput) || transformationSceneActive()) actionLines.push('Body detail (binding): where touch or change makes anatomy relevant, use the exact visible/contacting features and their location, movement, texture and practical effect as established in <characters>, <lore> and <transformation>. Do not replace a named feature with generic warmth, hide it behind a euphemism, or invent structures or functions absent from those sources.');
     if (turnInput.roll && turnInput.roll.d6) {
       const D = W.difficulty; const st = p.stats;
       // The totals are worked out here, so the narrator reads the outcome off a table instead of adding and comparing itself.
@@ -1450,13 +1525,13 @@
       const skillTotals = W.skills ? '; skills, for magic and craft: ' + Object.keys(W.skills).map((k) => k + ' ' + (d6 + skillLevel((S.skills || {})[k]))).join(', ') : '';
       actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
     }
-    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + band[0] + ' to ' + band[1] + ' when the scene earns it, and shorter whenever ' + p.first + ' reaches a choice sooner' + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. Stop at the first moment ' + p.first + ' would speak or choose.');
+    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + (turnInput.bandFloor ? 'at least ' + band[0] + ', as the director note requires' : band[0] + ' to ' + band[1] + ' when the scene earns it') + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
       'Reply with only one JSON object and nothing else, no code fence. Inside every string, escape double quotes as \\" and write paragraph breaks as \\n; never put a raw line break inside a string. Fields, in this order:',
       '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the outcome rule gives for that total against the difficulty, "reason": one sentence},',
-      '"narrative": string, at most ' + band[1] + ' words, second person present tense' + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
+      '"narrative": string, at most ' + band[1] + ' words, second person present tense, ' + (turnInput.director ? 'ending at the binding director note\'s requested ending, or at the first choice after its requested actions if it gives no ending' : 'ending at the first moment ' + p.first + ' would speak or choose') + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
       '"suggested_actions": exactly three strings, 12 words or fewer each: plausible things ' + p.first + ' would actually consider doing next, given who ' + p.first + ' is (<player>) and what just happened (speak, ask, move, accept or refuse what was offered, leave, act); each doable at the exact moment and place where the narrative ends, with the people present then, never a moment already passed; no two alike in kind; nothing odd, whimsical or out of character,',
       '"secret_info": string, 60 words or fewer, facts the player does not yet know that follow from this turn,',
       '"state_updates": array of {"key": path from <state>, "op": "set|inc|append|remove", "value": any}. Include location and present when they change, item and flag changes, and attitude changes only with a cause in the narrative. Never set time; the engine advances the clock from time_advance_minutes.',
@@ -1697,10 +1772,15 @@
     const rr = resolveRoll(out.evaluation, input.roll); notes.push(...rr.notes);
     let words = wc(out.narrative);
     // The band's top is a ceiling; the bottom is only a guide. A short turn that stops at a choice is right, so only overlong turns are fitted.
-    if (allowFit && adv.settings.autoFit && sample && words > band[1] * 1.12) {
+    if (allowFit && adv.settings.autoFit && sample && words > band[1] * (input.bandHard ? 1 : 1.12)) {
       setStatus('fitting length (' + words + ' words)…');
-      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= 50 && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= (input.bandFloor ? band[0] : 50) && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
+    } else if (allowFit && adv.settings.autoFit && sample && input.bandFloor && words < band[0]) {
+      // The director asked for at least this length, so a reply below it is expanded rather than kept.
+      setStatus('fitting length (' + words + ' words)…');
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= band[0] && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length expanded ' + words + ' → ' + wc(fitted) + ' words for the director note'); out.narrative = fitted; words = wc(fitted); } else notes.push('length expansion returned unusable text; kept the original'); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length expansion failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
@@ -1729,8 +1809,12 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) notes.push(f); } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
+    // Recovery reads a fold record only off the newest turn (an older one's successor carries the folded memory in its
+    // memBefore), so once this turn has committed the one before it gives its record up. A stopped or stale turn never
+    // reaches this line, so it leaves the previous turn as it was.
+    if (adv.turns.length > 1) delete adv.turns[adv.turns.length - 2].memAfter;
     // Only the last UNDO_DEPTH turns are ever read again for memBefore/pendingBefore/alts (undo, regenerate, previous
     // version) or the full stateBefore/stateAfter (older turns only need day/time/location/present for the prompt, the
     // renderer and migration). Trimming the turn that has just dropped out of reach keeps a long adventure's stored turns
@@ -1779,8 +1863,10 @@
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000 },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000 },
         { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
-        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 }
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, factsBytes: 4500, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, factsBytes: 4500, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 },
+        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000, compactTransformation: true }
       ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
         guard.window && guard.window < setWin ? 'verbatim window reduced to ' + guard.window : 'verbatim window kept',
@@ -1792,6 +1878,8 @@
         guard.olderRecentChars ? 'older verbatim turns abridged to their last ' + guard.olderRecentChars + ' characters' : '',
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
         guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
+        guard.factsBytes != null ? 'facts capped by a 4,500-byte budget when needed' : '',
+        guard.compactTransformation ? 'settled transformation history compacted for this prompt only' : '',
         guard.blockChars ? 'every other block cut to ' + guard.blockChars + ' characters' : ''
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
@@ -1872,7 +1960,7 @@
   }
   // A previous version shares its starting point (stateBefore, memBefore, pendingBefore) with the turn that replaced it,
   // so only what differs is kept; usePreviousVersion takes the shared part back from the current turn.
-  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.pendingBefore; return c; }
+  function stripAlts(t) { const c = Object.assign({}, t); delete c.alts; delete c.stateBefore; delete c.memBefore; delete c.memAfter; delete c.pendingBefore; return c; }   // a previous version keeps no fold record: only the live newest turn does
   const ALTS_MAX_BYTES = 48000;
   const jsonBytes = (o) => new TextEncoder().encode(JSON.stringify(o)).length;
   // Keeps the newest previous versions that fit in ALTS_MAX_BYTES; a single version bigger than that is not kept either.
@@ -1882,7 +1970,7 @@
   function trimTurnHistory(t) {
     if (t._trimmed) return false;
     t.stateBefore = trimState(t.stateBefore); t.stateAfter = trimState(t.stateAfter);
-    t.memBefore = null; t.pendingBefore = null; t.alts = [];
+    t.memBefore = null; t.memAfter = null; t.pendingBefore = null; t.alts = [];
     t._trimmed = true;
     return true;
   }
@@ -1918,7 +2006,7 @@
         xml('task', 'Write the roommate\'s first appearance for the opening of an interactive story: 220 to 340 words, second person present tense addressed to ' + p.first + ', plain prose in two to four paragraphs, no heading and no preamble. It drops into the middle of the opening scene: ' + p.first + ' has just walked into room 4B of Kettle Hall at Mythaven University at 17:40 on orientation Monday and looked out of the window; a closing paragraph about lanterns outside follows your text. Do not describe the window or the lanterns.'),
         xml('setting', fill(W.premise)),
         xml('room', 'What ' + p.first + ' sees of the roommate\'s side of the room: ' + (g.room || 'it is already lived in, in the way of the roommate\'s kind')),
-        xml('roommate', 'Name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks + '.' : '') + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
+        xml('roommate', 'Full name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Say this exact full name, including every part of it, when the roommate introduces themself. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks + '.' : '') + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
         xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen of mythkin so far: one glamour slipping in the world below three weeks ago, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ' with no glamour on, and nothing about it is ordinary to ' + p.pronouns.them + ' yet.'),
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
         xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
@@ -1926,6 +2014,9 @@
       const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
+      // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
+      const namedIn = (hay, nm) => { nm = String(nm || '').trim(); return !!nm && new RegExp('(^|[^\\p{L}\\p{M}])' + escRe(nm) + '(?![\\p{L}\\p{M}])', 'iu').test(hay); };
+      if (!namedIn(text, r.first) && !namedIn(text, r.name)) throw new Error('the roommate is not named');
       if (adv !== mine) { setStatus('A different adventure was loaded while the roommate introduction was being written; it was discarded.', true); return false; }
       adv.opening.narrative = openingNarrative(text); adv.opening.introWritten = true; adv.roommate.intro = text;
       lastDebug = { prompt, raw: res.text, notes: (((adv.cast.generated || {}).invention || {}).notes || []).concat(['roommate introduction written in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s']), meta: 'Turn 0 · roommate introduction · ' + wc(text) + ' words' };
@@ -1976,6 +2067,15 @@
       // A restored snapshot that still cannot be shown is put back rather than left half-applied.
       try { ensureTf(adv.state); ensureSkills(adv.state); renderAll(); }
       catch (e) { adv.turns.push(last); adv.state = keep.state; adv.memory = keep.memory; adv.pendingNotes = keep.pending; renderAll(); setStatus('Could not undo this turn: its saved history is damaged (' + ((e && e.message) || 'error') + ').', true); return; }
+      // The turn that is newest again gave up its fold record when the undone turn committed; the undone turn's memBefore is
+      // the memory after it, so the record is rebuilt from that (recovery may need it if the next save is interrupted). A
+      // trimmed turn gets one too: after a second Undo it is newest and holds no memory of its own.
+      const prev = adv.turns[adv.turns.length - 1];
+      // Its after-state is the undone turn's before-state; a trimmed turn gets the whole of it back, so a recovery can restore from it.
+      // It is no longer marked trimmed, so the whole after-state is trimmed again once the turn falls out of Undo's reach; it
+      // still cannot be undone itself (its before-state and memory stay trimmed, which restorable() checks).
+      if (prev && last.stateBefore) { prev.stateAfter = clone(last.stateBefore); delete prev._trimmed; }
+      if (prev && last.memBefore) prev.memAfter = { summary: last.memBefore.summary || '', beats: clone(last.memBefore.beats || []), facts: clone(last.memBefore.facts || []) };
       await persist({ removedTurn: true });
     } finally { actionDispatching = false; }
   }
@@ -2107,7 +2207,7 @@
   // would have used. Returns the body to write (it may still be too big, and then the write fails with a clear message).
   const CHUNK_MAX_BYTES = 250000;
   function chunkBody(i) {
-    const turns = adv.turns.slice(i * CHUNK, (i + 1) * CHUNK); const body = { c: i, turns };
+    const turns = adv.turns.slice(i * CHUNK, (i + 1) * CHUNK); const body = { c: i, rev: (adv.rev || 0) + 1, turns };
     if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body;
     for (const t of turns) { if (t.alts && t.alts.length) { t.alts = []; if (jsonBytes(body) <= CHUNK_MAX_BYTES) return body; } }
     const last = adv.turns[adv.turns.length - 1];
@@ -2174,7 +2274,7 @@
   function cleanAlts(turns) {
     for (const t of turns) {
       t.alts = Array.isArray(t.alts) ? t.alts.filter((a) => validAlt(a, t)) : [];
-      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
+      for (const a of t.alts) { delete a.stateBefore; delete a.memBefore; delete a.memAfter; delete a.pendingBefore; delete a.alts; delete a._trimmed; }
       t.alts = capAlts(t.alts);
     }
   }
@@ -2186,26 +2286,78 @@
     if (!d || typeof d !== 'object' || !Object.prototype.hasOwnProperty.call(WORLDS, wid)) throw new Error('world ' + wid + ' is not loaded');
     if (d.id && d.id !== id) throw new Error('save id does not match its document path');
     const record = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+    const validMemory = (m) => record(m) && Array.isArray(m.events) && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && (m.summary == null || typeof m.summary === 'string');
     const validPlayer = (p) => record(p) && typeof p.name === 'string' && typeof p.first === 'string' && record(p.pronouns) && record(p.stats);
     if (!record(d.state) || !record(d.state.items) || !record(d.state.attitudes) || !record(d.state.flags) || !Array.isArray(d.state.present) || !Number.isFinite(Number(d.state.day)) || typeof d.state.time !== 'string' || typeof d.state.location !== 'string' || !record(d.memory) || !Array.isArray(d.memory.events) || !Array.isArray(d.memory.beats) || (d.memory.facts != null && !Array.isArray(d.memory.facts)) || (d.memory.summary != null && typeof d.memory.summary !== 'string') || (d.settings != null && !record(d.settings)) || (d.player != null && !validPlayer(d.player)) || (d.roommate != null && (!record(d.roommate) || !record(d.roommate.pronouns))) || (d.opening != null && !record(d.opening)) || (d.cast != null && !record(d.cast)) || (d.turnCount != null && (!Number.isInteger(d.turnCount) || d.turnCount < 0))) throw new Error('save data is incomplete');
     const chunks = await db.collection('adventures/' + id + '/turns').orderBy('c', 'asc').limit(500).get();
-    const turns = []; chunks.docs.forEach((c) => { const b = c.data(); if (b && Array.isArray(b.turns)) turns.push(...clone(b.turns)); });
+    const chunkRecords = chunks.docs.map((doc) => doc.data()).filter((b) => b && Array.isArray(b.turns));
+    const storedTurns = chunkRecords.flatMap((b) => clone(b.turns));
+    const expectedTurns = d.turnCount || 0;
+    const turns = storedTurns.slice(0, expectedTurns);
+    let recoveredTail = [];
+    if (storedTurns.length >= expectedTurns) {
+      let chunkIndex = Math.floor(expectedTurns / CHUNK), offset = expectedTurns % CHUNK, nextTurn = expectedTurns + 1;
+      while (true) {
+        const chunk = chunkRecords.find((b) => b.c === chunkIndex);
+        if (!chunk || chunk.rev !== (Number(d.rev) || 0) + 1 || chunk.turns.length <= offset) break;
+        const next = chunk.turns.slice(offset);
+        if (next.some((t, i) => !record(t) || t.n !== nextTurn + i)) break;
+        recoveredTail.push(...clone(next));
+        nextTurn += next.length;
+        if (chunk.turns.length < CHUNK) break;
+        chunkIndex++; offset = 0;
+      }
+    }
+    // The state is restored from the newest recovered turn, so its after-state must be whole (a trimmed turn keeps only the
+    // clock, place and who is present). Without one the turns cannot be recovered, and the record's own turns load as before.
+    const wholeState = (x) => record(x) && record(x.items) && record(x.attitudes) && record(x.flags) && Array.isArray(x.present);
+    let unrecoverable = 0;
+    if (recoveredTail.length && !wholeState(recoveredTail[recoveredTail.length - 1].stateAfter)) { unrecoverable = recoveredTail.length; recoveredTail = []; }
+    turns.push(...recoveredTail);
     if (turns.some((t) => !record(t) || !Number.isInteger(t.n) || t.n < 1 || typeof t.narrative !== 'string' || !record(t.stateBefore) || !record(t.stateAfter) || !Number.isFinite(Number(t.stateBefore.day)) || !Number.isFinite(Number(t.stateAfter.day)) || typeof t.stateBefore.time !== 'string' || typeof t.stateAfter.time !== 'string' || typeof t.stateBefore.location !== 'string' || typeof t.stateAfter.location !== 'string')) throw new Error('save contains an invalid turn');
     const hadDuplicateNumbers = new Set(turns.map((t) => t.n)).size !== turns.length;
     const renumbered = orderTurns(turns); cleanAlts(turns);
-    const declaredTurnCount = Number.isInteger(d.turnCount) && d.turnCount >= 0 ? d.turnCount : null;
-    const staleTurnCount = declaredTurnCount == null ? 0 : Math.max(0, turns.length - declaredTurnCount);
-    if (staleTurnCount) turns.length = declaredTurnCount;
-    const turnCountMismatch = declaredTurnCount != null && declaredTurnCount !== turns.length;
+    const turnCountMismatch = expectedTurns !== turns.length;
+    const staleTurnCount = Math.max(0, storedTurns.length - expectedTurns - recoveredTail.length);
     const staleChunks = staleTurnCount ? chunks.docs.filter((c) => {
       const b = c.data(); const index = Number.isInteger(b && b.c) ? b.c : Number(c.id);
-      return Number.isInteger(index) && index >= Math.ceil(declaredTurnCount / CHUNK);
+      return Number.isInteger(index) && index >= Math.ceil(expectedTurns / CHUNK);
     }).map((c) => c.id) : [];
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
-    // A renumbered save rewrites every chunk on its next save (the stored chunks still hold the repeated numbers).
+    // A repaired or recovered save rewrites its chunks on the next save.
     adv = { id, title: d.title, createdAt: d.createdAt, updatedAt: d.updatedAt, rev: d.rev || 0, settings: normaliseSettings(clone(d.settings || {})), player: d.player ? clone(d.player) : null, roommate: d.roommate ? clone(d.roommate) : null, opening: d.opening ? clone(d.opening) : null, creation: d.creation ? clone(d.creation) : null, cast: d.cast ? clone(d.cast) : null, state: clone(d.state), memory: clone(d.memory), pendingNotes: clone(d.pendingNotes || []), turns, _savedUpToChunk: renumbered || staleTurnCount ? -1 : Math.floor(turns.length / CHUNK) - 1, _staleChunks: staleChunks };
+    if (recoveredTail.length && !renumbered) {
+      const last = recoveredTail[recoveredTail.length - 1];
+      adv.state = clone(last.stateAfter);
+      // memAfter is the fold's result (summary, beats, facts) recorded on the turn that folded; an older save may hold a
+      // whole memory there. Replay starts from the newest usable memory and applies each turn's events and any fold; when
+      // no recovered turn holds one (their history trimmed), it starts from the record's own memory, which is the memory
+      // just before the first recovered turn, and replays them all.
+      let replayFrom = 0;
+      const foldRecord = (m) => record(m) && typeof m.summary === 'string' && Array.isArray(m.beats) && (m.facts == null || Array.isArray(m.facts)) && !Array.isArray(m.events);
+      for (let i = recoveredTail.length - 1; i >= 0; i--) {
+        if (validMemory(recoveredTail[i].memAfter)) { adv.memory = clone(recoveredTail[i].memAfter); replayFrom = i + 1; break; }
+        if (validMemory(recoveredTail[i].memBefore)) { adv.memory = clone(recoveredTail[i].memBefore); replayFrom = i; break; }
+      }
+      adv.memory.events = Array.isArray(adv.memory.events) ? adv.memory.events : [];
+      adv.memory.beats = Array.isArray(adv.memory.beats) ? adv.memory.beats : [];
+      adv.memory.facts = Array.isArray(adv.memory.facts) ? adv.memory.facts : [];
+      for (const turn of recoveredTail.slice(replayFrom)) {
+        if (Array.isArray(turn.events)) adv.memory.events.push(...turn.events);
+        if (adv.memory.events.length > 600) adv.memory.events = adv.memory.events.slice(-600);
+        if (Array.isArray(turn.beats)) adv.memory.beats.push(...turn.beats);
+        if (Array.isArray(turn.facts)) adv.memory.facts.push(...turn.facts);
+        if (foldRecord(turn.memAfter)) { adv.memory.summary = turn.memAfter.summary; adv.memory.beats = clone(turn.memAfter.beats); adv.memory.facts = clone(turn.memAfter.facts || []); }
+      }
+      if (Array.isArray(last.pendingAfter)) adv.pendingNotes = clone(last.pendingAfter);
+    }
+    // Only the newest turn needs a fold record. A save written by 1.0 keeps a whole memory copy on every turn that folded;
+    // those are dropped once recovery has used what it needs, and the blocks that held them are written again on the next save.
+    let firstStale = -1;
+    adv.turns.forEach((t, i) => { if (i < adv.turns.length - 1 && t && t.memAfter != null) { delete t.memAfter; if (firstStale < 0) firstStale = Math.floor(i / CHUNK); } });
+    if (firstStale >= 0) adv._savedUpToChunk = Math.min(adv._savedUpToChunk == null ? -1 : adv._savedUpToChunk, firstStale - 1);
     try {
       if (!adv.player) adv.player = defaultPlayer();
       adv.memory.facts = adv.memory.facts || [];
@@ -2217,10 +2369,14 @@
     }
     dirty = false;
     try { localStorage.setItem('windlass.last', adv.id); } catch (e) {}
+    let recoverySaveFailed = false;
+    if (recoveredTail.length && !renumbered) { dirty = true; recoverySaveFailed = !(await persist()); }
     const warnings = [];
+    if (recoveredTail.length && !renumbered) warnings.push('Recovered ' + recoveredTail.length + ' complete saved turn' + (recoveredTail.length === 1 ? ' that was' : 's that were') + ' ahead of the adventure record, restored the latest state and repaired the save' + (recoverySaveFailed ? '; retry the save to sync it' : '') + '.');
     if (renumbered) warnings.push(hadDuplicateNumbers ? 'Duplicate turn numbers were repaired in chronological order (saved order); the next save stores the fix.' : 'Non-sequential turn numbers were repaired in saved order; the next save stores the fix.');
-    if (staleTurnCount) warnings.push('Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record; the next save will repair the extra history.');
-    else if (turnCountMismatch) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + declaredTurnCount + '. Some history may be missing; export a backup before continuing.');
+    if (unrecoverable) warnings.push(unrecoverable + ' newer saved turn' + (unrecoverable === 1 ? ' was' : 's were') + ' found ahead of the adventure record but could not be recovered (the newest of them kept too little of its state), so the game opens at the last turn the record knows. ' + (unrecoverable === 1 ? 'That turn is' : 'Those turns are') + ' not shown, Export will not include ' + (unrecoverable === 1 ? 'it' : 'them') + ', and taking a turn here replaces ' + (unrecoverable === 1 ? 'it' : 'them') + ' in the store.');
+    else if (staleTurnCount) warnings.push('Ignored ' + staleTurnCount + ' stale turn' + (staleTurnCount === 1 ? '' : 's') + ' beyond the save record; the next save will repair the extra history.');
+    else if (turnCountMismatch && !recoveredTail.length) warnings.push('Loaded ' + turns.length + ' available turn' + (turns.length === 1 ? '' : 's') + ', though the save record expected ' + expectedTurns + '. Some history may be missing; export a backup before continuing.');
     const warning = warnings.length ? warnings.join(' ') : null;
     if (warning) setStatus(warning, true);
     return warning;
