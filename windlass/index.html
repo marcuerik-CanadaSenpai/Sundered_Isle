@@ -336,6 +336,7 @@
     <div class="dlg">
       <div class="dlg-head"><h3 id="createTitle">New adventure</h3><button class="close quiet" data-close="dlgCreate">Cancel</button></div>
       <p class="small" id="cPremise"></p>
+      <p class="small notice" id="cRestoreNote" hidden></p>
       <p class="small">Everything starts randomised. Select any text and type over it, pick from the ▾ suggestions, or roll Random again.</p>
       <div class="row"><label for="cPreset" class="small">Preset</label><select id="cPreset" style="flex:1;min-width:160px"><option value="">— none —</option></select><button type="button" class="quiet" id="cPresetSave">Save these choices as a preset</button><button type="button" class="quiet danger" id="cPresetDelete" hidden>Delete preset</button></div>
       <div class="row" id="cPresetSaveRow" hidden><input type="text" id="cPresetName" style="flex:1;min-width:200px" placeholder="Preset name"><button type="button" class="primary" id="cPresetConfirm">Save preset</button><button type="button" class="quiet" id="cPresetCancel">Cancel</button></div>
@@ -367,8 +368,8 @@
     <div class="dlg">
       <div class="dlg-head"><h3>Settings</h3><button class="close quiet" data-close="dlgSettings">Close</button></div>
       <div class="grid2">
-        <div class="field"><label for="setNarrTier">Narrative tier</label>
-          <select id="setNarrTier"><option value="complex">complex</option><option value="default">default</option><option value="quick">quick</option></select></div>
+        <div class="field"><label for="setNarrTier">Story writer</label>
+          <select id="setNarrTier"><option value="complex">Most capable · every turn</option><option value="auto">Auto · most capable for romance, first meetings and changes; everyday otherwise</option></select></div>
         <div class="field"><label for="setUtilTier">Bookkeeping tier (length fit, summary folding)</label>
           <select id="setUtilTier"><option value="quick">quick</option><option value="default">default</option><option value="complex">complex</option></select></div>
         <div class="field"><label for="setDensity">Narrative density</label>
@@ -462,6 +463,8 @@
       <div class="small" id="dbgMeta">No turn taken yet in this session.</div>
       <h4>Model calls this session <button type="button" class="quiet" id="dbgRefresh">Refresh</button> <button type="button" class="quiet" id="dbgPing">Ping</button> <select id="dbgPingTier"><option value="quick">quick</option><option value="default" selected>default</option><option value="complex">complex</option></select> <select id="dbgPingKind"><option value="pong">pong (32 B)</option><option value="filler">pong after 12 KB of filler</option><option value="names">nine constrained names as JSON</option></select></h4>
       <pre class="debug" id="dbgCalls"></pre>
+      <h4>New adventures</h4>
+      <pre class="debug" id="dbgCreate"></pre>
       <h4>Notes</h4>
       <pre class="debug" id="dbgNotes"></pre>
       <h4>Prompt</h4>
@@ -502,7 +505,10 @@
   const DEFAULT_SETTINGS = { narrTier: 'complex', utilTier: 'quick', density: 'standard', window: 3, autoFit: true, loreBudget: 6000, testNote: '', pace: 'standard', thoughts: true, inventTier: 'quick' };
   function normaliseSettings(input) {
     const s = Object.assign({}, DEFAULT_SETTINGS, input || {}), tiers = ['quick', 'default', 'complex'];
-    for (const k of ['narrTier', 'utilTier', 'inventTier']) if (!tiers.includes(s[k])) s[k] = DEFAULT_SETTINGS[k];
+    for (const k of ['utilTier', 'inventTier']) if (!tiers.includes(s[k])) s[k] = DEFAULT_SETTINGS[k];
+    // The story writer is a toggle: 'complex' every turn, or 'auto' (see narrTierFor). A save from the old three-tier menu
+    // that asked for a lesser tier becomes auto.
+    if (s.narrTier !== 'complex' && s.narrTier !== 'auto') s.narrTier = tiers.includes(s.narrTier) ? 'auto' : DEFAULT_SETTINGS.narrTier;
     if (!['auto', 'terse', 'standard', 'rich'].includes(s.density)) s.density = DEFAULT_SETTINGS.density;
     if (!['slow', 'standard', 'fast', 'unbounded'].includes(s.pace)) s.pace = DEFAULT_SETTINGS.pace;
     s.window = Math.max(1, Math.min(10, Math.round(Number(s.window) || DEFAULT_SETTINGS.window)));
@@ -1310,14 +1316,52 @@
     const a = String(input.action || '');
     const romance = isRomanceScene(input);
     const tf = transformationSceneActive();
-    const firstMeeting = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i.test(a) &&
-      activeCharacters().some((c) => {
-        const names = [c.first, c.name].concat(c.aliases || []).filter(Boolean);
-        return names.some((n) => properWordIn(a, n)) && W.transformation && !ensureMet(adv.state).includes(speciesKeyOf(c));
-      });
-    if (romance || tf || firstMeeting) return 'rich';
+    if (romance || tf || isFirstMeeting(input)) return 'rich';
     if (isTransition(input)) return 'terse';
     return 'standard';
+  }
+  // The story writer for one turn. 'complex' asks for the most capable tier every time. 'auto' asks for it only where the
+  // writing matters most (romance, a first meeting, a change under way: the scenes sceneDensity calls rich) and takes the
+  // everyday tier otherwise, so an ordinary turn costs less of the player's usage. Both give the roommate's introduction
+  // the most capable tier: it is a first meeting written once.
+  // A first meeting: the action asks to meet someone new, or the director note brings someone new in (an arrival or an
+  // introduction, not a mere mention). Someone is new who has never been listed as present; in a world that tracks kinds,
+  // also someone of a kind the player has not yet met (humans are not a kind to be met, as in recordMet).
+  function isFirstMeeting(input) {
+    const a = String(input.action || ''), d = String(input.director || '');
+    const asked = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i;
+    const arrives = /\b(arriv\w*|enter(?:s|ed|ing)?|appear(?:s|ed|ing)?|join(?:s|ed|ing)?|approach(?:es|ed|ing)?|meet\w*|introduc\w*|first time|show(?:s|ed)? up|turn(?:s|ed)? up|(?:walk|come|comes|came|step|steps|stepped|burst|bursts|wander|wanders)\s+(?:in|into|over|up)|sit(?:s)? down (?:with|beside|next to))\b/i;
+    const negated = /\b(?:not|never|no longer|neither|nor|without|don't|doesn't|didn't|won't|isn't|aren't|can't|cannot|mustn't|shouldn't|offstage|off-stage|absent|away)\b|n't\b/i;
+    const seen = new Set();
+    const addSeen = (list) => { for (const raw of (list || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (n) seen.add(n); } };
+    addSeen(adv.state && adv.state.present);
+    for (const t of adv.turns || []) { addSeen(t.stateBefore && t.stateBefore.present); addSeen(t.stateAfter && t.stateAfter.present); }
+    return activeCharacters().some((c) => {
+      // A world's authored people may carry only a full name ("Ines Varga", "Professor Adaline Marsh"): its given name and
+      // surname count too, without a title.
+      const words = String(c.name || '').split(' ').filter((w) => !/^(?:professor|prof\.?|dr\.?|doctor|mr\.?|mrs\.?|ms\.?|miss|sir|lady|lord|warden)$/i.test(w));
+      const names = [c.first, c.name, words[0], words.length > 1 ? words[words.length - 1] : ''].concat(c.aliases || []).filter(Boolean);
+      const handles = names.map((n) => n.toLowerCase());
+      const kind = W.transformation ? speciesKeyOf(c) : null;
+      const isNew = !handles.some((h) => seen.has(h)) || (!!kind && kind !== 'human' && !ensureMet(adv.state).includes(kind));
+      if (!isNew) return false;
+      // The action and the note are read clause by clause. A negation counts only where it governs the cue, among the few
+      // words just before it in the same phrase ("Mira does not arrive", "do not introduce me to Mira"); one elsewhere in
+      // the clause ("Mira arrives without her coat", "Mira arrives and doesn't speak") leaves the arrival standing.
+      const negatesCue = (before) => negated.test(before.split(/[,(]|\b(?:and|or|so|while|whereas|because|when)\b/i).pop().trim().split(/\s+/).slice(-4).join(' '));
+      const cued = (text, cue) => text.split(/[.;:!?\n]+|,\s*(?:but|and then|then)\b|\bbut\b/i).some((cl) => {
+        if (!names.some((n) => properWordIn(cl, n))) return false;
+        const g = new RegExp(cue.source, 'gi'); let m;
+        while ((m = g.exec(cl))) { if (!negatesCue(cl.slice(0, m.index))) return true; }
+        return false;
+      });
+      return cued(a, asked) || cued(d, arrives);
+    });
+  }
+  function narrTierFor(input) {
+    if (adv.settings.narrTier !== 'auto') return 'complex';
+    if (!input) return 'complex';
+    return sceneDensity(input) === 'rich' ? 'complex' : 'default';
   }
   // Auto keeps transitions concise and reserves the richest band for romance, first meetings and active changes.
   function sceneBand(input) {
@@ -1832,10 +1876,12 @@
     let stateBefore = null, memBefore = null, pendingBefore = null, built = null;
     const turnsBefore = adv.turns.length;
     const notes = []; const t0 = performance.now(); let first = null; let raw = '';
+    let tier = adv.settings.narrTier;   // the setting's own label until the scene is classified below; a turn that fails before then records it
     startTimer(t0);
     try {
       stateBefore = clone(adv.state); memBefore = clone(adv.memory); pendingBefore = (adv.pendingNotes || []).slice();
       input.band = sceneBand(input);
+      tier = narrTierFor(input);
       built = buildPrompt(input);
       // Stay under the runtime's 64 KiB input cap by shedding in stages, each re-measured, so a pathologically long single
       // turn cannot fall through every stage still oversized and get sent to the runtime anyway.
@@ -1884,9 +1930,9 @@
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
       showDraft(input, '');
-      setStatus('thinking on ' + adv.settings.narrTier + ' tier…');
+      setStatus('thinking on ' + tier + ' tier…');
       const ask = () => sample(built.prompt, {
-        label: 'turn ' + (adv.turns.length + 1), modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal,
+        label: 'turn ' + (adv.turns.length + 1), modelTier: tier, cache: false, signal: ctl.signal,
         onText: ({ text }) => { if (first == null) { first = performance.now() - t0; setStatus('writing…'); } raw = text; showDraft(input, partialNarrative(text)); }
       });
       let res = await ask(); raw = res.text;
@@ -1894,7 +1940,7 @@
       if (!usableReply(data)) data = null;
       // An unusable or cut-off reply is asked for once more before giving up; the bad one is kept for diagnosis.
       if (!data) {
-        logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '' });
+        logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { tier, truncated: !!res.truncated, tierApplied: res.modelTierApplied || '' });
         notes.push((res.truncated ? 'first reply was cut off by the runtime' : 'first reply was not usable JSON') + '; asked again');
         setStatus(res.truncated ? 'The reply was cut off; asking once more…' : 'The reply was not usable; asking once more…'); first = null;
         res = await ask(); raw = res.text;
@@ -1902,9 +1948,9 @@
         if (res.truncated) data = null;
         if (!usableReply(data)) data = null;
       }
-      if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
+      if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { tier, truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
       if (adv !== mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
-      const turn = await commitReply(data, input, { mine, stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: adv.settings.narrTier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
+      const turn = await commitReply(data, input, { mine, stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: tier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
       lastDebug = { prompt: built.prompt, raw, notes, meta: 'Turn ' + turn.n + ' · asked ' + turn.tierAsked + ', answered ' + (turn.tierApplied || '?') + ' · first word ' + (turn.timing.first / 1000).toFixed(1) + ' s, total ' + (turn.timing.total / 1000).toFixed(1) + ' s · ' + turn.words + ' words (band ' + input.band.join('–') + ') · prompt ' + built.prompt.length.toLocaleString() + ' chars (~' + Math.round(built.prompt.length / 4).toLocaleString() + ' tokens) · lore: ' + (built.lore.join(', ') || 'none') };
       hideDraft(); renderAll(); if (!regen) { $('#action').value = ''; $('#director').value = ''; }
       setStatus('');
@@ -1926,7 +1972,7 @@
       else if (code === 'page_error') msg = 'Page error: ' + (e.message || 'unknown') + ' (see Debug).';
       else msg = 'Error: ' + code + (e && e.message ? ' — ' + e.message : '');
       setStatus(msg, true, statusAction);
-      lastDebug = { prompt: built ? built.prompt : '(prompt was not built)', raw: (e && e.text) || raw || '', notes: notes.concat(['failed: ' + code + (e && e.message ? ' — ' + e.message : ''), (e && e.stack) ? String(e.stack).slice(0, 600) : '']), meta: 'Failed turn · asked ' + adv.settings.narrTier };
+      lastDebug = { prompt: built ? built.prompt : '(prompt was not built)', raw: (e && e.text) || raw || '', notes: notes.concat(['failed: ' + code + (e && e.message ? ' — ' + e.message : ''), (e && e.stack) ? String(e.stack).slice(0, 600) : '']), meta: 'Failed turn · asked ' + tier };
       // Roll back the adventure this turn belongs to; a different, already-loaded adventure's live state must never be
       // clobbered with a stale snapshot from the turn that just failed.
       if (stateBefore) { mine.turns.length = turnsBefore; mine.state = stateBefore; mine.memory = memBefore; mine.pendingNotes = pendingBefore; }
@@ -1996,7 +2042,7 @@
     const r = adv.roommate; if (!r || !r.gen || !sample || !adv.opening || adv.opening.introWritten || busy || loadingAdv) return false;
     const p = adv.player; const g = r.gen; const t0 = performance.now();
     const mine = adv;   // guards against a different adventure being loaded while the model call is in flight
-    busy = true; ctl = new AbortController(); setBusyUI(true); setStatus('Writing your roommate on the ' + adv.settings.narrTier + ' tier…');
+    busy = true; ctl = new AbortController(); setBusyUI(true); setStatus('Writing your roommate on the ' + narrTierFor(null) + ' tier…');
     try {
       const porter = ((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).find((m) => m.key === 'porter');
       const porterBit = porter ? (porter.race === 'Human' ? 'the porter, who is human, across a desk an hour ago' : porter.name + ' the porter (' + porter.race.toLowerCase() + ') across a desk an hour ago, which was startling enough') : 'the porter across a desk an hour ago';
@@ -2011,7 +2057,7 @@
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
         xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].join('\n\n');
-      const res = await sample(prompt, { label: 'roommate introduction', modelTier: adv.settings.narrTier, cache: false, signal: ctl.signal });
+      const res = await sample(prompt, { label: 'roommate introduction', modelTier: narrTierFor(null), cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
       if (wc(text) < 60) throw new Error('too short');
       // The intro must name the roommate; one that does not (or names someone else) is unusable, and the plain one stands in.
@@ -2185,7 +2231,7 @@
       }
       live(); const doc = advDoc();
       await db.doc('adventures/' + mine.id).set(doc);
-      mine.updatedAt = doc.updatedAt; mine.rev = doc.rev;
+      mine.updatedAt = doc.updatedAt; mine.rev = doc.rev; settleCreateDraft(mine.id);
       if (adv !== mine) return true;   // saved in full; the page has since moved to another adventure, whose state is not ours to touch
       dirty = false;
       // Best effort: the turns just out of Undo's reach were saved whole in the previous chunk; store them trimmed now.
@@ -2279,7 +2325,9 @@
     }
   }
   // Loads a save and returns a warning for the player when something had to be repaired or is missing (null otherwise).
-  async function loadAdventure(id) {
+  // stillWanted (optional) is asked once more right before the save replaces the current adventure; when it says no,
+  // nothing is changed and the load throws code 'superseded'.
+  async function loadAdventure(id, stillWanted) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
     const d = snap.data();
     const wid = d && (d.worldId || LEGACY_WORLD);
@@ -2323,6 +2371,7 @@
       const b = c.data(); const index = Number.isInteger(b && b.c) ? b.c : Number(c.id);
       return Number.isInteger(index) && index >= Math.ceil(expectedTurns / CHUNK);
     }).map((c) => c.id) : [];
+    if (stillWanted && !stillWanted()) throw Object.assign(new Error('superseded'), { code: 'superseded' });
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
@@ -2614,7 +2663,7 @@
   async function inventCall(Wc, slots, label, opts) {
     if (!sample || !slots.length) return null; opts = opts || {};
     const t0 = performance.now(); const ctl = new AbortController(); let timedOut = false, timer = null;
-    const stopped = new Promise((_, reject) => ctl.signal.addEventListener('abort', () => reject({ code: 'aborted', message: 'stopped' })));
+    const stopped = new Promise((_, reject) => ctl.signal.addEventListener('abort', () => reject({ code: 'aborted', message: 'stopped' }))); stopped.catch(() => {});
     const onOuter = () => ctl.abort(); if (opts.signal) { if (opts.signal.aborted) onOuter(); else opts.signal.addEventListener('abort', onOuter); }
     const avoid = await withTimeout(recentRead(), 4000, { names: [], courses: [], quirks: [] }); const prompt = inventPrompt(Wc, slots, avoid);
     let partial = '';
@@ -2692,10 +2741,10 @@
   // ---------- creation dialog ----------
   let createWorldId = null;
   function creationWorld() { return WORLDS[createWorldId]; }
-  function openCreate(worldId) {
+  function openCreate(worldId, draft) {
     cancelPlayerInvention();
     createWorldId = worldId; const Wc = WORLDS[worldId]; const cr = Wc.creation || {};
-    $('#cBegin').disabled = false;
+    $('#cBegin').disabled = false; restoreWait = false;
     $('#createTitle').textContent = 'New adventure: ' + Wc.title;
     $('#cPremise').textContent = premiseParts(Wc).setting;
     $('#cName').value = cr.nameDefault || Wc.player.name;
@@ -2714,6 +2763,9 @@
     randomAll(); // everything starts randomised; each field stays editable
     closeCombo();
     $('#cPresetSaveRow').hidden = true; $('#cPresetNote').hidden = true; renderPresets(''); loadPresets(worldId);
+    $('#cRestoreNote').hidden = !draft;
+    if (draft) { applyPreset({ choices: draft.choices }); $('#cTitle').value = String(draft.choices.title || ''); $('#cRestoreNote').textContent = 'This page was reloaded or reopened while your new adventure was being set up (Begin at ' + new Date(draft.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '), so it was never started and nothing was saved. Your choices are back: press Begin to try again, or Cancel to discard them.'; }
+    else clearCreateDraft();   // a fresh creation screen replaces any creation left unfinished
     openDlg('dlgCreate');
   }
   // Until the player types or picks a roommate name, it follows the species and gender (each template has its own names).
@@ -3061,7 +3113,7 @@
         (t.alts && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + num(t.alts.length) + ')</button>' : '') +
         '<span class="spacer"></span>' +
         (warn && showHidden ? '<span class="pill warn" title="' + esc((t.notes || []).join('\n')) + '">' + warn + ' note' + (warn > 1 ? 's' : '') + '</span>' : '') +
-        '<span class="pill">' + esc(t.tierApplied || t.tierAsked) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
+        '<span class="pill">' + esc(t.tierApplied && t.tierAsked && t.tierApplied !== t.tierAsked ? t.tierAsked + ' → ' + t.tierApplied : (t.tierApplied || t.tierAsked)) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
       '</div>' +
       '<div class="reveal" data-panel="changes"><h4>Changes</h4>' + ((t.diff || []).length ? '<ul>' + t.diff.map((d) => '<li><code>' + esc(d.path) + '</code>: <span class="diff-from">' + esc(JSON.stringify(d.from)) + '</span> → ' + esc(JSON.stringify(d.to)) + '</li>').join('') + '</ul>' : '<div class="small">No state changes.</div>') + ((t.notes || []).length ? '<h4 style="margin-top:8px">Engine notes</h4><ul>' + t.notes.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '') + ((t.exposures || []).length ? '<h4 style="margin-top:8px">Exposures reported</h4><ul>' + t.exposures.map((e) => '<li>' + esc(e.species) + ' ×' + num(e.intensity, 1) + ': ' + esc(e.method) + '</li>').join('') + '</ul>' : '') + '</div>' +
       '<div class="reveal" data-panel="secret"><h4>Secret info (what the player is not told)</h4>' + (t.secret ? esc(t.secret) : '<span class="small">None.</span>') + '</div>' +
@@ -3150,6 +3202,7 @@
   }
   function renderDebug() {
     $('#dbgCalls').textContent = callTrace.length ? traceLines().join('\n') : 'No model calls yet this session.';
+    $('#dbgCreate').textContent = createLog.length ? createLog.slice().reverse().join('\n') : 'No new adventure begun in this browser yet.';
     if (!lastDebug) { $('#dbgMeta').textContent = 'No turn taken yet in this session.'; $('#dbgNotes').textContent = ''; $('#dbgPrompt').textContent = ''; $('#dbgRaw').textContent = ''; return; }
     $('#dbgMeta').textContent = lastDebug.meta; $('#dbgNotes').textContent = lastDebug.notes.filter(Boolean).join('\n') || 'none'; $('#dbgPrompt').textContent = lastDebug.prompt; $('#dbgRaw').textContent = lastDebug.raw;
   }
@@ -3278,31 +3331,93 @@
   $('#dlgCreate .dlg').addEventListener('scroll', () => { if (performance.now() - comboOpenedAt > 400) closeCombo(); });   // a click that scrolls its button into view must not close the menu it opened
   window.addEventListener('resize', closeCombo);
   $('#dlgCreate').addEventListener('close', closeCombo);
-  // Begin invents the people first (a second press, "Begin now", stops the invention and begins with what it has and the pools);
-  // closing the dialog while it runs cancels the creation outright.
-  let createCtl = null, createToken = 0;
-  $('#dlgCreate').addEventListener('close', () => { createToken += 1; cancelPlayerInvention(); if (createCtl) createCtl.abort(); });
+  // Begin invents the people first (a second press, "Begin now", stops the invention and begins with what it has and the pools).
+  // Only Cancel throws a begun creation away, and it says so. A close the player did not ask for with Cancel (the Android
+  // back gesture, Esc) is refused while the cast is invented, and if the browser closes the screen anyway it comes straight
+  // back. Begin leaves a draft in this browser until the adventure is saved, so a reload brings the creation screen back.
+  // createClosed: the player has closed a creation screen, so the boot must not open a fresh one over the page.
+  // restoreWait: a restored creation screen holds Begin until Claude and the save list are ready (see the boot).
+  let createCtl = null, createToken = 0, createT0 = 0, createBackTried = false, bootRestoring = false, createClosed = false, restoreWait = false;
+  const RESTORE_WAIT = 'Getting Claude and your saves ready; Begin is available in a moment.';
+  const createSecs = () => ((performance.now() - createT0) / 1000).toFixed(1);
+  const CREATE_DRAFT_KEY = 'windlass.createDraft', CREATE_LOG_KEY = 'windlass.createLog', CREATE_DRAFT_MAX_MS = 6 * 3600 * 1000;
+  let createLog = []; try { const l = JSON.parse(localStorage.getItem(CREATE_LOG_KEY) || '[]'); if (Array.isArray(l)) createLog = l.filter((x) => typeof x === 'string').slice(-40); } catch (e) {}
+  function createTrace(msg) { createLog.push(new Date().toISOString().slice(0, 19).replace('T', ' ') + 'Z · ' + msg); createLog = createLog.slice(-40); try { localStorage.setItem(CREATE_LOG_KEY, JSON.stringify(createLog)); } catch (e) {} }
+  function saveCreateDraft(d) { try { localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
+  function clearCreateDraft() { try { localStorage.removeItem(CREATE_DRAFT_KEY); } catch (e) {} }
+  // The draft lasts until the adventure it began is saved: the first save that lands, from Begin or a later turn, drops it.
+  function peekCreateDraft() { try { return JSON.parse(localStorage.getItem(CREATE_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+  function settleCreateDraft(id) { const d = peekCreateDraft(); if (d && d.advId === id) { clearCreateDraft(); createTrace('adventure ' + id + ' saved; the creation is complete'); } }
+  function readCreateDraft() {
+    let d = null, raw = null; try { raw = localStorage.getItem(CREATE_DRAFT_KEY); d = raw ? JSON.parse(raw) : null; } catch (e) { d = raw ? {} : null; }
+    if (!d) return null;
+    const why = (d.v !== 1 || !d.choices || typeof d.choices !== 'object') ? 'unreadable' : !WORLDS[d.worldId] ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
+    if (why) { clearCreateDraft(); createTrace('a creation left unfinished was found and dropped: ' + why); return null; }
+    return d;
+  }
+  const isPlaceholder = () => !!adv && !adv.rev && !adv.turns.length && !Object.keys(adv.creation || {}).length;
+  $('#dlgCreate').addEventListener('cancel', (e) => {
+    if (!createCtl || createCtl.signal.aborted) return;   // nothing being invented: a close request closes the screen as before
+    createBackTried = true;
+    createTrace('close request (back gesture or Esc) at ' + createSecs() + ' s into the invention; ' + (e.cancelable ? 'refused, the screen stays open' : 'the browser would not let the page refuse it'));
+    if (e.cancelable) e.preventDefault();
+  });
+  $('#dlgCreate').addEventListener('close', () => {
+    cancelPlayerInvention(); bootRestoring = false;
+    if (createCtl && !createCtl.signal.aborted) {
+      createBackTried = true; createTrace('the creation screen was closed by the browser at ' + createSecs() + ' s into the invention; reopened, the invention goes on');
+      openDlg('dlgCreate'); return;
+    }
+    createClosed = true;
+    if (createCtl) return;   // Begin now: the creation goes on and begins
+    // Closed with nothing being invented. Unless Begin has just made the adventure now on screen (the draft names it until
+    // its first save), the player dismissed the screen (Cancel, back, Esc), and its choices are not brought back next load.
+    const d = peekCreateDraft(); if (d && d.advId !== (adv && adv.id)) { clearCreateDraft(); createTrace('the creation screen was closed without Begin; its choices were dropped'); }
+    showPreviewNote();
+  });
+  function showPreviewNote() { if (isPlaceholder() && $('#status').hidden) setStatus('No adventure has started: this is a preview of the opening, and nothing here is saved.', false, { label: 'New adventure', run: () => openCreate(createWorldId) }); }
+  $('#dlgCreate [data-close]').onclick = () => {
+    const running = !!createCtl;
+    // The stopped invention lets go of the screen at once, so a new creation begun before the stop lands is not taken for it.
+    if (running) { createToken += 1; createCtl.abort(); createCtl = null; $('#cBegin').textContent = 'Begin'; $('#cNote').textContent = ''; }
+    createTrace('Cancel pressed' + (running ? ' at ' + createSecs() + ' s into the invention; the new adventure was not created' : ''));
+    clearCreateDraft(); closeDlg('dlgCreate');
+    if (running) setStatus('New adventure cancelled; nothing was saved.', false, isPlaceholder() ? { label: 'New adventure', run: () => openCreate(createWorldId) } : null);
+  };
+  document.addEventListener('visibilitychange', () => { if (createCtl) createTrace('page ' + document.visibilityState + ' at ' + createSecs() + ' s into the invention'); });
+  window.addEventListener('pagehide', (e) => { if (createCtl) createTrace('page unloading' + (e.persisted ? ' (kept for back/forward)' : '') + ' at ' + createSecs() + ' s into the invention'); });
   $('#cBegin').onclick = async () => {
-    if (createCtl) { createCtl.abort(); return; }
+    if (restoreWait) { $('#cNote').textContent = RESTORE_WAIT; return; }
+    if (createCtl) { if (!createCtl.signal.aborted) createTrace('Begin now pressed at ' + createSecs() + ' s'); createCtl.abort(); return; }
     if (busy) { $('#cNote').textContent = 'A turn is already running in the current adventure; wait for it to finish first.'; return; }
     cancelPlayerInvention();
     const c = creationChoices();
     if ((WORLDS[createWorldId].creation || {}).traits && c.strengths.length !== 2) { $('#cNote').textContent = 'Pick exactly two strengths.'; return; }
     closeCombo(); inventSeq += 1; const token = ++createToken;
     const Wc = WORLDS[createWorldId]; let prep = null;
+    const draft = { v: 1, worldId: createWorldId, choices: c, at: Date.now() }; saveCreateDraft(draft);
+    $('#cRestoreNote').hidden = true; createBackTried = false;
+    createTrace('Begin pressed: ' + Wc.id + ', roommate ' + JSON.stringify(c.rmSpecies || '(default)') + (sample && Wc.genPools ? ', inventing the cast on the ' + inventTier() + ' tier' : ', no invention (' + (sample ? 'this world draws from its pools' : 'Claude unavailable') + ')'));
     if (sample && Wc.genPools) {
-      createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
-      const t0 = performance.now(); let got = 0, total = 0;
+      const ctl = createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
+      const t0 = performance.now(); createT0 = t0; let got = 0, total = 0;
       const calls = Math.ceil((1 + (Wc.castRoles || []).length + (Wc.minorRoles || []).length) / INVENT_BATCH);
-      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of three, two at a time; each call is given up after ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s without a complete reply and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
-      note(); const ticker = setInterval(note, 1000);
-      try { prep = await prepareCreation(Wc, c, createCtl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
-      finally { clearInterval(ticker); createCtl = null; $('#cBegin').textContent = 'Begin'; }
-      if (token !== createToken) { $('#cNote').textContent = ''; return; }
+      const note = () => { if (token !== createToken) return; const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; each call is given up after ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s without a complete reply and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call afterwards.' + (createBackTried ? ' Back does not stop it; Cancel at the top does.' : ''); };
+      // After Cancel the stop can take a moment to land: by then the draft is dropped and the screen may be open on a new creation.
+      note(); const ticker = setInterval(() => { if (token !== createToken) return; note(); draft.tick = Date.now(); draft.secs = Math.round((performance.now() - t0) / 1000); draft.got = got; draft.total = total; saveCreateDraft(draft); }, 1000);
+      try { prep = await prepareCreation(Wc, c, ctl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
+      finally { clearInterval(ticker); if (createCtl === ctl) { createCtl = null; $('#cBegin').textContent = 'Begin'; } }
+      if (token !== createToken) return;   // Cancel, which has said so, dropped the draft and let go of the screen
+      createTrace('cast invention ended after ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s: ' + (prep ? Object.keys(prep.given || {}).length + ' of ' + total + ' people invented, the rest from the pools' : 'failed, all from the pools'));
     }
     $('#cNote').textContent = '';
     $('#cBegin').disabled = true;
-    newAdventure(c, createWorldId, prep || undefined); closeDlg('dlgCreate'); setStatus(''); await persist();
+    const prevAdv = adv, prevWorld = W && W.id;
+    try { newAdventure(c, createWorldId, prep || undefined); }
+    catch (e) { adv = prevAdv; setWorld(prevWorld); renderAll(); $('#cBegin').disabled = false; $('#cNote').textContent = 'The adventure could not be started (' + ((e && e.message) || 'error') + '). Your choices are still here; Begin tries again.'; createTrace('starting the adventure failed: ' + String((e && e.stack) || e).slice(0, 400)); return; }
+    draft.advId = adv.id; saveCreateDraft(draft);   // kept until this adventure's first save lands (settleCreateDraft)
+    closeDlg('dlgCreate'); setStatus('');
+    if (!(await persist())) createTrace('adventure ' + draft.advId + ' started, but its first save did not land; the choices are kept until a save does');
     if (prep) lastDebug = { prompt: prep.prompt || '(no invention call)', raw: prep.raw || '', notes: prep.notes.length ? prep.notes : ['the cast was drawn from the pools'], meta: 'Creation · cast invention' };
     rememberCast();
     await writeRoommateIntro();
@@ -3327,20 +3442,34 @@
   let bootLast = null;
   try { bootLast = localStorage.getItem('windlass.last'); } catch (e) { setSaveNote('local save pointer unavailable', true); }
   newAdventure({}, DEFAULT_WORLD);
+  const bootAdv = adv;
+  // Once the player has started or opened something of their own (a new adventure, the creation or adventures dialog),
+  // the background boot load stands aside: it must not replace their adventure, reopen creation or put up its errors.
+  // A creation restored from the draft does not stand the boot load aside: the newest save loads behind it, so Cancel lands there.
+  const bootSuperseded = () => adv !== bootAdv || createToken > 0 || (!!$('#dlgCreate').open && !bootRestoring) || !!$('#dlgAdventures').open;
+  const bootDraft = readCreateDraft();
+  if (bootDraft) {
+    createTrace('page loaded with a creation left unfinished: Begin at ' + new Date(bootDraft.at).toISOString().slice(11, 19) + 'Z in ' + bootDraft.worldId + (bootDraft.tick ? ', last heard ' + bootDraft.secs + ' s into the invention (' + (bootDraft.got || 0) + ' of ' + (bootDraft.total || '?') + ' arrived), ' + Math.round((Date.now() - bootDraft.tick) / 1000) + ' s before this load' : ', before the invention reported') + '; the creation screen is restored');
+    openCreate(bootDraft.worldId, bootDraft); bootRestoring = true;
+    // Begin waits for Claude and the save list: begun sooner, the cast would not be invented, the save could not be written,
+    // and the boot load would stand aside before loading the newest save, which is where Cancel is meant to land.
+    restoreWait = true; $('#cBegin').disabled = true; $('#cNote').textContent = RESTORE_WAIT;
+  }
   setBusyUI(false);
-  connectSample();
-  (async () => {
+  const sampleReady = connectSample();
+  const bootLoad = (async () => {
     try {
       if (!window.claude || typeof window.claude.use !== 'function') throw new Error('Claude runtime is unavailable');
       downloads = await window.claude.use('downloads');
       db = await window.claude.use('db');
       if (!db) throw new Error('persistent storage capability was not granted');
+      if ($('#dlgCreate').open) loadPresets(createWorldId);   // a creation screen opened before the store was ready lists its presets now
     } catch (e) {
       db = null; downloads = null;
       saveError = 'Windlass cannot save in this view (' + ((e && e.code) || (e && e.message) || 'storage unavailable') + '). Open the artifact in claude.ai and allow persistent storage.';
       setSaveNote('saves unavailable in this view', true);
       setStatus(saveError + ' You can still play, but progress will not be saved.', true, { label: 'Retry storage', run: () => { location.reload(); } });
-      openCreate(DEFAULT_WORLD);
+      if (!$('#dlgCreate').open && !createClosed) openCreate(DEFAULT_WORLD);
       return;
     }
     let snap = null, listError = null;
@@ -3349,34 +3478,52 @@
       snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
     } catch (e) { listError = e; }
     const ids = (snap && snap.docs ? snap.docs.map((d) => d.id) : []);
+    const listed = ids.slice();
     if (bootLast && !ids.includes(bootLast)) ids.push(bootLast);
     const skipped = [];
     for (const id of ids) {
+      if (bootSuperseded()) { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
       try {
-        const warning = await loadAdventure(id);
+        // This device's pointer can name an adventure that was never saved (a game opened and left before its first
+        // save): when the save list does not have it either, it is forgotten quietly rather than reported as a failure.
+        if (id === bootLast && !listed.includes(id) && !listError) {
+          const snapLast = await db.doc('adventures/' + id).get();
+          if (!snapLast.exists) { try { if (localStorage.getItem('windlass.last') === id) localStorage.removeItem('windlass.last'); } catch (e) {} continue; }
+        }
+        if (bootSuperseded()) return;
+        const warning = await loadAdventure(id, () => !bootSuperseded());
         setSaveNote('loaded');
+        // The creation left unfinished was saved after all (the page went between its save and the draft's removal): it is open.
+        if (bootRestoring && bootDraft && bootDraft.advId === adv.id) { createTrace('the creation left unfinished, ' + adv.id + ', had been saved after all; opened it'); clearCreateDraft(); closeDlg('dlgCreate'); }
         // A newer save that could not be opened is said out loud, so the player does not take an older one for the latest.
         const skippedNote = skipped.length ? (skipped.length === 1 ? 'Your most recent save' : skipped.length + ' more recent saves') + ' could not be opened (' + skipped[0].why + '; see Debug), so this is the newest one that could. ' : '';
         if (skippedNote || warning) setStatus(skippedNote + (warning || 'Pick up where you left off.'), true);
         else setStatus('Welcome back. Pick up where you left off.');
         return;
       } catch (e) {
+        if (e && e.code === 'superseded') { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
         const why = (e && e.message) || 'invalid save';
         let title = id; try { const doc = snap && snap.docs && snap.docs.find((x) => x.id === id); const dd = doc && doc.data(); if (dd && typeof dd.title === 'string' && dd.title) title = dd.title; } catch (e2) {}
         skipped.push({ id, title, why });
+        if (bootSuperseded()) continue;
         lastDebug = { prompt: '', raw: '', notes: skipped.map((x) => 'load failed for ' + x.title + ' (' + x.id + '): ' + x.why).concat([(e && e.stack) ? String(e.stack).slice(0, 800) : '']), meta: 'Boot load failure' };
       }
     }
+    if (bootSuperseded()) { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
     if (listError) {
       const why = (listError && listError.code) || (listError && listError.message) || 'storage error';
       setSaveNote('could not read saves: ' + why, true);
       setStatus('Windlass could not read saved adventures (' + why + '). A new adventure can still be started, but cannot load until storage access is restored.', true);
-    } else if (ids.length) {
+    } else if (skipped.length) {
       setSaveNote('saved adventures could not be loaded', true);
       setStatus('None of the saved adventures could be loaded. See Debug for the latest save error, or start a new adventure.', true);
     } else setSaveNote('no saves yet');
-    openCreate(DEFAULT_WORLD);
+    if (!$('#dlgCreate').open) { if (createClosed) showPreviewNote(); else openCreate(DEFAULT_WORLD); }
   })();
+  if (bootDraft) Promise.race([Promise.allSettled([sampleReady, bootLoad]), new Promise((r) => setTimeout(r, 20000))]).then(() => {
+    if (!restoreWait) return;   // the restored screen has given way to a fresh one, which needs no wait
+    restoreWait = false; $('#cBegin').disabled = false; if ($('#cNote').textContent === RESTORE_WAIT) $('#cNote').textContent = '';
+  });
 })();
 </script>
 

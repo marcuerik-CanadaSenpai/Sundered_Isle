@@ -35,11 +35,13 @@ async function main() {
     assert.match(prompt, /Consensual adult sex may be depicted on-page when requested/,
       'the romance prompt must allow requested consensual adult sex on-page');
     assert.match(prompt, /depict the requested physical act directly and continuously/,
-      'requested consensual sex must be depicted in detail rather than skipped');
+      'requested consensual sex must be depicted directly and continuously');
     assert.match(prompt, /do not fade out, cut away, imply, euphemize, summarize or skip the act/,
-      'requested consensual sex must not fade out or be summarized');
+      'requested consensual sex must not be faded, cut away, implied, summarized or skipped');
     assert.match(prompt, /do not jump to its aftermath in the same turn/,
-      'the sex scene must not jump ahead to an unrelated aftermath');
+      'a requested adult scene must not jump to its aftermath');
+    assert.match(prompt, /Use only anatomy and functions established in the world data; do not invent them/,
+      'on-page intimacy must use only established anatomy');
     assert.match(prompt, /Keep the narration in the world rule's second-person present-tense perspective and do not insert unrelated events/,
       'romance narration must retain perspective and stay on scene');
     assert.doesNotMatch(prompt, /fade to black|sex is not depicted|sex remains off-page/i,
