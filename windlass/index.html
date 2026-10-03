@@ -1001,7 +1001,9 @@
   function recordMet(state, extraKeys) {
     if (!W.transformation) return [];
     const met = ensureMet(state); const added = [];
-    const cast = activeCharacters();
+    // The generated minor figures count too: a mythkin porter seen once is a kind met.
+    const gen = adv && adv.cast && adv.cast.generated;
+    const cast = activeCharacters().concat(gen ? (gen.minors || []) : []);
     const handles = (ch) => [ch.name, ch.first || ch.name.split(' ')[0], ch.name.split(' ').pop()].concat(ch.aliases || []).filter(Boolean).map((n) => n.toLowerCase());
     const keys = [];
     for (const raw of (state.present || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (!n) continue; const c = cast.find((ch) => handles(ch).includes(n)); if (c) keys.push(speciesKeyOf(c)); }
@@ -1373,7 +1375,11 @@
         const before = ms.filter((x) => x.end <= cs);
         let k = before.length - 1;
         if (k >= 0 && !breaks.test(cl.slice(before[k].end, cs))) { who.push(before[k].i); while (k > 0 && linked(cl.slice(before[k - 1].end, before[k].start))) who.push(before[--k].i); }
-        if (objectCue.test(m[0])) { const after = ms.find((x) => x.start >= ce); if (after && !breaks.test(cl.slice(ce, after.start))) who.push(after.i); }
+        if (objectCue.test(m[0])) {
+          // Everyone named alongside after the cue counts too ("meet Tess and Mira").
+          const after = ms.filter((x) => x.start >= ce);
+          if (after.length && !breaks.test(cl.slice(ce, after[0].start))) { who.push(after[0].i); for (let j = 1; j < after.length && linked(cl.slice(after[j - 1].end, after[j].start)); j++) who.push(after[j].i); }
+        }
         if (who.some((i) => people[i].isNew)) return true;
       }
       return false;
@@ -3380,7 +3386,7 @@
     const sound = d.v === 1 && c && typeof c === 'object' && !Array.isArray(c) && okTime(d.at) && (d.tick == null || okTime(d.tick))
       && ['name', 'gender', 'background', 'personality', 'weakness', 'rmSpecies', 'rmName', 'rmGender', 'title'].every(str)
       && (c.strengths == null || (Array.isArray(c.strengths) && c.strengths.every((x) => typeof x === 'string')));
-    const why = !sound ? 'unreadable' : !(typeof d.worldId === 'string' && Object.prototype.hasOwnProperty.call(WORLDS, d.worldId)) ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
+    const why = !sound ? 'unreadable' : !(typeof d.worldId === 'string' && Object.prototype.hasOwnProperty.call(WORLDS, d.worldId)) ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick == null ? d.at : d.tick) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
     if (why) { clearCreateDraft(); createTrace('a creation left unfinished was found and dropped: ' + why); return null; }
     return d;
   }
