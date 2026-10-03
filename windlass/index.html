@@ -1322,15 +1322,30 @@
     if (asked) [lo, hi] = asked;
     return [lo, hi];
   }
+  // Only a clause that asks for the narrative's length counts: one that tells the narrator to write, tell, keep or make the scene
+  // a length, names the narrative ("a 700-word scene", "600 words long"), or is nothing but the length ("600 words."). A count of
+  // words something in the story holds ("read the 100 words on the plaque", "between 100 and 200 words from the letter") is not one.
   function directorBand(note) {
-    const t = String(note || ''); const N = '(\\d{2,4})'; const WD = '\\s*-?\\s*words?\\b';
+    const N = '(\\d{2,4})'; const WD = '\\s*-?\\s*words?\\b';
     const lim = (n) => Math.min(1500, Math.max(60, Math.round(n)));
     const band = (a, b) => { a = lim(a); b = lim(b); return a <= b ? [a, b] : [b, a]; };
-    let m;
-    if ((m = t.match(new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'i')))) return band(+m[1], +m[2]);
-    if ((m = t.match(new RegExp(N + '\\s*\\+' + WD, 'i'))) || (m = t.match(new RegExp('(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD, 'i'))) || (m = t.match(new RegExp(N + WD + '\\s+or (?:more|longer)', 'i')))) return band(+m[1], +m[1] * 1.25);
-    if ((m = t.match(new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'i')))) return band(+m[1] * 0.6, +m[1]);
-    if ((m = t.match(new RegExp('(?:(?:about|around|roughly|approximately|in|keep it to|make it|aim for)\\s+|~\\s*)' + N + WD, 'i'))) || (m = t.match(new RegExp(N + WD + '\\s+(?:long|in length)', 'i'))) || (m = t.match(new RegExp(N + '-word\\s+(?:scene|turn|reply|narrative|passage|response)', 'i')))) return band(+m[1] * 0.85, +m[1] * 1.1);
+    const forms = [
+      [new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'i'), (m) => band(+m[1], +m[2])],
+      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'i'), (m) => { const n = +(m[1] || m[2] || m[3]); return band(n, n * 1.25); }],
+      [new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'i'), (m) => band(+m[1] * 0.6, +m[1])],
+      [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'i'), (m) => band(+m[1] * 0.85, +m[1] * 1.1)]
+    ];
+    const output = /\b(?:write|tell|narrate|describe|keep|make|give|use|aim|run|expand|extend|stretch|spend|take)\b|\b(?:length|long|scene|turn|reply|response|passage|narrative|narration|story|chapter)\b/i;
+    for (const clause of String(note || '').split(/[.;!?\n]+/)) {
+      for (const [re, read] of forms) {
+        const m = clause.match(re); if (!m) continue;
+        const before = clause.slice(0, m.index), after = clause.slice(m.index + m[0].length);
+        if (/\b(?:read|recite|quote|says?|said|the|those|these|his|her|their|its)\s*$/i.test(before) || /^\s*(?:of|from|on|off|in (?:the|a|his|her|their)|written|carved|printed|engraved|long sign)\b/i.test(after)) break;
+        const bare = !/[a-z]/i.test((before + ' ' + after).replace(/\b(?:about|around|roughly|approximately|in|at least|at most|please|aim for|keep it to|make it)\b/gi, ''));
+        if (bare || output.test(clause)) return read(m);
+        break;
+      }
+    }
     return null;
   }
   // The world's premise in two parts: the setting (shown when creating) and the personal part from "You are …" on, which opens

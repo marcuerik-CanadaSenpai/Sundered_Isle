@@ -69,6 +69,10 @@ async function main() {
     assert.match(prompts[4], /Narrative length: at most 750 words; 600 to 750/, 'a requested lower bound must stay a lower bound');
     assert(await h.turn('Look around', { director: 'Read the 100 words on the plaque aloud.' }), 'incidental word-count turn did not finish');
     assert.doesNotMatch(prompts[5], /at most 100 words/, 'a word count mentioned for another reason must not set the length');
+    assert(await h.turn('Keep talking', { director: 'Write 600 words.' }), 'plain length turn did not finish');
+    assert.match(prompts[6], /Narrative length: at most 660 words; 510 to 660/, 'a plain "write N words" must set the length');
+    assert(await h.turn('Look around', { director: 'Read between 100 and 200 words from the plaque aloud.' }), 'incidental range turn did not finish');
+    assert.doesNotMatch(prompts[7], /at most 200 words/, 'a range of words read from something in the story must not set the length');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -83,6 +87,9 @@ async function main() {
     assert.deepEqual(Array.from(savedTurns[4].band), [600, 750], 'a requested lower bound must reach the saved band');
     assert.deepEqual(Array.from(savedTurns[5].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
       'an incidental word count must leave the selected band alone');
+    assert.deepEqual(Array.from(savedTurns[6].band), [510, 660], 'a plain "write N words" must reach the saved band');
+    assert.deepEqual(Array.from(savedTurns[7].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
+      'an incidental word range must leave the selected band alone');
 
     const worlds = h.window.WINDLASS_WORLDS;
     for (const id of ['sundered', 'mythaven', 'halloway']) {
