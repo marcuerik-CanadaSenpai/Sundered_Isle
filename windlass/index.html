@@ -3375,10 +3375,12 @@
     let d = null, raw = null; try { raw = localStorage.getItem(CREATE_DRAFT_KEY); d = raw ? JSON.parse(raw) : null; } catch (e) { d = raw ? {} : null; }
     if (!d) return null;
     const c = d && d.choices, str = (k) => c[k] == null || typeof c[k] === 'string';
-    const sound = d.v === 1 && c && typeof c === 'object' && !Array.isArray(c) && Number.isFinite(d.at) && (d.tick == null || Number.isFinite(d.tick))
+    // A time must be a real date no later than now (a minute's grace for clock drift), so the age check and the boot log can trust it.
+    const okTime = (t) => Number.isFinite(t) && !Number.isNaN(new Date(t).getTime()) && t <= Date.now() + 60000;
+    const sound = d.v === 1 && c && typeof c === 'object' && !Array.isArray(c) && okTime(d.at) && (d.tick == null || okTime(d.tick))
       && ['name', 'gender', 'background', 'personality', 'weakness', 'rmSpecies', 'rmName', 'rmGender', 'title'].every(str)
       && (c.strengths == null || (Array.isArray(c.strengths) && c.strengths.every((x) => typeof x === 'string')));
-    const why = !sound ? 'unreadable' : !WORLDS[d.worldId] ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
+    const why = !sound ? 'unreadable' : !(typeof d.worldId === 'string' && Object.prototype.hasOwnProperty.call(WORLDS, d.worldId)) ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
     if (why) { clearCreateDraft(); createTrace('a creation left unfinished was found and dropped: ' + why); return null; }
     return d;
   }
