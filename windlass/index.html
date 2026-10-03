@@ -3328,6 +3328,10 @@
   let bootLast = null;
   try { bootLast = localStorage.getItem('windlass.last'); } catch (e) { setSaveNote('local save pointer unavailable', true); }
   newAdventure({}, DEFAULT_WORLD);
+  const bootAdv = adv;
+  // Once the player has started or opened something of their own (a new adventure, the creation or adventures dialog),
+  // the background boot load stands aside: it must not replace their adventure, reopen creation or put up its errors.
+  const bootSuperseded = () => adv !== bootAdv || createToken > 0 || !!$('#dlgCreate').open || !!$('#dlgAdventures').open;
   setBusyUI(false);
   connectSample();
   (async () => {
@@ -3350,10 +3354,19 @@
       snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
     } catch (e) { listError = e; }
     const ids = (snap && snap.docs ? snap.docs.map((d) => d.id) : []);
+    const listed = ids.slice();
     if (bootLast && !ids.includes(bootLast)) ids.push(bootLast);
     const skipped = [];
     for (const id of ids) {
+      if (bootSuperseded()) { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
       try {
+        // This device's pointer can name an adventure that was never saved (a game opened and left before its first
+        // save): when the save list does not have it either, it is forgotten quietly rather than reported as a failure.
+        if (id === bootLast && !listed.includes(id) && !listError) {
+          const snapLast = await db.doc('adventures/' + id).get();
+          if (!snapLast.exists) { try { if (localStorage.getItem('windlass.last') === id) localStorage.removeItem('windlass.last'); } catch (e) {} continue; }
+        }
+        if (bootSuperseded()) return;
         const warning = await loadAdventure(id);
         setSaveNote('loaded');
         // A newer save that could not be opened is said out loud, so the player does not take an older one for the latest.
@@ -3365,14 +3378,16 @@
         const why = (e && e.message) || 'invalid save';
         let title = id; try { const doc = snap && snap.docs && snap.docs.find((x) => x.id === id); const dd = doc && doc.data(); if (dd && typeof dd.title === 'string' && dd.title) title = dd.title; } catch (e2) {}
         skipped.push({ id, title, why });
+        if (bootSuperseded()) continue;
         lastDebug = { prompt: '', raw: '', notes: skipped.map((x) => 'load failed for ' + x.title + ' (' + x.id + '): ' + x.why).concat([(e && e.stack) ? String(e.stack).slice(0, 800) : '']), meta: 'Boot load failure' };
       }
     }
+    if (bootSuperseded()) { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
     if (listError) {
       const why = (listError && listError.code) || (listError && listError.message) || 'storage error';
       setSaveNote('could not read saves: ' + why, true);
       setStatus('Windlass could not read saved adventures (' + why + '). A new adventure can still be started, but cannot load until storage access is restored.', true);
-    } else if (ids.length) {
+    } else if (skipped.length) {
       setSaveNote('saved adventures could not be loaded', true);
       setStatus('None of the saved adventures could be loaded. See Debug for the latest save error, or start a new adventure.', true);
     } else setSaveNote('no saves yet');
