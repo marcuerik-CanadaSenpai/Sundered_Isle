@@ -2294,7 +2294,9 @@
     }
   }
   // Loads a save and returns a warning for the player when something had to be repaired or is missing (null otherwise).
-  async function loadAdventure(id) {
+  // stillWanted (optional) is asked once more right before the save replaces the current adventure; when it says no,
+  // nothing is changed and the load throws code 'superseded'.
+  async function loadAdventure(id, stillWanted) {
     const snap = await db.doc('adventures/' + id).get(); if (!snap.exists) throw new Error('missing');
     const d = snap.data();
     const wid = d && (d.worldId || LEGACY_WORLD);
@@ -2334,6 +2336,7 @@
     const renumbered = orderTurns(turns); cleanAlts(turns);
     // setWorld swaps the global W used everywhere else; only change it after the document and all chunks validate.
     const turnCountMismatch = expectedTurns !== turns.length;
+    if (stillWanted && !stillWanted()) throw Object.assign(new Error('superseded'), { code: 'superseded' });
     const previousAdv = adv, previousWorld = W.id;
     setWorld(wid);
     // A repaired or recovered save rewrites its chunks on the next save.
@@ -3370,7 +3373,7 @@
           if (!snapLast.exists) { try { if (localStorage.getItem('windlass.last') === id) localStorage.removeItem('windlass.last'); } catch (e) {} continue; }
         }
         if (bootSuperseded()) return;
-        const warning = await loadAdventure(id);
+        const warning = await loadAdventure(id, () => !bootSuperseded());
         setSaveNote('loaded');
         // A newer save that could not be opened is said out loud, so the player does not take an older one for the latest.
         const skippedNote = skipped.length ? (skipped.length === 1 ? 'Your most recent save' : skipped.length + ' more recent saves') + ' could not be opened (' + skipped[0].why + '; see Debug), so this is the newest one that could. ' : '';
@@ -3378,6 +3381,7 @@
         else setStatus('Welcome back. Pick up where you left off.');
         return;
       } catch (e) {
+        if (e && e.code === 'superseded') { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
         const why = (e && e.message) || 'invalid save';
         let title = id; try { const doc = snap && snap.docs && snap.docs.find((x) => x.id === id); const dd = doc && doc.data(); if (dd && typeof dd.title === 'string' && dd.title) title = dd.title; } catch (e2) {}
         skipped.push({ id, title, why });

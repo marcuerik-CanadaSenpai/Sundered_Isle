@@ -42,11 +42,13 @@ async function main() {
     b.close();
 
     // With a real save, a new adventure begun during a slow boot load is not replaced by the older save.
-    const c = await boot({ setup(w, m) { m.store = store; m.dbLatency = 1500; } });
-    await c.sleep(200);
+    // The save's own document is slow here, so the boot load is already inside loadAdventure when Begin is pressed.
+    let slowSave = true;
+    const c = await boot({ setup(w, m) { m.store = store; m.dbDelay = (op, path) => (slowSave && op === 'get' && path === 'adventures/' + savedId ? 1500 : 0); } });
+    await c.sleep(300);
     c.click('#newAdv');
     c.click('#cBegin');
-    c.mock.dbLatency = 2;
+    slowSave = false;
     assert(await c.idle(20000), 'creating the second adventure did not finish');
     await c.sleep(3200);
     assert(await c.settle(150, 6000), 'the page did not settle');
