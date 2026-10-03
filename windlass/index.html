@@ -1336,7 +1336,9 @@
     const addSeen = (list) => { for (const raw of (list || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (n) seen.add(n); } };
     addSeen(adv.state && adv.state.present);
     for (const t of adv.turns || []) { addSeen(t.stateBefore && t.stateBefore.present); addSeen(t.stateAfter && t.stateAfter.present); }
-    const people = activeCharacters().map((c) => {
+    // The generated minor figures (a porter, a professor) are named to the narrator too, so meeting one counts.
+    const gen = adv.cast && adv.cast.generated;
+    const people = activeCharacters().concat(gen ? (gen.minors || []) : []).map((c) => {
       // A world's authored people may carry only a full name ("Ines Varga", "Professor Adaline Marsh"): its given name and
       // surname count too, without a title.
       const words = String(c.name || '').split(' ').filter((w) => !/^(?:professor|prof\.?|dr\.?|doctor|mr\.?|mrs\.?|ms\.?|miss|sir|lady|lord|warden)$/i.test(w));
@@ -3372,7 +3374,11 @@
   function readCreateDraft() {
     let d = null, raw = null; try { raw = localStorage.getItem(CREATE_DRAFT_KEY); d = raw ? JSON.parse(raw) : null; } catch (e) { d = raw ? {} : null; }
     if (!d) return null;
-    const why = (d.v !== 1 || !d.choices || typeof d.choices !== 'object') ? 'unreadable' : !WORLDS[d.worldId] ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
+    const c = d && d.choices, str = (k) => c[k] == null || typeof c[k] === 'string';
+    const sound = d.v === 1 && c && typeof c === 'object' && !Array.isArray(c) && Number.isFinite(d.at) && (d.tick == null || Number.isFinite(d.tick))
+      && ['name', 'gender', 'background', 'personality', 'weakness', 'rmSpecies', 'rmName', 'rmGender', 'title'].every(str)
+      && (c.strengths == null || (Array.isArray(c.strengths) && c.strengths.every((x) => typeof x === 'string')));
+    const why = !sound ? 'unreadable' : !WORLDS[d.worldId] ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
     if (why) { clearCreateDraft(); createTrace('a creation left unfinished was found and dropped: ' + why); return null; }
     return d;
   }

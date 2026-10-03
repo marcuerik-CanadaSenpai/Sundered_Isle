@@ -308,7 +308,7 @@ const S = {
   },
   // Old or foreign drafts are dropped quietly (and logged); the normal randomised creation opens.
   async staleDraft() {
-    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, '{not json']) {
+    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, '{not json', { v: 1, worldId: 'sundered', choices: { name: 'Old Name', strengths: {} }, at: Date.now() }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 'yesterday' }]) {
       const h = await boot({ setup(w) { w.localStorage.setItem('windlass.createDraft', typeof d === 'string' ? d : JSON.stringify(d)); } });
       try {
         assert(await h.settle(150, 6000)); assert(h.$('#dlgCreate').open);
@@ -330,7 +330,8 @@ const S = {
   const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(S);
   let failed = 0;
   for (const n of names) {
-    try { await S[n](); console.log('PASS', n); }
+    const before = unhandled;
+    try { await S[n](); await new Promise((r) => setTimeout(r, 50)); assert.equal(unhandled - before, 0, 'unhandled promise rejections during the scenario'); console.log('PASS', n); }
     catch (e) { failed += 1; console.log('FAIL', n, '-', String((e && e.message) || e).split('\n')[0].slice(0, 220)); }
   }
   if (failed) { console.error('CREATE INTERRUPT FAILED: ' + failed + ' of ' + names.length + ' scenarios'); process.exit(1); }

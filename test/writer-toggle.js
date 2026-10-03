@@ -94,6 +94,14 @@ async function main() {
     h.$('#director').value = '';
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'someone new arriving alongside someone known is a first meeting');
 
+    // The generated minor figures are named to the narrator, so meeting one is a first meeting too.
+    const advDoc = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path))[1].data;
+    const present = new Set((advDoc.state.present || []).map((x) => String(x).replace(/\s*\([^)]*\)\s*$/, '').toLowerCase()));
+    const minor = (advDoc.cast.generated.minors || []).find((m) => m.first && m.first.length >= 3 && !present.has(String(m.name).toLowerCase()) && !present.has(m.first.toLowerCase()));
+    assert(minor, 'the test needs a generated minor figure not yet present');
+    assert(await h.turn('Introduce myself to ' + minor.first), 'minor first-meeting turn did not finish');
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'meeting a generated minor figure is a first meeting: ' + minor.name);
+
     // A reply that fails records the tier the runtime was asked for, not the setting.
     const before = tierOf(h, 'turn').length;
     h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? 'not json' : 'A short answer.');
