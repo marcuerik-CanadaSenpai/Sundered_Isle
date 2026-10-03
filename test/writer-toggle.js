@@ -86,6 +86,13 @@ async function main() {
     h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? { text: turnReply() } : 'A short answer.');
     assert(await h.turn('Introduce myself to Tess'), 'human re-introduction turn did not finish');
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a human already present must not count as a first meeting');
+    // A cue belongs to whoever it is said of: Tess arriving does not bring Mira in, but Mira and Tess arriving together does.
+    assert(await h.turn('Stay at the table', { director: 'Mira remains offstage while Tess arrives.' }), 'cue attribution turn did not finish');
+    h.$('#director').value = '';
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'an arrival said of someone already present must not count for someone new in the same clause');
+    assert(await h.turn('Stay at the table', { director: 'Mira and Tess arrive together.' }), 'joint arrival turn did not finish');
+    h.$('#director').value = '';
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'someone new arriving alongside someone known is a first meeting');
 
     // A reply that fails records the tier the runtime was asked for, not the setting.
     const before = tierOf(h, 'turn').length;
@@ -119,6 +126,8 @@ async function main() {
     assert(await h2.turn('Walk along the cloister'), 'Halloway ordinary turn did not finish');
     assert(await h2.turn('Introduce myself to Ines'), 'Halloway first-meeting turn did not finish');
     assert.deepEqual(tierOf(h2, 'turn').slice(-2), ['default', 'complex'], 'auto must take the complex tier for a first meeting in a world without kinds');
+    assert(await h2.turn('introduce myself to ines'), 'lower-case first-meeting turn did not finish');
+    assert.equal(tierOf(h2, 'turn').slice(-1)[0], 'complex', 'a name typed in lower case must still count');
     assert(await h2.turn('Introduce myself to Tobias'), 'Halloway already-present turn did not finish');
     assert.equal(tierOf(h2, 'turn').slice(-1)[0], 'default', 'someone already present is not a first meeting');
     assert(!h2.errors.length && !h2.mock.violations.length, 'page errors or contract violations: ' + JSON.stringify(h2.errors.concat(h2.mock.violations)));

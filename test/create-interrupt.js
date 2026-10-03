@@ -240,6 +240,23 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // If the boot load is still running when the restored screen stops waiting, Begin then Cancel still lands on the newest save.
+  async slowBootBegin() {
+    const { ls, store, savedId } = await reloadMidCreationWithSave();
+    const h = await boot({ setup(w, m) { m.dbDelay = (op, path) => (op === 'query' && path === 'adventures' ? 21000 : 0); for (const [k, v] of Object.entries(ls)) w.localStorage.setItem(k, v); m.store = store; } });
+    try {
+      assert(h.$('#dlgCreate').open && h.$('#cBegin').disabled, 'the restored screen waits for the boot');
+      for (let t = 0; t < 250 && h.$('#cBegin').disabled; t++) await h.sleep(100);
+      assert(!h.$('#cBegin').disabled, 'Begin is offered after the wait even while the save list is slow');
+      h.mock.sampleHandler = null; slowInvention(h.window, h.mock);
+      h.click('#cBegin'); await h.sleep(300); h.click('#dlgCreate [data-close]');
+      for (let t = 0; t < 100 && h.window.localStorage.getItem('windlass.last') !== savedId; t++) await h.sleep(100);
+      assert(await h.settle(150, 10000), 'boot did not settle');
+      assert.equal(h.window.localStorage.getItem('windlass.last'), savedId, 'the boot load must still open the newest save');
+      assert.doesNotMatch(h.$('#feed').textContent, /You are Alex Rowan/, 'not on the placeholder');
+      clean(h);
+    } finally { h.close(); }
+  },
   // Begin now still begins with whoever has arrived.
   async beginNow() {
     const h = await boot({ setup(w, m) { slowInvention(w, m); } });
