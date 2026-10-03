@@ -336,6 +336,7 @@
     <div class="dlg">
       <div class="dlg-head"><h3 id="createTitle">New adventure</h3><button class="close quiet" data-close="dlgCreate">Cancel</button></div>
       <p class="small" id="cPremise"></p>
+      <p class="small notice" id="cRestoreNote" hidden></p>
       <p class="small">Everything starts randomised. Select any text and type over it, pick from the ▾ suggestions, or roll Random again.</p>
       <div class="row"><label for="cPreset" class="small">Preset</label><select id="cPreset" style="flex:1;min-width:160px"><option value="">— none —</option></select><button type="button" class="quiet" id="cPresetSave">Save these choices as a preset</button><button type="button" class="quiet danger" id="cPresetDelete" hidden>Delete preset</button></div>
       <div class="row" id="cPresetSaveRow" hidden><input type="text" id="cPresetName" style="flex:1;min-width:200px" placeholder="Preset name"><button type="button" class="primary" id="cPresetConfirm">Save preset</button><button type="button" class="quiet" id="cPresetCancel">Cancel</button></div>
@@ -462,6 +463,8 @@
       <div class="small" id="dbgMeta">No turn taken yet in this session.</div>
       <h4>Model calls this session <button type="button" class="quiet" id="dbgRefresh">Refresh</button> <button type="button" class="quiet" id="dbgPing">Ping</button> <select id="dbgPingTier"><option value="quick">quick</option><option value="default" selected>default</option><option value="complex">complex</option></select> <select id="dbgPingKind"><option value="pong">pong (32 B)</option><option value="filler">pong after 12 KB of filler</option><option value="names">nine constrained names as JSON</option></select></h4>
       <pre class="debug" id="dbgCalls"></pre>
+      <h4>New adventures</h4>
+      <pre class="debug" id="dbgCreate"></pre>
       <h4>Notes</h4>
       <pre class="debug" id="dbgNotes"></pre>
       <h4>Prompt</h4>
@@ -2623,7 +2626,7 @@
   async function inventCall(Wc, slots, label, opts) {
     if (!sample || !slots.length) return null; opts = opts || {};
     const t0 = performance.now(); const ctl = new AbortController(); let timedOut = false, timer = null;
-    const stopped = new Promise((_, reject) => ctl.signal.addEventListener('abort', () => reject({ code: 'aborted', message: 'stopped' })));
+    const stopped = new Promise((_, reject) => ctl.signal.addEventListener('abort', () => reject({ code: 'aborted', message: 'stopped' }))); stopped.catch(() => {});
     const onOuter = () => ctl.abort(); if (opts.signal) { if (opts.signal.aborted) onOuter(); else opts.signal.addEventListener('abort', onOuter); }
     const avoid = await withTimeout(recentRead(), 4000, { names: [], courses: [], quirks: [] }); const prompt = inventPrompt(Wc, slots, avoid);
     let partial = '';
@@ -2700,7 +2703,7 @@
   // ---------- creation dialog ----------
   let createWorldId = null;
   function creationWorld() { return WORLDS[createWorldId]; }
-  function openCreate(worldId) {
+  function openCreate(worldId, draft) {
     cancelPlayerInvention();
     createWorldId = worldId; const Wc = WORLDS[worldId]; const cr = Wc.creation || {};
     $('#cBegin').disabled = false;
@@ -2722,6 +2725,9 @@
     randomAll(); // everything starts randomised; each field stays editable
     closeCombo();
     $('#cPresetSaveRow').hidden = true; $('#cPresetNote').hidden = true; renderPresets(''); loadPresets(worldId);
+    $('#cRestoreNote').hidden = !draft;
+    if (draft) { applyPreset({ choices: draft.choices }); $('#cTitle').value = String(draft.choices.title || ''); $('#cRestoreNote').textContent = 'This page was reloaded or reopened while your new adventure was being set up (Begin at ' + new Date(draft.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '), so it was never started and nothing was saved. Your choices are back: press Begin to try again, or Cancel to discard them.'; }
+    else clearCreateDraft();   // a fresh creation screen replaces any creation left unfinished
     openDlg('dlgCreate');
   }
   // Until the player types or picks a roommate name, it follows the species and gender (each template has its own names).
@@ -3158,6 +3164,7 @@
   }
   function renderDebug() {
     $('#dbgCalls').textContent = callTrace.length ? traceLines().join('\n') : 'No model calls yet this session.';
+    $('#dbgCreate').textContent = createLog.length ? createLog.slice().reverse().join('\n') : 'No new adventure begun in this browser yet.';
     if (!lastDebug) { $('#dbgMeta').textContent = 'No turn taken yet in this session.'; $('#dbgNotes').textContent = ''; $('#dbgPrompt').textContent = ''; $('#dbgRaw').textContent = ''; return; }
     $('#dbgMeta').textContent = lastDebug.meta; $('#dbgNotes').textContent = lastDebug.notes.filter(Boolean).join('\n') || 'none'; $('#dbgPrompt').textContent = lastDebug.prompt; $('#dbgRaw').textContent = lastDebug.raw;
   }
@@ -3286,31 +3293,80 @@
   $('#dlgCreate .dlg').addEventListener('scroll', () => { if (performance.now() - comboOpenedAt > 400) closeCombo(); });   // a click that scrolls its button into view must not close the menu it opened
   window.addEventListener('resize', closeCombo);
   $('#dlgCreate').addEventListener('close', closeCombo);
-  // Begin invents the people first (a second press, "Begin now", stops the invention and begins with what it has and the pools);
-  // closing the dialog while it runs cancels the creation outright.
-  let createCtl = null, createToken = 0;
-  $('#dlgCreate').addEventListener('close', () => { createToken += 1; cancelPlayerInvention(); if (createCtl) createCtl.abort(); });
+  // Begin invents the people first (a second press, "Begin now", stops the invention and begins with what it has and the pools).
+  // Only Cancel throws a begun creation away, and it says so. A close the player did not ask for with Cancel (the Android
+  // back gesture, Esc) is refused while the cast is invented, and if the browser closes the screen anyway it comes straight
+  // back. Begin leaves a draft in this browser until the adventure is saved, so a reload brings the creation screen back.
+  let createCtl = null, createToken = 0, createT0 = 0, createBackTried = false, bootRestoring = false;
+  const createSecs = () => ((performance.now() - createT0) / 1000).toFixed(1);
+  const CREATE_DRAFT_KEY = 'windlass.createDraft', CREATE_LOG_KEY = 'windlass.createLog', CREATE_DRAFT_MAX_MS = 6 * 3600 * 1000;
+  let createLog = []; try { const l = JSON.parse(localStorage.getItem(CREATE_LOG_KEY) || '[]'); if (Array.isArray(l)) createLog = l.filter((x) => typeof x === 'string').slice(-40); } catch (e) {}
+  function createTrace(msg) { createLog.push(new Date().toISOString().slice(0, 19).replace('T', ' ') + 'Z · ' + msg); createLog = createLog.slice(-40); try { localStorage.setItem(CREATE_LOG_KEY, JSON.stringify(createLog)); } catch (e) {} }
+  function saveCreateDraft(d) { try { localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
+  function clearCreateDraft() { try { localStorage.removeItem(CREATE_DRAFT_KEY); } catch (e) {} }
+  function readCreateDraft() {
+    let d = null, raw = null; try { raw = localStorage.getItem(CREATE_DRAFT_KEY); d = raw ? JSON.parse(raw) : null; } catch (e) { d = raw ? {} : null; }
+    if (!d) return null;
+    const why = (d.v !== 1 || !d.choices || typeof d.choices !== 'object') ? 'unreadable' : !WORLDS[d.worldId] ? 'its world (' + d.worldId + ') is not in this build' : !(Date.now() - (d.tick || d.at) < CREATE_DRAFT_MAX_MS) ? 'more than six hours old' : '';
+    if (why) { clearCreateDraft(); createTrace('a creation left unfinished was found and dropped: ' + why); return null; }
+    return d;
+  }
+  const isPlaceholder = () => !!adv && !adv.rev && !adv.turns.length && !Object.keys(adv.creation || {}).length;
+  $('#dlgCreate').addEventListener('cancel', (e) => {
+    if (!createCtl || createCtl.signal.aborted) return;   // nothing being invented: a close request closes the screen as before
+    createBackTried = true;
+    createTrace('close request (back gesture or Esc) at ' + createSecs() + ' s into the invention; ' + (e.cancelable ? 'refused, the screen stays open' : 'the browser would not let the page refuse it'));
+    if (e.cancelable) e.preventDefault();
+  });
+  $('#dlgCreate').addEventListener('close', () => {
+    cancelPlayerInvention(); bootRestoring = false;
+    if (createCtl && !createCtl.signal.aborted) {
+      createBackTried = true; createTrace('the creation screen was closed by the browser at ' + createSecs() + ' s into the invention; reopened, the invention goes on');
+      openDlg('dlgCreate'); return;
+    }
+    if (!createCtl && isPlaceholder() && $('#status').hidden) setStatus('No adventure has started: this is a preview of the opening, and nothing here is saved.', false, { label: 'New adventure', run: () => openCreate(createWorldId) });
+  });
+  $('#dlgCreate [data-close]').onclick = () => {
+    const running = !!createCtl;
+    // The stopped invention lets go of the screen at once, so a new creation begun before the stop lands is not taken for it.
+    if (running) { createToken += 1; createCtl.abort(); createCtl = null; $('#cBegin').textContent = 'Begin'; $('#cNote').textContent = ''; }
+    createTrace('Cancel pressed' + (running ? ' at ' + createSecs() + ' s into the invention; the new adventure was not created' : ''));
+    clearCreateDraft(); closeDlg('dlgCreate');
+    if (running) setStatus('New adventure cancelled; nothing was saved.', false, isPlaceholder() ? { label: 'New adventure', run: () => openCreate(createWorldId) } : null);
+  };
+  document.addEventListener('visibilitychange', () => { if (createCtl) createTrace('page ' + document.visibilityState + ' at ' + createSecs() + ' s into the invention'); });
+  window.addEventListener('pagehide', (e) => { if (createCtl) createTrace('page unloading' + (e.persisted ? ' (kept for back/forward)' : '') + ' at ' + createSecs() + ' s into the invention'); });
   $('#cBegin').onclick = async () => {
-    if (createCtl) { createCtl.abort(); return; }
+    if (createCtl) { if (!createCtl.signal.aborted) createTrace('Begin now pressed at ' + createSecs() + ' s'); createCtl.abort(); return; }
     if (busy) { $('#cNote').textContent = 'A turn is already running in the current adventure; wait for it to finish first.'; return; }
     cancelPlayerInvention();
     const c = creationChoices();
     if ((WORLDS[createWorldId].creation || {}).traits && c.strengths.length !== 2) { $('#cNote').textContent = 'Pick exactly two strengths.'; return; }
     closeCombo(); inventSeq += 1; const token = ++createToken;
     const Wc = WORLDS[createWorldId]; let prep = null;
+    const draft = { v: 1, worldId: createWorldId, choices: c, at: Date.now() }; saveCreateDraft(draft);
+    $('#cRestoreNote').hidden = true; createBackTried = false;
+    createTrace('Begin pressed: ' + Wc.id + ', roommate ' + JSON.stringify(c.rmSpecies || '(default)') + (sample && Wc.genPools ? ', inventing the cast on the ' + inventTier() + ' tier' : ', no invention (' + (sample ? 'this world draws from its pools' : 'Claude unavailable') + ')'));
     if (sample && Wc.genPools) {
-      createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
-      const t0 = performance.now(); let got = 0, total = 0;
+      const ctl = createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
+      const t0 = performance.now(); createT0 = t0; let got = 0, total = 0;
       const calls = Math.ceil((1 + (Wc.castRoles || []).length + (Wc.minorRoles || []).length) / INVENT_BATCH);
-      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
-      note(); const ticker = setInterval(note, 1000);
-      try { prep = await prepareCreation(Wc, c, createCtl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
-      finally { clearInterval(ticker); createCtl = null; $('#cBegin').textContent = 'Begin'; }
-      if (token !== createToken) { $('#cNote').textContent = ''; return; }
+      const note = () => { if (token !== createToken) return; const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call afterwards.' + (createBackTried ? ' Back does not stop it; Cancel at the top does.' : ''); };
+      // After Cancel the stop can take a moment to land: by then the draft is dropped and the screen may be open on a new creation.
+      note(); const ticker = setInterval(() => { if (token !== createToken) return; note(); draft.tick = Date.now(); draft.secs = Math.round((performance.now() - t0) / 1000); draft.got = got; draft.total = total; saveCreateDraft(draft); }, 1000);
+      try { prep = await prepareCreation(Wc, c, ctl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
+      finally { clearInterval(ticker); if (createCtl === ctl) { createCtl = null; $('#cBegin').textContent = 'Begin'; } }
+      if (token !== createToken) return;   // Cancel, which has said so, dropped the draft and let go of the screen
+      createTrace('cast invention ended after ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s: ' + (prep ? Object.keys(prep.given || {}).length + ' of ' + total + ' people invented, the rest from the pools' : 'failed, all from the pools'));
     }
     $('#cNote').textContent = '';
     $('#cBegin').disabled = true;
-    newAdventure(c, createWorldId, prep || undefined); closeDlg('dlgCreate'); setStatus(''); await persist();
+    const prevAdv = adv, prevWorld = W && W.id;
+    try { newAdventure(c, createWorldId, prep || undefined); }
+    catch (e) { adv = prevAdv; setWorld(prevWorld); renderAll(); $('#cBegin').disabled = false; $('#cNote').textContent = 'The adventure could not be started (' + ((e && e.message) || 'error') + '). Your choices are still here; Begin tries again.'; createTrace('starting the adventure failed: ' + String((e && e.stack) || e).slice(0, 400)); return; }
+    closeDlg('dlgCreate'); setStatus('');
+    const saved = await persist(); clearCreateDraft();
+    createTrace('adventure ' + adv.id + ' started' + (saved ? ' and saved' : ', but not saved'));
     if (prep) lastDebug = { prompt: prep.prompt || '(no invention call)', raw: prep.raw || '', notes: prep.notes.length ? prep.notes : ['the cast was drawn from the pools'], meta: 'Creation · cast invention' };
     rememberCast();
     await writeRoommateIntro();
@@ -3338,7 +3394,13 @@
   const bootAdv = adv;
   // Once the player has started or opened something of their own (a new adventure, the creation or adventures dialog),
   // the background boot load stands aside: it must not replace their adventure, reopen creation or put up its errors.
-  const bootSuperseded = () => adv !== bootAdv || createToken > 0 || !!$('#dlgCreate').open || !!$('#dlgAdventures').open;
+  // A creation restored from the draft does not stand the boot load aside: the newest save loads behind it, so Cancel lands there.
+  const bootSuperseded = () => adv !== bootAdv || createToken > 0 || (!!$('#dlgCreate').open && !bootRestoring) || !!$('#dlgAdventures').open;
+  const bootDraft = readCreateDraft();
+  if (bootDraft) {
+    createTrace('page loaded with a creation left unfinished: Begin at ' + new Date(bootDraft.at).toISOString().slice(11, 19) + 'Z in ' + bootDraft.worldId + (bootDraft.tick ? ', last heard ' + bootDraft.secs + ' s into the invention (' + (bootDraft.got || 0) + ' of ' + (bootDraft.total || '?') + ' arrived), ' + Math.round((Date.now() - bootDraft.tick) / 1000) + ' s before this load' : ', before the invention reported') + '; the creation screen is restored');
+    openCreate(bootDraft.worldId, bootDraft); bootRestoring = true;
+  }
   setBusyUI(false);
   connectSample();
   (async () => {
@@ -3347,12 +3409,13 @@
       downloads = await window.claude.use('downloads');
       db = await window.claude.use('db');
       if (!db) throw new Error('persistent storage capability was not granted');
+      if ($('#dlgCreate').open) loadPresets(createWorldId);   // a creation screen opened before the store was ready lists its presets now
     } catch (e) {
       db = null; downloads = null;
       saveError = 'Windlass cannot save in this view (' + ((e && e.code) || (e && e.message) || 'storage unavailable') + '). Open the artifact in claude.ai and allow persistent storage.';
       setSaveNote('saves unavailable in this view', true);
       setStatus(saveError + ' You can still play, but progress will not be saved.', true, { label: 'Retry storage', run: () => { location.reload(); } });
-      openCreate(DEFAULT_WORLD);
+      if (!$('#dlgCreate').open) openCreate(DEFAULT_WORLD);
       return;
     }
     let snap = null, listError = null;
@@ -3399,7 +3462,7 @@
       setSaveNote('saved adventures could not be loaded', true);
       setStatus('None of the saved adventures could be loaded. See Debug for the latest save error, or start a new adventure.', true);
     } else setSaveNote('no saves yet');
-    openCreate(DEFAULT_WORLD);
+    if (!$('#dlgCreate').open) openCreate(DEFAULT_WORLD);
   })();
 })();
 </script>
