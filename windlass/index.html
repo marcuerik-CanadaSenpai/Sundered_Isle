@@ -1309,11 +1309,13 @@
   // writing matters most (romance, a first meeting, a change under way: the scenes sceneDensity calls rich) and takes the
   // everyday tier otherwise, so an ordinary turn costs less of the player's usage. Both give the roommate's introduction
   // the most capable tier: it is a first meeting written once.
-  // A first meeting: the action asks to meet someone new, or the director note brings someone new in. Someone is new who
-  // has never been listed as present; in a world that tracks kinds, also someone whose kind the player has not yet met.
+  // A first meeting: the action asks to meet someone new, or the director note brings someone new in (an arrival or an
+  // introduction, not a mere mention). Someone is new who has never been listed as present; in a world that tracks kinds,
+  // also someone of a kind the player has not yet met (humans are not a kind to be met, as in recordMet).
   function isFirstMeeting(input) {
     const a = String(input.action || ''), d = String(input.director || '');
     const asked = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i;
+    const arrives = /\b(arriv\w*|enter(?:s|ed|ing)?|appear(?:s|ed|ing)?|join(?:s|ed|ing)?|approach(?:es|ed|ing)?|meet\w*|introduc\w*|first time|show(?:s|ed)? up|turn(?:s|ed)? up|(?:walk|come|comes|came|step|steps|stepped|burst|bursts|wander|wanders)\s+(?:in|into|over|up)|sit(?:s)? down (?:with|beside|next to))\b/i;
     const seen = new Set();
     const addSeen = (list) => { for (const raw of (list || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (n) seen.add(n); } };
     addSeen(adv.state && adv.state.present);
@@ -1324,9 +1326,10 @@
       const words = String(c.name || '').split(' ').filter((w) => !/^(?:professor|prof\.?|dr\.?|doctor|mr\.?|mrs\.?|ms\.?|miss|sir|lady|lord|warden)$/i.test(w));
       const names = [c.first, c.name, words[0], words.length > 1 ? words[words.length - 1] : ''].concat(c.aliases || []).filter(Boolean);
       const handles = names.map((n) => n.toLowerCase());
-      const isNew = !handles.some((h) => seen.has(h)) || (!!W.transformation && !ensureMet(adv.state).includes(speciesKeyOf(c)));
+      const kind = W.transformation ? speciesKeyOf(c) : null;
+      const isNew = !handles.some((h) => seen.has(h)) || (!!kind && kind !== 'human' && !ensureMet(adv.state).includes(kind));
       if (!isNew) return false;
-      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || (!!d && names.some((n) => properWordIn(d, n)));
+      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || (arrives.test(d) && names.some((n) => properWordIn(d, n)));
     });
   }
   function narrTierFor(input) {

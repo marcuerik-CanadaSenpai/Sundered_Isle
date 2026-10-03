@@ -54,9 +54,24 @@ async function main() {
     h.type('#cfName', 'Mira Holt'); h.type('#cfSpecies', 'Fox');
     h.click('#cfSave');
     assert(await h.settle(80, 4000), 'saving the test character did not finish');
+    assert(await h.turn('Stay at the table', { director: 'Mira remains offstage; remember what Mira said.' }), 'director mention turn did not finish');
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a director note that only mentions someone new must not count as a first meeting');
     assert(await h.turn('Stay at the table', { director: 'Mira arrives and sits down.' }), 'director first-meeting turn did not finish');
     h.$('#director').value = '';
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'auto must take the complex tier when the director note brings in someone new');
+
+    // A human already present is not new again: humans are never a kind to be met in a world that tracks kinds.
+    h.click('#btnCast'); h.click('#castAdd');
+    assert(await h.settle(80, 4000), 'adding a human did not finish');
+    h.type('#cfName', 'Tess Ward'); h.type('#cfSpecies', 'Human');
+    h.click('#cfSave');
+    assert(await h.settle(80, 4000), 'saving the human did not finish');
+    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input))
+      ? { text: JSON.stringify(Object.assign(JSON.parse(turnReply()), { state_updates: [{ key: 'present', op: 'append', value: ['Tess Ward'] }] })) } : 'A short answer.');
+    assert(await h.turn('Wave at Tess Ward across the room'), 'human arrival turn did not finish');
+    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? { text: turnReply() } : 'A short answer.');
+    assert(await h.turn('Introduce myself to Tess'), 'human re-introduction turn did not finish');
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a human already present must not count as a first meeting');
 
     // A reply that fails records the tier the runtime was asked for, not the setting.
     const before = tierOf(h, 'turn').length;
