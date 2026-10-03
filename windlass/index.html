@@ -1319,31 +1319,35 @@
     // A director note that asks for a length ("about 600 words", "at least 600 words", "400 to 600 words") sets the band, so the
     // prompt and the length fit agree with it. A number of words mentioned for any other reason ("the 100 words on the plaque") is not a length.
     const asked = directorBand(input.director);
-    if (asked) [lo, hi] = asked;
+    input.bandFloor = !!(asked && asked.floor);
+    if (asked) [lo, hi] = asked.band;
     return [lo, hi];
   }
-  // Only a clause that asks for the narrative's length counts: one that tells the narrator to write, tell, keep or make the scene
-  // a length, names the narrative ("a 700-word scene", "600 words long"), or is nothing but the length ("600 words."). A count of
-  // words something in the story holds ("read the 100 words on the plaque", "between 100 and 200 words from the letter") is not one.
+  // Only a count tied to the narrative counts: one that a write/tell/keep/make verb governs directly ("write about 600 words",
+  // "keep the scene under 300 words"), one that names the narrative ("a 700-word scene", "800 words long"), or a clause that is
+  // nothing but the length ("600 words."). A count of words something in the story holds ("read the 100 words on the plaque",
+  // "describe the plaque containing 100 words") is not one. A range or a minimum is a floor: a reply below it is expanded.
   function directorBand(note) {
     const N = '(\\d{2,4})'; const WD = '\\s*-?\\s*words?\\b';
     const lim = (n) => Math.min(1500, Math.max(60, Math.round(n)));
     const band = (a, b) => { a = lim(a); b = lim(b); return a <= b ? [a, b] : [b, a]; };
     const forms = [
-      [new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'i'), (m) => band(+m[1], +m[2])],
-      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'i'), (m) => { const n = +(m[1] || m[2] || m[3]); return band(n, n * 1.25); }],
-      [new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'i'), (m) => band(+m[1] * 0.6, +m[1])],
-      [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'i'), (m) => band(+m[1] * 0.85, +m[1] * 1.1)]
+      [new RegExp('(?:between\\s+)?' + N + '\\s*(?:-|–|to|and)\\s*' + N + WD, 'gi'), (m) => ({ band: band(+m[1], +m[2]), floor: true })],
+      [new RegExp(N + '\\s*\\+' + WD + '|(?:at least|no (?:fewer|less) than|(?<!no )more than|over|a minimum of)\\s+' + N + WD + '|' + N + WD + '\\s+or (?:more|longer)', 'gi'), (m) => { const n = +(m[1] || m[2] || m[3]); return { band: band(n, n * 1.25), floor: true }; }],
+      [new RegExp('(?:at most|no more than|up to|under|fewer than|less than|a maximum of)\\s+' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.6, +m[1]), floor: false })],
+      [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.85, +m[1] * 1.1), floor: false })]
     ];
-    const output = /\b(?:write|tell|narrate|describe|keep|make|give|use|aim|run|expand|extend|stretch|spend|take)\b|\b(?:length|long|scene|turn|reply|response|passage|narrative|narration|story|chapter)\b/i;
-    for (const clause of String(note || '').split(/[.;!?\n]+/)) {
+    const noun = '(?:scene|turn|reply|response|passage|narrative|narration|story|chapter)';
+    const governed = new RegExp('\\b(?:write|tell|narrate|keep|make|give|use|aim for|run|expand|extend|stretch|spend|take)\\b(?:\\s+(?:it|this|me|that|the|whole|' + noun + '|in|to|at|should|must|be|is|just))*\\s*$', 'i');
+    const named = new RegExp('(?:^|\\b' + noun + '\\b(?:\\s+(?:should|must|is|be|at|in|to|just))*)\\s*$', 'i');
+    const after = new RegExp('^\\s*(?:long\\b|in length\\b|' + noun + '\\b)', 'i');
+    for (const clause of String(note || '').split(/[.;!?\n,]+|\band then\b|\bthen\b/i)) {
       for (const [re, read] of forms) {
-        const m = clause.match(re); if (!m) continue;
-        const before = clause.slice(0, m.index), after = clause.slice(m.index + m[0].length);
-        if (/\b(?:read|recite|quote|says?|said|the|those|these|his|her|their|its)\s*$/i.test(before) || /^\s*(?:of|from|on|off|in (?:the|a|his|her|their)|written|carved|printed|engraved|long sign)\b/i.test(after)) break;
-        const bare = !/[a-z]/i.test((before + ' ' + after).replace(/\b(?:about|around|roughly|approximately|in|at least|at most|please|aim for|keep it to|make it)\b/gi, ''));
-        if (bare || output.test(clause)) return read(m);
-        break;
+        for (const m of clause.matchAll(re)) {
+          const before = clause.slice(0, m.index), rest = clause.slice(m.index + m[0].length);
+          const bare = !/[a-z]/i.test((before + ' ' + rest).replace(/\b(?:please|just|aim for|keep it to|make it|in)\b/gi, ''));
+          if (/-word$/i.test(m[0].trim()) ? after.test(rest) : (bare || governed.test(before) || after.test(rest) || (named.test(before) && before.trim()))) return read(m);
+        }
       }
     }
     return null;
@@ -1505,7 +1509,7 @@
       const skillTotals = W.skills ? '; skills, for magic and craft: ' + Object.keys(W.skills).map((k) => k + ' ' + (d6 + skillLevel((S.skills || {})[k]))).join(', ') : '';
       actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
     }
-    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + band[0] + ' to ' + band[1] + ' when the scene earns it' + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
+    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + (turnInput.bandFloor ? 'at least ' + band[0] + ', as the director note requires' : band[0] + ' to ' + band[1] + ' when the scene earns it') + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
@@ -1756,6 +1760,11 @@
       setStatus('fitting length (' + words + ' words)…');
       try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= 50 && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
+    } else if (allowFit && adv.settings.autoFit && sample && input.bandFloor && words < band[0]) {
+      // The director asked for at least this length, so a reply below it is expanded rather than kept.
+      setStatus('fitting length (' + words + ' words)…');
+      try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= band[0] * 0.9 && wc(fitted) <= band[1] * 1.12 && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length expanded ' + words + ' → ' + wc(fitted) + ' words for the director note'); out.narrative = fitted; words = wc(fitted); } else notes.push('length expansion returned unusable text; kept the original'); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length expansion failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };

@@ -13,9 +13,10 @@ async function startAdventure() {
 async function main() {
   const h = await startAdventure();
   try {
-    const prompts = [];
+    const prompts = []; const fits = [];
     h.mock.sampleHandler = (input) => {
       const prompt = Array.isArray(input) ? input.map((m) => m.content).join('\n') : String(input);
+      if (/Rewrite it to between/.test(prompt)) { fits.push(prompt); return Array(640).fill('moment').join(' '); }
       if (prompt.includes('You are the storyteller for an interactive text adventure')) prompts.push(prompt);
       return JSON.stringify({
         evaluation: { stat: 'none', outcome: 'none' },
@@ -66,13 +67,20 @@ async function main() {
     assert.match(prompts[3], /Narrative length: at most 660 words; 510 to 660/, 'a director-requested length must set the prompt band');
     assert.match(prompts[3], /"narrative": string, at most 660 words/, 'the output format must use the director-requested length');
     assert(await h.turn('Keep talking', { director: 'Tell it in 600+ words.' }), 'director lower-bound turn did not finish');
-    assert.match(prompts[4], /Narrative length: at most 750 words; 600 to 750/, 'a requested lower bound must stay a lower bound');
+    assert.match(prompts[4], /Narrative length: at most 750 words; at least 600, as the director note requires/, 'a requested lower bound must stay a lower bound');
+    assert.equal(fits.length, 1, 'only the reply below a requested minimum must be fitted');
+    assert.match(fits[0], /Rewrite it to between 600 and 750 words/, 'a reply below a requested minimum must be expanded into the band');
     assert(await h.turn('Look around', { director: 'Read the 100 words on the plaque aloud.' }), 'incidental word-count turn did not finish');
     assert.doesNotMatch(prompts[5], /at most 100 words/, 'a word count mentioned for another reason must not set the length');
     assert(await h.turn('Keep talking', { director: 'Write 600 words.' }), 'plain length turn did not finish');
     assert.match(prompts[6], /Narrative length: at most 660 words; 510 to 660/, 'a plain "write N words" must set the length');
     assert(await h.turn('Look around', { director: 'Read between 100 and 200 words from the plaque aloud.' }), 'incidental range turn did not finish');
     assert.doesNotMatch(prompts[7], /at most 200 words/, 'a range of words read from something in the story must not set the length');
+    assert(await h.turn('Look around', { director: 'Describe the plaque containing 100 words.' }), 'incidental description turn did not finish');
+    assert.doesNotMatch(prompts[8], /at most 110 words/, 'a count describing something in the story must not set the length');
+    assert(await h.turn('Keep talking', { director: 'Read 100 words aloud, then write about 600 words.' }), 'mixed-count turn did not finish');
+    assert.match(prompts[9], /Narrative length: at most 660 words; 510 to 660/, 'a later narrative length must win over an earlier incidental count');
+    assert.equal(fits.length, 1, 'turns without a requested minimum must not be expanded');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
@@ -85,6 +93,7 @@ async function main() {
     assert.deepEqual(Array.from(savedTurns[3].band), [510, 660],
       'a director-requested length must set the band the length fit uses');
     assert.deepEqual(Array.from(savedTurns[4].band), [600, 750], 'a requested lower bound must reach the saved band');
+    assert.equal(savedTurns[4].words, 640, 'the expanded reply must be the one saved');
     assert.deepEqual(Array.from(savedTurns[5].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.standard),
       'an incidental word count must leave the selected band alone');
     assert.deepEqual(Array.from(savedTurns[6].band), [510, 660], 'a plain "write N words" must reach the saved band');
