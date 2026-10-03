@@ -277,6 +277,30 @@ async function checkChunkRecoveryRevision() {
     assert(await h.settle(100, 8000), 'loading the shorter save did not finish');
     assert.deepEqual(visibleActions(h), [], 'a chunk from an already committed revision must not resurrect removed turns');
     assert.equal(entry.data.turnCount, 0);
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
+async function checkCreationFallbackPreservesChoices() {
+  const h = await boot({});
+  try {
+    assert(await h.settle(150, 6000), 'the page did not settle after boot');
+    h.mock.sampleHandler = (input, options, call) => {
+      if (call.label === 'cast invention') throw { code: 'upstream_error', message: 'simulated generation failure' };
+      return h.mock.defaultHandler(input, options, call);
+    };
+    h.type('#cName', 'Morgan Vale');
+    h.click('#cBegin');
+    assert(await h.idle(15000), 'adventure creation did not finish after cast invention failed');
+
+    const [, entry] = adventureEntry(h);
+    assert.equal(entry.data.player.name, 'Morgan Vale', 'fallback generation must preserve the player name selected in the creation dialog');
+    assert(entry.data.cast.generated.characters.length > 0, 'the world pools should still generate cast members when invention fails');
+    assert(entry.data.roommate, 'the roommate should still be generated when invention fails');
 
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
@@ -293,6 +317,7 @@ async function checkChunkRecoveryRevision() {
   await checkStaleImportRecovery();
   await checkGeneratedRoommateReplacement();
   await checkChunkRecoveryRevision();
+  await checkCreationFallbackPreservesChoices();
   console.log('review regressions passed');
 })().catch((error) => {
   console.error('REVIEW REGRESSIONS FAILED\n' + (error && error.stack || error));
