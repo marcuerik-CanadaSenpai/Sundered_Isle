@@ -1330,9 +1330,10 @@
       const kind = W.transformation ? speciesKeyOf(c) : null;
       const isNew = !handles.some((h) => seen.has(h)) || (!!kind && kind !== 'human' && !ensureMet(adv.state).includes(kind));
       if (!isNew) return false;
-      // The note is read clause by clause, and a clause that negates its cue ("Mira does not arrive") brings nobody in.
-      const broughtIn = d.split(/[.;:!?\n]+|,\s*(?:but|and then|then)\b|\bbut\b/i).some((cl) => arrives.test(cl) && !negated.test(cl) && names.some((n) => properWordIn(cl, n)));
-      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || broughtIn;
+      // The action and the note are read clause by clause, and a clause that negates its cue ("Mira does not arrive",
+      // "do not introduce me to Mira") brings nobody in.
+      const cued = (text, cue) => text.split(/[.;:!?\n]+|,\s*(?:but|and then|then)\b|\bbut\b/i).some((cl) => cue.test(cl) && !negated.test(cl) && names.some((n) => properWordIn(cl, n)));
+      return cued(a, asked) || cued(d, arrives);
     });
   }
   function narrTierFor(input) {
