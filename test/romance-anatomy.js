@@ -33,11 +33,11 @@ async function main() {
     assert.match(prompt, /Romance scene pacing \(binding\)/, 'the scene-specific romance directive must reach the narrator');
     assert.match(prompt, /one specific reciprocal beat at a time/, 'intimacy must be paced as discrete beats');
     assert.match(prompt, /Consensual adult sex may be depicted on-page when requested/,
-      'the romance prompt must not require sex to remain off-page');
-    assert.match(prompt, /do not fade to black, cut away, or end the scene merely because requested consensual sex begins/,
-      'the romance prompt must explicitly prohibit reintroducing a sex-triggered cutaway');
-    assert.doesNotMatch(prompt, /sex is not depicted|sex remains off-page/i,
-      'the romance prompt must not reinstate the off-page restriction');
+      'the romance prompt must allow requested consensual adult sex on-page');
+    assert.doesNotMatch(prompt, /fade to black|sex is not depicted|sex remains off-page/i,
+      'the romance prompt must not reinstate an off-page restriction');
+    assert.match(prompt, /Do not presume consent or decide the player's desire, feelings or next action/,
+      'on-page intimacy must preserve consent and player agency');
     assert.match(prompt, /Body detail \(binding\)/, 'scene-specific anatomical guidance must reach the narrator');
     assert.match(prompt, /Do not replace a named feature with generic warmth or euphemism/, 'established anatomy must not be euphemized');
     assert.match(prompt, /Narrative length:.*640 words/i, 'the rich scene band must be enforced for romance');
@@ -129,10 +129,10 @@ async function main() {
       assert.match(rules, /romance/i, id + ' must permit romance');
       assert.match(rules, /consensual adult sex may be (?:described|depicted) on-page when requested/i,
         id + ' must permit consensual adult sex on-page when requested');
-      assert.match(rules, /do not fade to black or cut away merely because requested consensual sex begins/i,
-        id + ' must prevent a sex-triggered fade-out');
-      assert.doesNotMatch(rules, /sex is not|sex remains off-page/i,
+      assert.doesNotMatch(rules, /sex is not|sex remains off-page|fade to black/i,
         id + ' must not require sex to remain off-page');
+      assert.match(rules, /never presume consent or decide the player's desire or actions/i,
+        id + ' must preserve consent and player agency');
       assert.match(rules, /accurate, neutral terms|anatomical accuracy/i, id + ' must have an affirmative anatomy rule');
       assert.doesNotMatch(rules, /Content: no sexual content/i, id + ' must not blanket-suppress romance');
     }
