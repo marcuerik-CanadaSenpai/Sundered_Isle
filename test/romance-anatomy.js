@@ -102,6 +102,9 @@ async function main() {
       'a person the director note brings in must be in focus, not shut out by it');
     assert.match(prompts[13], /unless the action or the director note invites it/,
       'the focus rule must leave room for the director note');
+    assert(await h.turn('Stay at the table', { director: 'Have Luna write 100 words in her journal.' }), 'in-story writing turn did not finish');
+    assert.doesNotMatch(prompts[14], /at most 110 words/, 'words a character writes in the story must not set the narrative length');
+    assert.equal(fits.length, 4, 'an in-story word count must not trigger a length fit');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');

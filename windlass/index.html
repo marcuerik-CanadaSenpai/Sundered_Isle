@@ -1338,7 +1338,9 @@
       [new RegExp('(?:(?:about|around|roughly|approximately)\\s+|~\\s*)?' + N + WD, 'gi'), (m) => ({ band: band(+m[1] * 0.85, +m[1] * 1.1), floor: false })]
     ];
     const noun = '(?:scene|turn|reply|response|passage|narrative|narration|story|chapter)';
-    const governed = new RegExp('\\b(?:write|tell|narrate|keep|make|give|use|aim for|run|expand|extend|stretch|spend|take)\\b(?:\\s+(?:it|this|me|that|the|whole|' + noun + '|in|to|at|should|must|be|is|just))*\\s*$', 'i');
+    // The verb must open the clause (after at most a polite lead-in), so it is an instruction to the narrator and not something a
+    // character does in the story ("have Luna write 100 words in her journal").
+    const governed = new RegExp('^\\s*(?:(?:please|now|just|ok|okay|and|so|narrator|could you|can you|would you|i want you to|i\'d like you to)[\\s,:]+)*(?:write|tell|narrate|keep|make|give|use|aim for|run|expand|extend|stretch|spend|take)\\b(?:\\s+(?:it|this|me|that|the|whole|' + noun + '|in|to|at|should|must|be|is|just))*\\s*$', 'i');
     const named = new RegExp('(?:^|\\b' + noun + '\\b(?:\\s+(?:should|must|is|be|at|in|to|just))*)\\s*$', 'i');
     const after = new RegExp('^\\s*(?:long\\b|in length\\b|' + noun + '\\b)', 'i');
     for (const clause of String(note || '').split(/[.;!?\n,]+|\band then\b|\bthen\b/i)) {
@@ -1346,6 +1348,7 @@
         for (const m of clause.matchAll(re)) {
           const before = clause.slice(0, m.index), rest = clause.slice(m.index + m[0].length);
           const bare = !/[a-z]/i.test((before + ' ' + rest).replace(/\b(?:please|just|aim for|keep it to|make it|in)\b/gi, ''));
+          if (/^\s*(?:of|from|on|off|into|onto|in (?:the|a|an|his|her|their|my|your|its|our)|written|carved|printed|engraved)\b/i.test(rest)) continue;
           if (/-word$/i.test(m[0].trim()) ? after.test(rest) : (bare || governed.test(before) || after.test(rest) || (named.test(before) && before.trim()))) return read(m);
         }
       }
