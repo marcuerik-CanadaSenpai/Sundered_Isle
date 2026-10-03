@@ -1316,6 +1316,7 @@
     const a = String(input.action || ''), d = String(input.director || '');
     const asked = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i;
     const arrives = /\b(arriv\w*|enter(?:s|ed|ing)?|appear(?:s|ed|ing)?|join(?:s|ed|ing)?|approach(?:es|ed|ing)?|meet\w*|introduc\w*|first time|show(?:s|ed)? up|turn(?:s|ed)? up|(?:walk|come|comes|came|step|steps|stepped|burst|bursts|wander|wanders)\s+(?:in|into|over|up)|sit(?:s)? down (?:with|beside|next to))\b/i;
+    const negated = /\b(?:not|never|no longer|nor|without|don't|doesn't|didn't|won't|isn't|aren't|can't|cannot|mustn't|shouldn't|offstage|off-stage|absent|away)\b|n't\b/i;
     const seen = new Set();
     const addSeen = (list) => { for (const raw of (list || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (n) seen.add(n); } };
     addSeen(adv.state && adv.state.present);
@@ -1329,7 +1330,9 @@
       const kind = W.transformation ? speciesKeyOf(c) : null;
       const isNew = !handles.some((h) => seen.has(h)) || (!!kind && kind !== 'human' && !ensureMet(adv.state).includes(kind));
       if (!isNew) return false;
-      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || (arrives.test(d) && names.some((n) => properWordIn(d, n)));
+      // The note is read clause by clause, and a clause that negates its cue ("Mira does not arrive") brings nobody in.
+      const broughtIn = d.split(/[.;:!?\n]+|,\s*(?:but|and then|then)\b|\bbut\b/i).some((cl) => arrives.test(cl) && !negated.test(cl) && names.some((n) => properWordIn(cl, n)));
+      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || broughtIn;
     });
   }
   function narrTierFor(input) {

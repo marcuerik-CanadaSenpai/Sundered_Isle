@@ -56,6 +56,8 @@ async function main() {
     assert(await h.settle(80, 4000), 'saving the test character did not finish');
     assert(await h.turn('Stay at the table', { director: 'Mira remains offstage; remember what Mira said.' }), 'director mention turn did not finish');
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a director note that only mentions someone new must not count as a first meeting');
+    assert(await h.turn('Stay at the table', { director: 'Mira does not arrive; keep her offstage.' }), 'negated arrival turn did not finish');
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a director note that says someone new does not arrive must not count as a first meeting');
     assert(await h.turn('Stay at the table', { director: 'Mira arrives and sits down.' }), 'director first-meeting turn did not finish');
     h.$('#director').value = '';
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'auto must take the complex tier when the director note brings in someone new');
