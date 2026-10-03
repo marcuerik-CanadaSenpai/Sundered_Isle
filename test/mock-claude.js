@@ -11,6 +11,7 @@
 // mock.violations before it is thrown, so a probe can trust an empty violations list.
 // Knobs: mock.disable = {db:true, sample:true, downloads:true}; mock.sampleHandler(input, opts, call) -> string | {text, truncated} | throws {code,message}
 //        mock.dbFail = (op, path) => error|null ; mock.dbDelay = (op, path) => extra ms ; mock.dbLatency ; mock.sampleLatency ; mock.downloadsDecline
+//        mock.useLatency: ms before each claude.use() answers (a slow runtime handshake)
 
 const MAX_DOC = 256 * 1024, MAX_DOCS = 5000, MAX_PROMPT = 65536;
 const utf8 = (s) => (typeof Buffer !== 'undefined' ? Buffer.byteLength(s, 'utf8') : new TextEncoder().encode(s).length);
@@ -29,7 +30,7 @@ function install(window, opts) {
   opts = opts || {};
   const mock = {
     violations: [], sampleCalls: [], dbLog: [], downloadsLog: [], store: new Map(),
-    disable: {}, dbFail: null, dbDelay: null, dbLatency: 2, sampleLatency: 3, downloadsDecline: false, sampleHandler: null,
+    disable: {}, dbFail: null, dbDelay: null, dbLatency: 2, sampleLatency: 3, useLatency: 0, downloadsDecline: false, sampleHandler: null,
     inflight: new Map(), pending: 0, calls: { db: 0, sample: 0 },
   };
   const violate = (kind, detail) => { mock.violations.push({ kind, detail }); };
@@ -233,7 +234,7 @@ function install(window, opts) {
   // ---------- claude.use ----------
   win.claude = Object.freeze({
     use: async (name) => {
-      await wait(1);
+      await wait(1 + mock.useLatency);
       if (name === 'db') return mock.disable.db ? null : dbNs;
       if (name === 'sample') return mock.disable.sample ? null : sample;
       if (name === 'downloads') return mock.disable.downloads ? null : dlNs;

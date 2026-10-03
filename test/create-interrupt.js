@@ -38,6 +38,16 @@ function closeRequest(h, cancelable) {
 const debugCreate = (h) => { h.click('#btnDebug'); const el = h.$('#dbgCreate'); const t = el ? el.textContent : '(no #dbgCreate)'; h.click('[data-close="dlgDebug"]'); return t; };
 const clean = (h) => assert(!h.errors.length && !h.mock.violations.length, 'page errors or contract violations: ' + JSON.stringify(h.errors.concat(h.mock.violations)));
 
+// One saved adventure, then a new creation interrupted by a reload: the localStorage and store the next page boots from.
+async function reloadMidCreationWithSave() {
+  const h0 = await boot({}); await h0.settle(150, 6000); h0.click('#cBegin'); assert(await h0.idle(20000)); await h0.settle(150, 6000);
+  const savedId = advDocs(h0.mock)[0][0].split('/')[1]; const store0 = h0.mock.store; h0.close();
+  const h1 = await boot({ setup(w, m) { m.store = store0; slowInvention(w, m); } });
+  await h1.settle(150, 6000); h1.click('#btnAdventures'); h1.click('#newAdv'); await h1.sleep(50);
+  h1.type('#cRmSpecies', 'cow'); h1.click('#cBegin'); await h1.sleep(1500);
+  const ls = lsDump(h1.window); const store = h1.mock.store; h1.close();
+  return { ls, store, savedId };
+}
 async function reloadRestoresIn(world) {
   const h1 = await boot({ setup(w, m) { slowInvention(w, m); } });
   await startCow(h1, { at: 2500, world: world === 'sundered' ? null : world });
@@ -134,6 +144,102 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // A first save that fails keeps the draft, so a reload still brings the choices back; the save that lands drops it.
+  async saveFails() {
+    const h1 = await boot({});
+    assert(await h1.settle(150, 6000), 'boot did not settle');
+    h1.mock.dbFail = (op, path) => (op === 'set' && /^adventures\/[^/]+$/.test(path) ? { code: 'unavailable', message: 'test outage' } : null);
+    h1.type('#cName', 'Erik Marcu'); h1.type('#cRmSpecies', 'cow'); h1.click('#cBegin');
+    assert(await h1.idle(30000), 'creation did not finish'); await h1.settle(150, 6000);
+    assert.equal(advDocs(h1.mock).length, 0, 'the save must have failed');
+    const kept = JSON.parse(h1.window.localStorage.getItem('windlass.createDraft') || 'null');
+    assert(kept && kept.advId, 'a failed first save must keep the draft');
+    const ls = lsDump(h1.window); const store = h1.mock.store; h1.close();
+    const h = await boot({ setup(w, m) { for (const [k, v] of Object.entries(ls)) w.localStorage.setItem(k, v); m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      assert(h.$('#dlgCreate').open && h.$('#cName').value === 'Erik Marcu' && h.$('#cRmSpecies').value === 'cow', 'the reload must bring the choices back');
+      h.click('#cBegin'); assert(await h.idle(30000), 'creation did not finish'); await h.settle(150, 6000);
+      assert.equal(advDocs(h.mock).length, 1, 'the second try is saved');
+      assert.equal(h.window.localStorage.getItem('windlass.createDraft'), null, 'the save that lands drops the draft');
+      clean(h);
+    } finally { h.close(); }
+  },
+  // A draft whose adventure was saved after all (the page went between the save and the draft's removal) opens that adventure.
+  async savedAfterAll() {
+    const h0 = await boot({}); await h0.settle(150, 6000); h0.click('#cBegin'); assert(await h0.idle(20000)); await h0.settle(150, 6000);
+    const savedId = advDocs(h0.mock)[0][0].split('/')[1]; const store = h0.mock.store; h0.close();
+    const draft = { v: 1, worldId: 'sundered', choices: { name: 'Erik Marcu', rmSpecies: 'cow' }, at: Date.now(), advId: savedId };
+    const h = await boot({ setup(w, m) { m.store = store; w.localStorage.setItem('windlass.last', savedId); w.localStorage.setItem('windlass.createDraft', JSON.stringify(draft)); } });
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      assert(!h.$('#dlgCreate').open, 'the creation screen must close once its adventure is found saved');
+      assert.equal(h.window.localStorage.getItem('windlass.last'), savedId, 'that adventure is the one open');
+      assert.match(h.$('#status').textContent, /Welcome back/, 'it opens as a saved adventure: ' + h.$('#status').textContent);
+      assert.equal(h.window.localStorage.getItem('windlass.createDraft'), null, 'the draft is dropped');
+      assert.match(debugCreate(h), /saved after all/, 'Debug must say so');
+      clean(h);
+    } finally { h.close(); }
+  },
+  // A restored creation screen dismissed with back (or Esc) drops its draft, so it does not come back over the game on later loads.
+  async dismissRestored() {
+    const { ls, store, savedId } = await reloadMidCreationWithSave();
+    const h2 = await boot({ setup(w, m) { for (const [k, v] of Object.entries(ls)) w.localStorage.setItem(k, v); m.store = store; } });
+    let ls2, store2;
+    try {
+      assert(await h2.settle(150, 6000), 'boot did not settle');
+      assert(h2.$('#dlgCreate').open, 'the creation is restored');
+      assert(!closeRequest(h2, true), 'with nothing being invented a close request goes through');
+      assert(!h2.$('#dlgCreate').open, 'back closes the restored screen');
+      assert.equal(h2.window.localStorage.getItem('windlass.createDraft'), null, 'dismissing the restored screen drops its draft');
+      assert.match(debugCreate(h2), /closed without Begin/, 'Debug must say the choices were dropped');
+      ls2 = lsDump(h2.window); store2 = h2.mock.store; clean(h2);
+    } finally { h2.close(); }
+    const h3 = await boot({ setup(w, m) { for (const [k, v] of Object.entries(ls2)) w.localStorage.setItem(k, v); m.store = store2; } });
+    try {
+      assert(await h3.settle(150, 6000), 'boot did not settle');
+      assert(!h3.$('#dlgCreate').open, 'the next load must not bring the dismissed creation back');
+      assert.equal(h3.window.localStorage.getItem('windlass.last'), savedId, 'the save opens');
+      clean(h3);
+    } finally { h3.close(); }
+  },
+  // Cancel on a restored screen before the boot has finished, with no saves: the boot does not open a fresh creation over it.
+  async cancelDuringBoot() {
+    const draft = { v: 1, worldId: 'mythaven', choices: { name: 'Erik Marcu', rmSpecies: 'cow' }, at: Date.now() };
+    const h = await boot({ setup(w, m) { m.dbLatency = 400; w.localStorage.setItem('windlass.createDraft', JSON.stringify(draft)); } });
+    try {
+      assert(h.$('#dlgCreate').open, 'the creation is restored at once');
+      await h.sleep(250); h.click('#dlgCreate [data-close]');
+      assert(await h.settle(300, 10000), 'boot did not settle');
+      assert(!h.$('#dlgCreate').open, 'the boot must not open a fresh creation screen after Cancel');
+      assert.equal(h.$('#summaryNote').textContent, 'no saves yet');
+      assert(!h.$('#status').hidden && /preview/.test(h.$('#status').textContent), 'the placeholder must be called a preview: ' + h.$('#status').textContent);
+      clean(h);
+    } finally { h.close(); }
+  },
+  // Begin on a restored screen waits until Claude and the saves are ready; then Cancel lands on the newest save, not the placeholder.
+  async earlyBegin() {
+    const { ls, store, savedId } = await reloadMidCreationWithSave();
+    const h = await boot({ setup(w, m) { m.useLatency = 1200; for (const [k, v] of Object.entries(ls)) w.localStorage.setItem(k, v); m.store = store; } });
+    try {
+      assert(h.$('#dlgCreate').open, 'the creation is restored at once');
+      await h.sleep(200);
+      assert(h.$('#cBegin').disabled && /ready/.test(h.$('#cNote').textContent), 'Begin must wait for Claude and the saves: ' + h.$('#cNote').textContent);
+      h.click('#cBegin'); await h.sleep(50);
+      assert.equal(h.mock.sampleCalls.filter((c) => c.label === 'cast invention').length, 0, 'an early Begin must not start anything');
+      for (let t = 0; t < 100 && h.$('#cBegin').disabled; t++) await h.sleep(100);   // settle() cannot see a slow handshake
+      assert(await h.settle(150, 10000), 'boot did not settle');
+      assert(!h.$('#cBegin').disabled, 'Begin is available once ready'); assert.doesNotMatch(h.$('#cNote').textContent, /ready/);
+      assert.equal(h.window.localStorage.getItem('windlass.last'), savedId, 'the newest save has loaded behind the screen');
+      h.mock.sampleHandler = null; slowInvention(h.window, h.mock);
+      h.click('#cBegin'); await h.sleep(500);
+      assert.match(h.$('#cNote').textContent, /Inventing/, 'Begin invents the cast once ready');
+      h.click('#dlgCreate [data-close]'); await h.sleep(300);
+      assert.equal(h.window.localStorage.getItem('windlass.last'), savedId, 'Cancel lands on the newest save');
+      assert.doesNotMatch(h.$('#feed').textContent, /You are Alex Rowan/, 'not on the placeholder');
+      clean(h);
+    } finally { h.close(); }
+  },
   // Begin now still begins with whoever has arrived.
   async beginNow() {
     const h = await boot({ setup(w, m) { slowInvention(w, m); } });
@@ -211,5 +317,5 @@ const S = {
     catch (e) { failed += 1; console.log('FAIL', n, '-', String((e && e.message) || e).split('\n')[0].slice(0, 220)); }
   }
   if (failed) { console.error('CREATE INTERRUPT FAILED: ' + failed + ' of ' + names.length + ' scenarios'); process.exit(1); }
-  console.log('create interrupt passed: back during the invention is refused or reopens; Cancel says so and lets a new creation begin at once; Begin now begins; a reload restores the creation in its own world; a save loads behind it; stale drafts are dropped; a closed creation screen calls the placeholder a preview; no unhandled rejections');
+  console.log('create interrupt passed: back during the invention is refused or reopens; Cancel says so and lets a new creation begin at once; Begin now begins; a reload restores the creation in its own world, and a failed first save keeps the choices; a save loads behind it; stale drafts are dropped, and so is a restored screen dismissed with back; Begin on a restored screen waits for Claude and the saves; the boot opens no fresh screen after Cancel; a closed creation screen calls the placeholder a preview; no unhandled rejections');
 })();

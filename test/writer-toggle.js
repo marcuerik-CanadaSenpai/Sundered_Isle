@@ -64,6 +64,15 @@ async function main() {
     assert(await h.turn('Stay at the table', { director: 'Mira arrives and sits down.' }), 'director first-meeting turn did not finish');
     h.$('#director').value = '';
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'auto must take the complex tier when the director note brings in someone new');
+    // A negation elsewhere in the clause does not take the arrival back.
+    for (const note of ['Mira arrives without her coat.', 'Mira arrives and doesn\'t speak.']) {
+      assert(await h.turn('Stay at the table', { director: note }), 'arrival turn did not finish: ' + note);
+      h.$('#director').value = '';
+      assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'a negation that does not govern the arrival must not cancel it: ' + note);
+    }
+    assert(await h.turn('Stay at the table', { director: 'Tess is away, and Mira will not be joining us.' }), 'negated joining turn did not finish');
+    h.$('#director').value = '';
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'default', 'a negation just before the cue still brings nobody in');
 
     // A human already present is not new again: humans are never a kind to be met in a world that tracks kinds.
     h.click('#btnCast'); h.click('#castAdd');
