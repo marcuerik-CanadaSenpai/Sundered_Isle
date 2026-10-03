@@ -34,6 +34,14 @@ async function main() {
     assert.match(prompt, /one specific reciprocal beat at a time/, 'intimacy must be paced as discrete beats');
     assert.match(prompt, /Consensual adult sex may be depicted on-page when requested/,
       'the romance prompt must allow requested consensual adult sex on-page');
+    assert.match(prompt, /depict the requested physical act directly and continuously/,
+      'requested consensual sex must be depicted in detail rather than skipped');
+    assert.match(prompt, /do not fade out, cut away, imply, euphemize, summarize or skip the act/,
+      'requested consensual sex must not fade out or be summarized');
+    assert.match(prompt, /do not jump to its aftermath in the same turn/,
+      'the sex scene must not jump ahead to an unrelated aftermath');
+    assert.match(prompt, /Keep the narration in the world rule's second-person present-tense perspective and do not insert unrelated events/,
+      'romance narration must retain perspective and stay on scene');
     assert.doesNotMatch(prompt, /fade to black|sex is not depicted|sex remains off-page/i,
       'the romance prompt must not reinstate an off-page restriction');
     assert.match(prompt, /Do not presume consent or decide the player's desire, feelings or next action/,
