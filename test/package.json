@@ -11,6 +11,7 @@
     "schedule-precedence": "node schedule-precedence.js",
     "name-matcher": "node name-matcher.js",
     "undo-recovery": "node undo-recovery.js",
+    "writer-toggle": "node writer-toggle.js",
     "long-game": "node probe2.js",
     "import-export": "node probe3.js",
     "serve": "node server.js 4173"
