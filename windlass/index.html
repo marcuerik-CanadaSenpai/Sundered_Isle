@@ -1319,7 +1319,7 @@
     // A director note that asks for a length ("about 600 words", "at least 600 words", "400 to 600 words") sets the band, so the
     // prompt and the length fit agree with it. A number of words mentioned for any other reason ("the 100 words on the plaque") is not a length.
     const asked = directorBand(input.director);
-    input.bandFloor = !!(asked && asked.floor);
+    input.bandFloor = !!(asked && asked.floor); input.bandHard = !!asked;
     if (asked) [lo, hi] = asked.band;
     return [lo, hi];
   }
@@ -1414,7 +1414,8 @@
     const lore = (limits && limits.noLore) ? [] : activeLore([turnInput.action, turnInput.director || '', recentText], turnInput.forceLore || [], limits && limits.loreBudget);
     const exemplars = pickExemplars((limits && limits.exemplars) || 2).map((e) => fill(e));
     const slot = slotInfo(S).cur.slot;
-    const focusedNames = focusNames(turnInput.action);
+    // A director note's people are part of the turn too, so they reach the cast and the focus line rather than being shut out by it.
+    const focusedNames = [...new Set(focusNames(turnInput.action).concat(turnInput.director ? focusNames(turnInput.director) : []))];
     const publicErrand = /\b(cocoa|creamery|market|library|dining hall|tea|coffee|walk|study|class|club|pool|shore|garden)\b/i.test(turnInput.action || '');
     const initiativeWindow = ((adv.turns.length + 1) % 3 === 0) || publicErrand;
     // At the 'lean' cast level, only the newest verbatim turn is read for names; include the current action too.
@@ -1494,7 +1495,7 @@
     parts.push(x('recent_turns', recent.map((t, i) => 'Turn ' + t.n + ' (Day ' + t.stateBefore.day + ', ' + t.stateBefore.time + ', ' + t.stateBefore.location + ')' + (t.action ? '\n' + p.first + ': ' + t.action : '') + '\n' + recentNarr(t, i === recent.length - 1)).join('\n\n'), 'note="verbatim' + (recentChars ? ', the tail end of each turn only (the prompt was near its size cap)' : (abridgedOlder ? ', the older turns abridged to their tail end (the prompt was near its size cap)' : '')) + ', oldest first"'));
     const actionLines = ['Player action: ' + turnInput.action];
     const named = focusedNames;
-    if (named.length) actionLines.push('Focus: the action names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action invites it.');
+    if (named.length) actionLines.push('Focus: the action' + (turnInput.director ? ' or director note' : '') + ' names ' + named.join(' and ') + ', so the turn belongs to them: reaching them, being with them, what they say and do; nobody else arrives and nothing interrupts unless the action' + (turnInput.director ? ' or the director note' : '') + ' invites it.');
     else if (initiativeWindow && !turnInput.director && !turnInput.rewrite) actionLines.push('NPC initiative window: already present: ' + (S.present.join(', ') || 'nobody listed') + '. When it fits an established aim and temperament, one person already here may begin a small interaction or offer to join the stated public errand; at a named public destination, one existing named character whose "Now" schedule in <characters> places them there may already be present and initiate a brief, natural bid. Use no invented named character and do not force anyone to arrive. Do not assume ' + p.first + ' accepts or answers; stop at that choice. Do not initiate if the player asks for solitude, is in a private or intimate moment, or the scene already has a clear focus. This is an occasional possibility, not a required beat.');
     if (turnInput.director) actionLines.push('Director note (binding): ' + turnInput.director + '\nTreat its concrete actions, requested people, and ending as required for this turn, not optional suggestions. Carry them out now instead of merely acknowledging, quoting, summarizing, delaying, or replacing them with unrelated continuation. Actions the note gives ' + p.first + ' are the player\'s own instruction for this turn: carry them out as part of the stated action, which the agency rule\'s limit to the stated action then includes; still add no desire, consent, dialogue or further action for ' + p.first + ' that the note does not state. This note overrides prior-scene momentum, default pacing, and the generic stop-at-choice instruction, but never world facts, established mechanics, or other rules in this prompt. If part of it conflicts with those limits, fulfill the compatible parts and use the nearest allowed alternative.');
     if (turnInput.rewrite) actionLines.push('Regeneration note (binding, for this rewrite only): ' + turnInput.rewrite);
@@ -1756,7 +1757,7 @@
     const rr = resolveRoll(out.evaluation, input.roll); notes.push(...rr.notes);
     let words = wc(out.narrative);
     // The band's top is a ceiling; the bottom is only a guide. A short turn that stops at a choice is right, so only overlong turns are fitted.
-    if (allowFit && adv.settings.autoFit && sample && words > band[1] * (input.bandFloor ? 1 : 1.12)) {
+    if (allowFit && adv.settings.autoFit && sample && words > band[1] * (input.bandHard ? 1 : 1.12)) {
       setStatus('fitting length (' + words + ' words)…');
       try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= (input.bandFloor ? band[0] : 50) && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
       catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }

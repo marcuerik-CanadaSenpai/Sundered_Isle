@@ -87,6 +87,21 @@ async function main() {
     assert.equal(fits.length, 3, 'the overlong reply and the reply below a requested minimum must both be fitted');
     assert.match(fits[1], /Rewrite it to between 180 and 300 words/, 'an overlong reply must be fitted to the requested ceiling');
     assert.match(fits[2], /Rewrite it to between 700 and 875 words/, 'the expansion must target the requested band');
+    assert(await h.turn('Keep talking', { director: 'Keep it not more than 350 words.' }), 'tight-ceiling turn did not finish');
+    assert.equal(fits.length, 4, 'a reply even slightly over a requested maximum must be fitted');
+    assert.match(fits[3], /Rewrite it to between 210 and 350 words/, 'the fit must target the requested ceiling');
+    h.click('#btnCast');
+    h.click('#castAdd');
+    assert(await h.settle(80, 4000), 'adding a character did not finish');
+    h.type('#cfName', 'Luna');
+    h.type('#cfSpecies', 'Werewolf');
+    h.click('#cfSave');
+    assert(await h.settle(80, 4000), 'saving the test character did not finish');
+    assert(await h.turn('Stay at the table', { director: 'Luna arrives and sits down.' }), 'director-arrival turn did not finish');
+    assert.match(prompts[13], /Focus: the action or director note names Luna/,
+      'a person the director note brings in must be in focus, not shut out by it');
+    assert.match(prompts[13], /unless the action or the director note invites it/,
+      'the focus rule must leave room for the director note');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
