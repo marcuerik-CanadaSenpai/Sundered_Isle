@@ -48,6 +48,25 @@ async function main() {
     assert(pills.includes('complex → default'), 'a turn answered on another tier must show both the tier asked for and the one applied, got ' + JSON.stringify(pills));
     applied = null;
 
+    // A director note that brings in someone never present is a first meeting, as is asking to meet them.
+    h.click('#btnCast'); h.click('#castAdd');
+    assert(await h.settle(80, 4000), 'adding a character did not finish');
+    h.type('#cfName', 'Mira Holt'); h.type('#cfSpecies', 'Fox');
+    h.click('#cfSave');
+    assert(await h.settle(80, 4000), 'saving the test character did not finish');
+    assert(await h.turn('Stay at the table', { director: 'Mira arrives and sits down.' }), 'director first-meeting turn did not finish');
+    h.$('#director').value = '';
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'auto must take the complex tier when the director note brings in someone new');
+
+    // A reply that fails records the tier the runtime was asked for, not the setting.
+    const before = tierOf(h, 'turn').length;
+    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? 'not json' : 'A short answer.');
+    await h.turn('Look out of the window');
+    assert.deepEqual(tierOf(h, 'turn').slice(before), ['default', 'default'], 'an ordinary failed turn must be asked on the default tier both times');
+    const failure = JSON.parse(h.window.localStorage.getItem('windlass.lastFailure'));
+    assert.equal(failure.tier, 'default', 'a failed turn must record the tier asked for, got ' + failure.tier);
+    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? { text: turnReply() } : 'A short answer.');
+
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.narrTier, 'auto', 'the toggle must be saved with the adventure');
     const store = new Map([...h.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
@@ -59,9 +78,23 @@ async function main() {
     assert(await h2.idle(10000), 'reopening the save did not finish');
     h2.click('#btnSettings');
     assert.equal(h2.$('#setNarrTier').value, 'auto', 'an old save that asked for a lesser tier must open as auto');
+    h2.click('[data-close="dlgSettings"]');
+
+    // A first meeting in a world that does not track kinds: Halloway has no transformation, and Ines is not there at the start.
+    h2.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? turnReply() : 'A short answer.');
+    h2.$('#newWorld').value = 'halloway'; h2.click('#newAdv');
+    assert(await h2.settle(150, 6000), 'opening Halloway creation did not settle');
+    h2.click('#cBegin');
+    assert(await h2.idle(15000), 'creating the Halloway adventure did not finish');
+    await setWriter(h2, 'auto');
+    assert(await h2.turn('Walk along the cloister'), 'Halloway ordinary turn did not finish');
+    assert(await h2.turn('Introduce myself to Ines'), 'Halloway first-meeting turn did not finish');
+    assert.deepEqual(tierOf(h2, 'turn').slice(-2), ['default', 'complex'], 'auto must take the complex tier for a first meeting in a world without kinds');
+    assert(await h2.turn('Introduce myself to Tobias'), 'Halloway already-present turn did not finish');
+    assert.equal(tierOf(h2, 'turn').slice(-1)[0], 'default', 'someone already present is not a first meeting');
     assert(!h2.errors.length && !h2.mock.violations.length, 'page errors or contract violations: ' + JSON.stringify(h2.errors.concat(h2.mock.violations)));
     h2.close();
-    console.log('writer toggle passed: most capable every turn; auto by scene; the intro on the most capable tier; an old lesser tier opens as auto');
+    console.log('writer toggle passed: most capable every turn; auto by scene, director first meetings and Halloway first meetings included; failures record the tier asked; the intro on the most capable tier; an old lesser tier opens as auto');
   } catch (e) {
     console.error('WRITER TOGGLE FAILED\n' + ((e && e.stack) || e));
     process.exit(1);

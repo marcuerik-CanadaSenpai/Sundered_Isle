@@ -1301,12 +1301,7 @@
     const a = String(input.action || '');
     const romance = isRomanceScene(input);
     const tf = transformationSceneActive();
-    const firstMeeting = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i.test(a) &&
-      activeCharacters().some((c) => {
-        const names = [c.first, c.name].concat(c.aliases || []).filter(Boolean);
-        return names.some((n) => properWordIn(a, n)) && W.transformation && !ensureMet(adv.state).includes(speciesKeyOf(c));
-      });
-    if (romance || tf || firstMeeting) return 'rich';
+    if (romance || tf || isFirstMeeting(input)) return 'rich';
     if (isTransition(input)) return 'terse';
     return 'standard';
   }
@@ -1314,6 +1309,26 @@
   // writing matters most (romance, a first meeting, a change under way: the scenes sceneDensity calls rich) and takes the
   // everyday tier otherwise, so an ordinary turn costs less of the player's usage. Both give the roommate's introduction
   // the most capable tier: it is a first meeting written once.
+  // A first meeting: the action asks to meet someone new, or the director note brings someone new in. Someone is new who
+  // has never been listed as present; in a world that tracks kinds, also someone whose kind the player has not yet met.
+  function isFirstMeeting(input) {
+    const a = String(input.action || ''), d = String(input.director || '');
+    const asked = /\b(meet|meeting|introduc(?:e|ed|ing)|first time)\b/i;
+    const seen = new Set();
+    const addSeen = (list) => { for (const raw of (list || [])) { const n = String(raw).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); if (n) seen.add(n); } };
+    addSeen(adv.state && adv.state.present);
+    for (const t of adv.turns || []) { addSeen(t.stateBefore && t.stateBefore.present); addSeen(t.stateAfter && t.stateAfter.present); }
+    return activeCharacters().some((c) => {
+      // A world's authored people may carry only a full name ("Ines Varga", "Professor Adaline Marsh"): its given name and
+      // surname count too, without a title.
+      const words = String(c.name || '').split(' ').filter((w) => !/^(?:professor|prof\.?|dr\.?|doctor|mr\.?|mrs\.?|ms\.?|miss|sir|lady|lord|warden)$/i.test(w));
+      const names = [c.first, c.name, words[0], words.length > 1 ? words[words.length - 1] : ''].concat(c.aliases || []).filter(Boolean);
+      const handles = names.map((n) => n.toLowerCase());
+      const isNew = !handles.some((h) => seen.has(h)) || (!!W.transformation && !ensureMet(adv.state).includes(speciesKeyOf(c)));
+      if (!isNew) return false;
+      return (asked.test(a) && names.some((n) => properWordIn(a, n))) || (!!d && names.some((n) => properWordIn(d, n)));
+    });
+  }
   function narrTierFor(input) {
     if (adv.settings.narrTier !== 'auto') return 'complex';
     if (!input) return 'complex';
@@ -1896,7 +1911,7 @@
       if (!usableReply(data)) data = null;
       // An unusable or cut-off reply is asked for once more before giving up; the bad one is kept for diagnosis.
       if (!data) {
-        logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '' });
+        logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { tier, truncated: !!res.truncated, tierApplied: res.modelTierApplied || '' });
         notes.push((res.truncated ? 'first reply was cut off by the runtime' : 'first reply was not usable JSON') + '; asked again');
         setStatus(res.truncated ? 'The reply was cut off; asking once more…' : 'The reply was not usable; asking once more…'); first = null;
         res = await ask(); raw = res.text;
@@ -1904,7 +1919,7 @@
         if (res.truncated) data = null;
         if (!usableReply(data)) data = null;
       }
-      if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
+      if (!data) { logFailure(res.truncated ? 'truncated' : 'invalid_json', input, raw, { tier, truncated: !!res.truncated, tierApplied: res.modelTierApplied || '', second: true }); throw { code: res.truncated ? 'truncated' : 'invalid_json', message: 'The reply was not valid JSON.', text: raw }; }
       if (adv !== mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
       const turn = await commitReply(data, input, { mine, stateBefore, memBefore, pendingBefore, notes, regen, raw, band: input.band, tierAsked: tier, tierApplied: res.modelTierApplied, timing: { first: Math.round(first || 0), total: Math.round(performance.now() - t0) }, truncated: !!res.truncated, allowFit: true });
       lastDebug = { prompt: built.prompt, raw, notes, meta: 'Turn ' + turn.n + ' · asked ' + turn.tierAsked + ', answered ' + (turn.tierApplied || '?') + ' · first word ' + (turn.timing.first / 1000).toFixed(1) + ' s, total ' + (turn.timing.total / 1000).toFixed(1) + ' s · ' + turn.words + ' words (band ' + input.band.join('–') + ') · prompt ' + built.prompt.length.toLocaleString() + ' chars (~' + Math.round(built.prompt.length / 4).toLocaleString() + ' tokens) · lore: ' + (built.lore.join(', ') || 'none') };
