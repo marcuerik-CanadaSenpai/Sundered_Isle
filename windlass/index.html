@@ -1832,7 +1832,7 @@
     let stateBefore = null, memBefore = null, pendingBefore = null, built = null;
     const turnsBefore = adv.turns.length;
     const notes = []; const t0 = performance.now(); let first = null; let raw = '';
-    let tier = narrTierFor(input);
+    let tier = adv.settings.narrTier;   // the setting's own label until the scene is classified below; a turn that fails before then records it
     startTimer(t0);
     try {
       stateBefore = clone(adv.state); memBefore = clone(adv.memory); pendingBefore = (adv.pendingNotes || []).slice();
@@ -3044,7 +3044,7 @@
         (t.alts && t.alts.length && isLast ? '<button class="quiet" data-prevver="' + esc(t.id) + '">Previous version (' + num(t.alts.length) + ')</button>' : '') +
         '<span class="spacer"></span>' +
         (warn && showHidden ? '<span class="pill warn" title="' + esc((t.notes || []).join('\n')) + '">' + warn + ' note' + (warn > 1 ? 's' : '') + '</span>' : '') +
-        '<span class="pill">' + esc(t.tierApplied || t.tierAsked) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
+        '<span class="pill">' + esc(t.tierApplied && t.tierAsked && t.tierApplied !== t.tierAsked ? t.tierAsked + ' → ' + t.tierApplied : (t.tierApplied || t.tierAsked)) + '</span><span class="pill">' + num(t.words) + ' w</span><span class="pill">' + (t.timing ? (t.timing.total / 1000).toFixed(0) + ' s' : '') + '</span>' +
       '</div>' +
       '<div class="reveal" data-panel="changes"><h4>Changes</h4>' + ((t.diff || []).length ? '<ul>' + t.diff.map((d) => '<li><code>' + esc(d.path) + '</code>: <span class="diff-from">' + esc(JSON.stringify(d.from)) + '</span> → ' + esc(JSON.stringify(d.to)) + '</li>').join('') + '</ul>' : '<div class="small">No state changes.</div>') + ((t.notes || []).length ? '<h4 style="margin-top:8px">Engine notes</h4><ul>' + t.notes.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul>' : '') + ((t.exposures || []).length ? '<h4 style="margin-top:8px">Exposures reported</h4><ul>' + t.exposures.map((e) => '<li>' + esc(e.species) + ' ×' + num(e.intensity, 1) + ': ' + esc(e.method) + '</li>').join('') + '</ul>' : '') + '</div>' +
       '<div class="reveal" data-panel="secret"><h4>Secret info (what the player is not told)</h4>' + (t.secret ? esc(t.secret) : '<span class="small">None.</span>') + '</div>' +

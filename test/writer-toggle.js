@@ -25,7 +25,8 @@ async function main() {
   h.click('#cBegin');
   assert(await h.idle(15000), 'creating the adventure did not finish');
   try {
-    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? turnReply() : 'A short answer.');
+    let applied = null;   // when set, the mock answers on this tier instead of the one asked for
+    h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? { text: turnReply(), modelTierApplied: applied } : 'A short answer.');
     const options = [...h.$('#setNarrTier').options].map((o) => o.value);
     assert.deepEqual(options, ['complex', 'auto'], 'the writer menu must offer exactly the two toggle positions');
     assert.deepEqual(tierOf(h, 'roommate introduction'), ['complex'], 'the roommate introduction must be written on the most capable tier');
@@ -41,6 +42,11 @@ async function main() {
       'auto must take the default tier for an ordinary turn and the complex tier for romance');
     const feed = h.document.querySelectorAll('#feed .turn .pill');
     assert([...feed].some((p) => p.textContent === 'default'), 'the turn card must show the tier that was asked for');
+    applied = 'default';
+    assert(await h.turn('Kiss Luna again and hold her'), 'fallback-tier turn did not finish');
+    const pills = [...h.document.querySelectorAll('#feed .turn .pill')].map((p) => p.textContent);
+    assert(pills.includes('complex → default'), 'a turn answered on another tier must show both the tier asked for and the one applied, got ' + JSON.stringify(pills));
+    applied = null;
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.narrTier, 'auto', 'the toggle must be saved with the adventure');

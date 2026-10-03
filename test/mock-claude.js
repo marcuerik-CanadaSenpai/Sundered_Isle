@@ -183,7 +183,8 @@ function install(window, opts) {
     if (options.signal && options.signal.aborted) { call.outcome = 'cancelled'; throw err('cancelled', 'aborted', { text: sent }); }
     call.outcome = res.truncated ? 'truncated' : 'ok';
     if (asJson) { try { return JSON.parse(full); } catch (e) { const m = /[\[{][\s\S]*[\]}]/.exec(full); try { return JSON.parse(m[0]); } catch (e2) { throw err('invalid_json', 'no JSON', { text: full }); } } }
-    return { text: full, truncated: !!res.truncated, modelTierApplied: options.modelTier || 'default' };
+    // A handler may answer on another tier (res.modelTierApplied), as the runtime does when the viewer's plan lacks the one asked for.
+    return { text: full, truncated: !!res.truncated, modelTierApplied: res.modelTierApplied || options.modelTier || 'default' };
   }
   const sample = (input, options) => sampleImpl(input, options, false);
   sample.json = (input, options) => sampleImpl(input, options, true);
