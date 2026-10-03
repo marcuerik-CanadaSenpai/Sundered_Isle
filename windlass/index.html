@@ -2448,10 +2448,8 @@
     if (!db) return;
     try { const cur = await recentRead(); const merge = (a, b, cap) => a.concat((b || []).filter(Boolean)).filter((x, i, arr) => arr.lastIndexOf(x) === i).slice(-cap); await db.doc('meta/recent').set({ names: merge(cur.names, add.names, 160), courses: merge(cur.courses, add.courses, 60), quirks: merge(cur.quirks, add.quirks, 60), updatedAt: new Date().toISOString() }); } catch (e) {}
   }
-  // Live trace, 30 Sep: one person on the default tier answered in 4.5 s; nine people per call gave no text in 43 s, three
-  // calls alike, while pings on every tier answered in about a second. The default tier appears to think before it writes,
-  // and nine constrained names at once is a long think; so the invention runs on the quick tier in batches of five.
-  const INVENT_TIMEOUT_MS = 60000, INVENT_BATCH = 5;
+  // Smaller invention batches keep each cast-generation response within a reasonable first-token and completion time.
+  const INVENT_TIMEOUT_MS = 60000, INVENT_BATCH = 3;
   const inventTier = () => (adv && adv.settings && ['quick', 'default', 'complex'].includes(adv.settings.inventTier)) ? adv.settings.inventTier : 'quick';
   // opts.signal stops the call (the player pressing Begin now, or the dialog closing); opts.onProgress hears how many people
   // have arrived as the reply streams. A reply cut short by a stop or the timeout still yields the people it had finished.
@@ -2473,7 +2471,8 @@
     };
     try {
       if (ctl.signal.aborted) throw { code: 'aborted', message: 'stopped' };
-      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (timer == null) timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS); if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
+      timer = setTimeout(() => { timedOut = true; ctl.abort(); }, INVENT_TIMEOUT_MS);
+      const res = await Promise.race([sample(prompt, { label, modelTier: inventTier(), cache: false, signal: ctl.signal, onText: ({ text }) => { partial = text || partial; if (opts.onProgress) opts.onProgress((partial.match(/"key"\s*:/g) || []).length, slots.length); } }), stopped]);
       const out = finish(res.text, !!res.truncated); if (!Object.keys(out.given).length) logFailure('invent_empty', { action: label }, res.text, { prompt: prompt.slice(0, 4000) });
       return out;
     } catch (e) {
@@ -3139,7 +3138,7 @@
       createCtl = new AbortController(); $('#cBegin').textContent = 'Begin now';
       const t0 = performance.now(); let got = 0, total = 0;
       const calls = Math.ceil((1 + (Wc.castRoles || []).length + (Wc.minorRoles || []).length) / INVENT_BATCH);
-      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of five, two at a time; usually 10 to 30 s; a call that has not answered by ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s is given up and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
+      const note = () => { const secs = Math.round((performance.now() - t0) / 1000); $('#cNote').textContent = 'Inventing your roommate and the cast… ' + secs + ' s' + (got ? ', ' + got + ' of ' + total + ' arrived' : '') + ' (' + inventTier() + ' tier, up to ' + calls + ' calls of three, two at a time; each call is given up after ' + Math.round(INVENT_TIMEOUT_MS / 1000) + ' s without a complete reply and the pools fill in). Begin now stops the wait and keeps whoever has arrived; Debug lists every call.'; };
       note(); const ticker = setInterval(note, 1000);
       try { prep = await prepareCreation(Wc, c, createCtl.signal, (n, t) => { got = n; total = t; note(); }); } catch (e) { prep = null; }
       finally { clearInterval(ticker); createCtl = null; $('#cBegin').textContent = 'Begin'; }

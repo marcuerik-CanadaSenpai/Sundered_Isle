@@ -248,12 +248,38 @@ async function checkGeneratedRoommateReplacement() {
   }
 }
 
+async function checkCreationFallbackPreservesChoices() {
+  const h = await boot({});
+  try {
+    assert(await h.settle(150, 6000), 'the page did not settle after boot');
+    h.mock.sampleHandler = (input, options, call) => {
+      if (call.label === 'cast invention') throw { code: 'upstream_error', message: 'simulated generation failure' };
+      return h.mock.defaultHandler(input, options, call);
+    };
+    h.type('#cName', 'Morgan Vale');
+    h.click('#cBegin');
+    assert(await h.idle(15000), 'adventure creation did not finish after cast invention failed');
+
+    const [, entry] = adventureEntry(h);
+    assert.equal(entry.data.player.name, 'Morgan Vale', 'fallback generation must preserve the player name selected in the creation dialog');
+    assert(entry.data.cast.generated.characters.length > 0, 'the world pools should still generate cast members when invention fails');
+    assert(entry.data.roommate, 'the roommate should still be generated when invention fails');
+
+    const diagnostics = h.diagnostics();
+    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
+    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
+  } finally {
+    h.close();
+  }
+}
+
 (async () => {
   await checkInferenceAndCompaction();
   await checkDuplicateChronology();
   await checkStaleChunkRecovery();
   await checkStaleImportRecovery();
   await checkGeneratedRoommateReplacement();
+  await checkCreationFallbackPreservesChoices();
   console.log('review regressions passed');
 })().catch((error) => {
   console.error('REVIEW REGRESSIONS FAILED\n' + (error && error.stack || error));
