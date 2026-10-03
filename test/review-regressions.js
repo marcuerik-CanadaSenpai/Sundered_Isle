@@ -82,6 +82,12 @@ async function checkInferenceAndCompaction() {
 
     for (let i = 7; i <= 11; i++) assert(await h.turn('Action ' + i), 'turn ' + i + ' did not finish');
     turns = turnsIn(h, id);
+    for (const rule of ['Perspective: everything is seen from inside', 'Player knowledge: ', 'Stopping: a turn ends at the first moment', 'Variety: aims are directions, not scripts', 'Attitudes: an attitude value moves at most one point', 'Fresh detail: show people and places']) {
+      assert.equal((prompts[0].match(new RegExp(rule.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length, 1, 'shared rule should appear exactly once: ' + rule);
+    }
+    assert.match(prompts[0], /World-authored transformation traits, steps and habits are sensory references/);
+    assert.doesNotMatch(prompts[0], /suggested actions that include fear, curiosity and enjoyment/);
+    assert.doesNotMatch(prompts[0], /Write the evaluation first, then the narrative/);
     const compacted = turns.find((turn) => turn.n === 9);
     assert(compacted && compacted._trimmed && compacted.memBefore === null, 'turn 9 should be compacted in its completed chunk');
     assert(!Object.hasOwn(compacted.stateBefore, 'items'), 'the compacted snapshot should not retain full state');
