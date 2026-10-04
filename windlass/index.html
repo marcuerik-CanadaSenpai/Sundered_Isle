@@ -597,10 +597,13 @@
   // (the body pool) and for the player's path (the steps), so the werewolf two tables down and the werewolf {first} is
   // becoming are described from the same facts.
   const eyeColour = (phrase) => { const p = String(phrase || '').replace(/,.*$/, '').trim(); const m = /^eyes (.+)$/.exec(p); return m ? m[1] : p.replace(/\s*\beyes\b\s*/, ' ').trim(); };
-  function kindText(Wc, key, text, eyes) {
+  // {breasts} is one woman's chest (cup, nipple, areola), drawn once from the kind's pool or the world's, so no two women share it.
+  const pickBreasts = (Wc, key) => { const sp = speciesPool(Wc, key); const pool = sp && sp.breasts && sp.breasts.length ? sp.breasts : ((Wc.genPools && Wc.genPools.breasts) || []); return pool.length ? pick(pool) : 'breasts'; };
+  function kindText(Wc, key, text, eyes, breasts) {
     const sp = speciesPool(Wc, key); const e = eyes || (sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '');
-    const ph = e || 'eyes of no particular colour';
-    return String(text || '').replace(/(^|\. )\{eyes\}/g, (m, pre) => pre + cap(ph)).replace(/\{eyes\}/g, ph).replace(/\{eye\}/g, e ? eyeColour(e) : 'a new colour').replace(/\{teats\}/g, (sp && sp.teats) || 'a second pair of small nipples');
+    const ph = e || 'eyes of no particular colour'; const b = breasts || pickBreasts(Wc, key);
+    return String(text || '').replace(/(^|\. )\{eyes\}/g, (m, pre) => pre + cap(ph)).replace(/\{eyes\}/g, ph).replace(/\{eye\}/g, e ? eyeColour(e) : 'a new colour').replace(/\{teats\}/g, (sp && sp.teats) || 'a second pair of small nipples')
+      .replace(/(^|\. )\{breasts\}/g, (m, pre) => pre + cap(b)).replace(/\{breasts\}/g, b);
   }
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // Body structures an invented line may name only when the kind's own world text already has them.
@@ -695,9 +698,18 @@
     const lead = sp && sp.leadByGender && sp.leadByGender[gender] && sp.leadByGender[gender].length ? pick(sp.leadByGender[gender]) : '';
     const byG = sp && sp.bodyByGender && sp.bodyByGender[gender] && sp.bodyByGender[gender].length ? '. ' + pick(sp.bodyByGender[gender]) : '';
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
-    const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
-    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText, p.eyes), p) : '');
+    // Hair (its style, and its colour where the kind's colour pool is hair colour) comes right after the lead, before the body.
+    p.hair = sp && sp.hair && sp.hair.length ? pick(sp.hair).replace(/\{colour\}/g, colour) : '';
+    p.breasts = gender === 'female' ? pickBreasts(Wc, speciesKey) : '';
+    const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/(^|\. )\{colour\}/g, (m, pre) => pre + cap(colour)).replace(/\{colour\}/g, colour) : '';
+    const head = [lead ? lead.replace(/\{colour\}/g, colour) : '', p.hair].filter(Boolean).map(cap);
+    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, head.length ? head.join('. ') + '. ' + cap(bodyText) : bodyText, p.eyes, p.breasts), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
+    // An authored look (a role's) gets the hair, and a woman's chest, added after it when it says nothing of them.
+    if (opts.looks) {
+      const add = [p.hair && !/\b(hair|plumage|feathers?|crest|plait|crop|braid|mane|bald|shaved)\b/i.test(p.looks) ? p.hair : '', p.breasts && !/\b(breasts?|chest|cup|bosom|nipples?)\b/i.test(p.looks) ? p.breasts : ''].filter(Boolean);
+      if (add.length) p.looks = String(p.looks).replace(/[.;,]\s*$/, '') + '. ' + add.map(cap).join('. ');
+    }
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
     p.temperament = given.temperament || pick(G.temperaments);
@@ -1174,7 +1186,10 @@
   // A step, an anatomy or a sex line of the player's path, with the kind's facts filled: the path's eye colour, the kind's teats phrase.
   function pathFill(tf, k, text) {
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
-    return fill(kindText(W, k, text, path && path.eye));
+    if (path && !path.breasts) path.breasts = pickBreasts(W, k);
+    const st = (W.transformation && W.transformation.sexStages) || {};
+    const staged = String(text || '').replace(/\{(tanner\d|genitals)\}/g, (m, key) => (st[key] != null ? st[key] : m));
+    return fill(kindText(W, k, staged, path && path.eye, path && path.breasts));
   }
   const rungContent = (sp, path, position) => sp.ladder[(path && Array.isArray(path.order) && path.order[position] != null) ? path.order[position] : position] || sp.ladder[position];
   const STEP_KEEP = 0.75, STEP_KEEP_MIN = 0.6;
@@ -1208,6 +1223,15 @@
           if (tf.last[k] == null || tf.last[k] < now) tf.last[k] = now;
           tf.tracks.push({ species: k, rung: r + 1, kind: 'body', trait: content.trait, steps: drawSteps(content.steps), anatomy: content.anatomy || '', habits: shuffled(sp.habits || []).slice(0, 2), noticed: pick(sp.noticed || []) || '', i: 0, nextAt: now, day: state.day, beganAt: now });
           if (tf.paths[k].sex && rung.sex && rung.sex.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'sex', to: tf.paths[k].sex, trait: content.trait, steps: rung.sex.slice(), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day });
+          // A woman's body (the player's own, one that has gone over, or one this path is making) takes the kind's form where a woman's
+          // differs: the rung's women steps, told alongside. On a path still going over they wait for that rung's sex steps, so the
+          // breasts are grown before they fill; a path going toward a man's body has none.
+          const womanly = tf.paths[k].sex ? tf.paths[k].sex === 'female' : (p.gender === 'female' || !!(tf.sex && tf.sex.to === 'female'));
+          if (womanly && rung.women && rung.women.length) {
+            const form = { species: k, rung: r + 1, kind: 'form', trait: content.trait, steps: rung.women.slice(), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day };
+            if (tf.paths[k].sex) form.after = 'sex';
+            tf.tracks.push(form);
+          }
           diff.push({ path: 'tf.traits', from: '', to: sp.short + ': ' + content.trait + ' (beginning)' });
         } else {
           tf.traits.push({ species: k, trait: rung.trait, day: state.day, settled: false });
@@ -1250,6 +1274,7 @@
   function stepNote(t, tf, text) {
     const sp = W.transformation.species[t.species]; const who = firstName(); const inf = tf.influence[t.species] || 0;
     const step = pathFill(tf, t.species, text); const isFirst = t.i === 0, isLast = t.i === t.steps.length - 1;
+    if (t.kind === 'form') return 'The change continues (' + sp.name + '; the kind\'s form on a woman\'s body): ' + step + '. One small thing this turn, in your own words, found in passing (a mirror, a strap, the shower, a shirt), plain and precise, with its practical consequence; then the scene goes on. Nobody remarks on it unless it is plainly visible and they would have cause; how ' + who + ' takes it is the player\'s.';
     if (t.kind === 'sex') {
       const what = t.to === 'female' ? 'a woman\'s' : 'a man\'s';
       if (isLast && t.rung >= lastSexRung(sp)) return 'The body has finished going over (' + sp.name + ' path): ' + step + '. ' + who + '\'s body is ' + what + ' now, the whole of it. Say so once, plainly, as a fact found in the mirror or in clothes, without ceremony or explanation; then the scene goes on. What ' + who + ' is called and how ' + who + ' feels about it are the player\'s; people who know ' + who + ' go by whatever ' + who + ' has said, and otherwise by what they see.';
@@ -1266,7 +1291,8 @@
     const T = W.transformation; if (!T || !state.tf) return [];
     const tf = state.tf; tf.tracks = tf.tracks || []; const now = storyMin(state); const gap = stepGapMin(); const out = [];
     const held = (t) => { const b = bodyTrackOf(tf, t); return !!b && fadeHeld(tf, b, now); };
-    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t)).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
+    const waits = (t) => !!t.after && tf.tracks.some((x) => x !== t && x.species === t.species && x.rung === t.rung && x.kind === t.after);
+    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t) && !waits(t)).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
     for (const t of due) {
       out.push(stepNote(t, tf, t.steps[t.i]));
       if (t.kind === 'sex') {
@@ -1276,6 +1302,7 @@
       const last = t.i === t.steps.length - 1; t.i += 1; t.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
       if (!last) continue;
       if (t.kind === 'body') { const tr = tf.traits.find((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (tr) tr.settled = true; notes.push('change complete: ' + t.species + ' rung ' + t.rung); }
+      else if (t.kind === 'form') notes.push(t.species + ' path: form steps of rung ' + t.rung + ' told');
       else if (t.rung >= lastSexRung(T.species[t.species])) { if (!tf.sex) tf.sex = { to: t.to, species: t.species, rung: t.rung, day: state.day }; notes.push('the body is ' + (t.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now (' + t.species + ' path)'); }
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
@@ -1303,7 +1330,7 @@
       }
       if (t.i === 0) {
         // Gone: the trait, the rung, the sex steps of the same rung, and influence to just under the line, so the body remembers.
-        tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && x.kind === 'sex' && x.rung === t.rung));
+        tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && (x.kind === 'sex' || x.kind === 'form') && x.rung === t.rung));
         const path = (tf.paths || {})[t.species], rung = sp.ladder[t.rung - 1];
         if (path && Array.isArray(path.sexTold) && rung && rung.sex) path.sexTold = path.sexTold.filter((x) => !rung.sex.includes(x));
         const i = tf.traits.findIndex((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (i >= 0) tf.traits.splice(i, 1);
@@ -2223,30 +2250,33 @@
       let guard = null;
       const setWin = Math.max(1, Number(adv.settings.window) || 3);
       const fits = () => new TextEncoder().encode(built.prompt).length <= 63000;
-      // First what the story misses least: fewer timeline lines and older beats, one style example, a smaller lore budget,
+      // First what the story misses least: fewer timeline lines and older beats, one style example, the transformation guidance
+      // in its short form (the same rules, fewer words; it keeps the lore, which the story cannot do without), a lore budget cut by
+      // a quarter (the lowest-priority entries go first) and then halved,
       // one-line sheets for people who are not in the scene, then the older verbatim turns abridged to their tail ends.
       // Only after that are verbatim turns dropped, and only at the very end is anything cut that normally goes whole.
       // A stage whose window is wider than the player's own setting is skipped: it would only repeat the stage before it.
       for (const lim of [
         { events: 20, earlier: 12 },
         { events: 20, earlier: 12, exemplars: 1 },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000 },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean' },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', gmLevel: 'lean' },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean' },
-        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 2500 },
-        { events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500 },
-        { window: 3, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900 },
-        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500 },
-        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900 },
-        { window: 1, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean' },
-        { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000 },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, factsBytes: 4500, summaryChars: 3000, notesChars: 400, castLevel: 'brief' },
-        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, factsBytes: 4500, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000 },
-        { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000 },
+        { events: 20, earlier: 12, exemplars: 1, compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 4500, compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', gmLevel: 'lean', compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', compactTransformation: true },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 2500, compactTransformation: true },
+        { events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500, compactTransformation: true },
+        { window: 3, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900, compactTransformation: true },
+        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 1500, compactTransformation: true },
+        { window: 2, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', olderRecentChars: 900, compactTransformation: true },
+        { window: 1, events: 10, earlier: 6, exemplars: 1, loreBudget: 1500, castLevel: 'lean', gmLevel: 'lean', compactTransformation: true },
+        { window: 1, events: 10, earlier: 6, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 6000, compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, castLevel: 'lean', gmLevel: 'lean', recentChars: 2000, compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, summaryChars: 3000, notesChars: 400, castLevel: 'brief', compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 2000, facts: 20, factChars: 300, factsBytes: 4500, summaryChars: 3000, notesChars: 400, castLevel: 'brief', compactTransformation: true },
+        { window: 1, events: 5, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 1200, facts: 8, factChars: 200, factsBytes: 4500, summaryChars: 1200, notesChars: 200, castLevel: 'brief', blockChars: 8000, compactTransformation: true },
         { window: 1, events: 3, earlier: 0, exemplars: 1, noLore: true, gmLevel: 'lean', recentChars: 800, facts: 0, factsBytes: 4500, summaryChars: 600, notesChars: 120, castLevel: 'brief', blockChars: 3000, compactTransformation: true }
       ]) { if (fits()) break; if (lim.window && lim.window > setWin) continue; built = buildPrompt(input, lim); guard = lim; }
       if (guard) notes.push('prompt near the size cap: ' + [
@@ -2260,7 +2290,7 @@
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
         guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
         guard.factsBytes != null ? 'facts capped by a 4,500-byte budget when needed' : '',
-        guard.compactTransformation ? 'settled transformation history compacted for this prompt only' : '',
+        guard.compactTransformation ? 'transformation block in its short form (settled changes compacted, the same rules in fewer words)' : '',
         guard.blockChars ? 'every other block cut to ' + guard.blockChars + ' characters' : ''
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
