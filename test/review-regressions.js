@@ -93,7 +93,7 @@ async function checkInferenceAndCompaction() {
     assert(!Object.hasOwn(compacted.stateBefore, 'items'), 'the compacted snapshot should not retain full state');
     const worlds = h.window.WINDLASS_WORLDS;
     const wolfBody = worlds.sundered.genPools.species.wolf.bodyByGender.female[0];
-    assert.equal(wolfBody, 'Two rows of small nipples run down the abdomen, dark against the pelt');
+    assert.match(wolfBody, /Two rows of small nipples run down the abdomen, dark against the pelt/, 'the wolf\'s established anatomy stays in her first body line');
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
     assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));

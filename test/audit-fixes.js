@@ -258,7 +258,7 @@ const S = {
       'scratches her third pair of ears', 'polishes her fourth set of horns', 'flicks her second tail', 'twitches her third ear', 'tugs her fifth teat', 'grows an extra pair of ears',
       'scratches her second pair of eyes', 'scratches her 2nd pair of eyes', 'rubs her extra pair of hands', 'blinks her second row of eyes', 'blinks a second row of eyes',
       'blinks her third and fourth pairs of eyes', 'blinks her third, smaller pair of eyes', 'blinks her twenty-first pair of eyes', 'blinks her twenty-second pair of eyes', 'has twenty-one arms',
-      'tugs her fifth, swollen teat', 'flicks her second, smaller tail', 'scratches her third, torn ear', 'taps her third hoof', 'has three hooves']) assert.equal(fits(t, cow), false, 'refused: ' + t);
+      'tugs her fifth, swollen teat', 'flicks her second, smaller tail', 'scratches her third, torn ear', 'taps her seventh hoof', 'has nine hooves', 'has four hoof-thumbs']) assert.equal(fits(t, cow), false, 'refused: ' + t);
     // Time, idiom and a pronoun or preposition between the number and the part are not anatomy.
     for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table',
       'takes a second to scratch her head before answering', 'gives another shake of her head', 'touches the other side of her face when thinking',
@@ -269,7 +269,7 @@ const S = {
       'counts to seventeen while her tail sways', 'for the seventh time rubs her eyes',
       // A pair of things, then her own hands or eyes; a teat she has; "a second" as time before a comma.
       'darns her third pair of stockings, both hands busy', 'sits in the third row of benches, both hands in her lap', 'hauls the third set of nets, bare hands raw', 'reads the third set of minutes, tired eyes narrowed',
-      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'pauses a second, long tail swishing', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'taps her third hoof', 'has three hooves on each hand', 'grips the mug with two hoof-fingers', 'pauses a second, long tail swishing', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
     // The kind's own counts set the bar: the fox's two tails, the cat's four pairs of nipples, the wolf's two more pairs.
     assert.equal(fits('flicks her second tail', species.fox), true, 'the fox has a second tail');
     for (const t of ['flicks her third tail', 'flicks her second pair of tails']) assert.equal(fits(t, species.fox), false, 'refused for the fox: ' + t);
@@ -429,6 +429,47 @@ const S = {
     try {
       assert(await h.turn('Ask Varga about the Quiet Table.'));
       assert.match(promptOf(lastTurn(h)), /Focus: the action names Tessa\b/, 'the surname must resolve to the generated cast member');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Cast screen: unsaved edits survive a stray close. A back gesture or Esc (the dialog's cancel event) is refused, a screen the
+  // browser closes anyway comes straight back with the typed text, and Close or another name asks once before dropping edits.
+  async castEditsKept() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    try {
+      const dlg = h.$('#dlgCast'), looks = h.$('#cfLooks'), note = () => h.$('#cfNote').textContent;
+      const typed = (el, text) => { el.value = text; el.dispatchEvent(new h.window.Event('input', { bubbles: true })); };
+      h.click('#btnCast'); await h.sleep(20);
+      assert(dlg.open && h.$('#cfName').value === 'Daisy Clover', 'the Cast screen opens on the roommate');
+      // Nothing typed yet: Close closes at once.
+      h.click('[data-close="dlgCast"]'); assert(!dlg.open, 'with nothing unsaved, Close closes at once');
+      h.click('#btnCast'); await h.sleep(20); assert(dlg.open);
+      typed(looks, 'Short and soft, with a long dark tail.');
+      const cancel = new h.window.Event('cancel', { cancelable: true }); dlg.dispatchEvent(cancel);
+      assert(cancel.defaultPrevented, 'a close request (back gesture, Esc) is refused while edits are unsaved');
+      assert(dlg.open && looks.value === 'Short and soft, with a long dark tail.', 'the screen stays open with the edits');
+      dlg.close(); await h.sleep(20);
+      assert(dlg.open, 'closed by the browser anyway, the screen comes back');
+      assert.equal(looks.value, 'Short and soft, with a long dark tail.', 'the typed text is kept when the screen comes back');
+      // Another name: the first tap asks, typing again disarms, two taps in a row switch.
+      const other = [...h.document.querySelectorAll('#castList button')].find((b) => b.dataset.key !== 'roommate'); assert(other, 'another character is listed');
+      other.click(); assert.equal(h.$('#cfName').value, 'Daisy Clover', 'the first tap on another name keeps the edited form');
+      assert.match(note(), /Unsaved edits to Daisy Clover/, 'the player is told why: ' + note());
+      typed(looks, looks.value + ' Horns polished.'); assert.equal(note(), '', 'typing clears the question');
+      other.click(); assert.equal(h.$('#cfName').value, 'Daisy Clover', 'after more typing the next tap asks again');
+      other.click(); assert.notEqual(h.$('#cfName').value, 'Daisy Clover', 'the second tap in a row switches character');
+      // Back to the roommate: the switch dropped the edits, so the world's text shows; edit again, then Close twice.
+      h.document.querySelector('#castList button[data-key="roommate"]').click();
+      assert.equal(h.$('#cfName').value, 'Daisy Clover'); assert.doesNotMatch(looks.value, /Short and soft/, 'dropped edits are gone');
+      typed(looks, 'Petite, with a swinging tail.');
+      h.click('[data-close="dlgCast"]'); assert(dlg.open, 'the first Close with unsaved edits keeps the screen open'); assert.match(note(), /tap Close again/);
+      h.click('[data-close="dlgCast"]'); assert(!dlg.open, 'the second Close closes it');
+      // Saved edits close at once, and the save holds.
+      h.click('#btnCast'); await h.sleep(20); typed(looks, 'Petite, with a swinging tail.');
+      h.click('#cfSave'); assert(await h.idle(10000));
+      h.click('[data-close="dlgCast"]'); assert(!dlg.open, 'after Save, Close closes at once');
+      assert.equal(onlyAdv(h.mock.store).data.cast.overrides.roommate.looks, 'Petite, with a swinging tail.', 'the saved looks are stored');
       clean(h);
     } finally { h.close(); }
   },
