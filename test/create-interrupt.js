@@ -205,7 +205,7 @@ const S = {
   },
   // Cancel on a restored screen before the boot has finished, with no saves: the boot does not open a fresh creation over it.
   async cancelDuringBoot() {
-    const draft = { v: 1, worldId: 'mythaven', choices: { name: 'Erik Marcu', rmSpecies: 'cow' }, at: Date.now() };
+    const draft = { v: 1, worldId: 'sundered', choices: { name: 'Erik Marcu', rmSpecies: 'cow' }, at: Date.now() };
     const h = await boot({ setup(w, m) { m.dbLatency = 400; w.localStorage.setItem('windlass.createDraft', JSON.stringify(draft)); } });
     try {
       assert(h.$('#dlgCreate').open, 'the creation is restored at once');
@@ -271,7 +271,7 @@ const S = {
     } finally { h.close(); }
   },
   // A reload mid-invention (the earlier attempt): the next boot restores the creation screen, same world and choices.
-  async reloadRestores() { await reloadRestoresIn('sundered'); await reloadRestoresIn('mythaven'); },
+  async reloadRestores() { await reloadRestoresIn('sundered'); },
   // Closing the creation screen with nothing begun leaves the boot preview behind it, and the page says it is only a preview.
   async previewNote() {
     const h = await boot({});
@@ -308,7 +308,7 @@ const S = {
   },
   // Old or foreign drafts are dropped quietly (and logged); the normal randomised creation opens.
   async staleDraft() {
-    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, '{not json', { v: 1, worldId: 'sundered', choices: { name: 'Old Name', strengths: {} }, at: Date.now() }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 'yesterday' }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 1e100 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() + 864e5 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now(), tick: 0 }, { v: 1, worldId: '__proto__', choices: { name: 'Old Name' }, at: Date.now() }, { v: 1, worldId: 'constructor', choices: { name: 'Old Name' }, at: Date.now() }]) {
+    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, { v: 1, worldId: 'mythaven', choices: { name: 'Old Name' }, at: Date.now() }, { v: 1, worldId: 'halloway', choices: { name: 'Old Name' }, at: Date.now() }, '{not json', { v: 1, worldId: 'sundered', choices: { name: 'Old Name', strengths: {} }, at: Date.now() }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 'yesterday' }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 1e100 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() + 864e5 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now(), tick: 0 }, { v: 1, worldId: '__proto__', choices: { name: 'Old Name' }, at: Date.now() }, { v: 1, worldId: 'constructor', choices: { name: 'Old Name' }, at: Date.now() }]) {
       const h = await boot({ setup(w) { w.localStorage.setItem('windlass.createDraft', typeof d === 'string' ? d : JSON.stringify(d)); } });
       try {
         assert(await h.settle(150, 6000)); assert(h.$('#dlgCreate').open);

@@ -144,7 +144,9 @@ async function main() {
       'an incidental word range must leave the selected band alone');
 
     const worlds = h.window.WINDLASS_WORLDS;
-    for (const id of ['sundered', 'mythaven', 'halloway']) {
+    // Every world the page loads keeps the romance and anatomy rules (Sundered Isle is the only one in the game now).
+    assert(worlds.sundered, 'Sundered Isle must be loaded');
+    for (const id of Object.keys(worlds)) {
       const rules = worlds[id].rules.join('\n');
       assert.match(rules, /romance/i, id + ' must permit romance');
       assert.match(rules, /consensual adult sex may be (?:described|depicted) on-page when requested/i,
@@ -179,10 +181,6 @@ async function main() {
     assert.match(sunderedCow, /udder.*four teats/i, 'Sundered must retain its established bovine anatomy');
     const sunderedWolf = worlds.sundered.genPools.species.wolf.bodyByGender.female.join(' ');
     assert.match(sunderedWolf, /two rows of small nipples run down the abdomen/i, 'Sundered must retain its established wolf anatomy');
-    const mythavenUdder = worlds.mythaven.transformation.species.cow.ladder.find((step) => step.at === 85).trait;
-    assert.match(mythavenUdder, /udder develops low on the abdomen with four teats/i, 'Mythaven must use the sourced bovine anatomy');
-    assert.match(worlds.mythaven.genPools.species.cow.bodyByGender.female.join(' '), /udder.*four teats/i,
-      'Mythaven roommate profiles must retain the sourced bovine anatomy');
     const wolfTeeth = worlds.sundered.transformation.species.wolf.ladder.find((step) => step.at === 30).steps;
     assert.equal(wolfTeeth.length, 10, 'wolf canine progression must have ten incremental steps');
     assert.match(wolfTeeth[0], /canine catches.*looks unchanged/i, 'the first canine stage must remain subtle');

@@ -21,10 +21,11 @@ async function main() {
     a.close();
 
     // The player's case: the boot load is slow, and Begin is pressed before it finishes. The boot load ends while the
-    // cast is still being invented, and must leave the creation alone (its world, its progress note, its status).
+    // cast is still being invented, and must leave the creation alone (its world, its progress note, its status). Sundered
+    // Isle is the only world now, so there is no picker to set; the saved world must still be the one the creation used.
     const b = await boot({ setup(w, m) { ghost(w); m.dbLatency = 1500; m.sampleLatency = 700; } });
     await b.sleep(200);
-    b.$('#newWorld').value = 'mythaven'; b.click('#newAdv');
+    b.click('#newAdv');
     b.click('#cBegin');
     b.mock.dbLatency = 2;
     await b.sleep(1900);
@@ -35,7 +36,7 @@ async function main() {
     assert(await b.settle(150, 6000), 'the page did not settle');
     assert(!b.$('#dlgCreate').open, 'the boot load must not reopen the creation screen over a new adventure');
     assert.equal(advDocs(b.mock).length, 1, 'the new adventure must be saved');
-    assert.equal(advDocs(b.mock)[0][1].data.worldId, 'mythaven', 'the new adventure must keep the world the player chose');
+    assert.equal(advDocs(b.mock)[0][1].data.worldId, 'sundered', 'the new adventure must keep the world it was created in');
     const store = new Map([...b.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
     const savedId = advDocs(b.mock)[0][0].split('/')[1];
     assert(!b.errors.length && !b.mock.violations.length, 'page errors or contract violations: ' + JSON.stringify(b.errors.concat(b.mock.violations)));

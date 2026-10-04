@@ -2,6 +2,8 @@
 
 Runs the real page in jsdom against `mock-claude.js`, a strict mock of the artifact runtime (contract 0.2.60). By default it loads `../windlass/index.html` and `../windlass/worlds/*.js`. Set `WL_HTML` and `WL_WORLDS` to run the same scripts against another build, such as the reviewed snapshot in `../review/published/`.
 
+The game now has one world, the Sundered Isle (`worlds/sundered.js`); Halloway and Mythaven were removed, and the suites create and check Sundered adventures only. The reviewed snapshot in `../review/published/` still carries all three worlds. `audit-fixes.js hallowayAttunement` still checks the page's `runProgression` (the engine code only a world with a progression reaches) against the last Halloway world file, kept as the test fixture `fixtures/halloway.js` unless `WL_WORLDS` has one; `audit-fixes.js sunderedOnly` checks that saves from a removed world are passed over quietly at boot and shown as no longer in this game.
+
 The mock enforces the documented limits: 256 KiB per db document, 5,000 documents, the db path grammar, the 64 KiB sample input cap, sample option validation and the downloads extension allow-list. Every breach is recorded in `mock.violations` before the call is rejected. `mock.pending` counts db operations that have started and not yet settled; `h.idle()` and `h.settle()` wait for it to reach zero.
 
 `smoke` and `turns` are pass/fail checks: they exit 1 if a turn does not finish, the feed or the store is missing a turn, or the page logged an error or a contract violation. The other scripts are probes that print what they observe.
