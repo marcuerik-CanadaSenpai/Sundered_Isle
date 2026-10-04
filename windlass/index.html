@@ -604,9 +604,11 @@
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // Body structures an invented line may name only when the kind's own world text already has them.
   const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls)\b/gi;
+  // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
+  const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|dozen|several|multiple|many|[3-9]|\d{2,}) (?:\w+ )?(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:\w+ )?(?:heads|mouths|faces)\b/i;
   const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:\w+ )?(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
   function anatomyFits(text, sp) {
-    text = String(text || ''); if (ANATOMY_NEVER.test(text)) return false;
+    text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
     const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
     const kindWords = new Set(sp ? (JSON.stringify(sp).match(/[a-z]+/gi) || []).map(norm) : []);
@@ -1328,7 +1330,9 @@
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
   function isRomanceScene(input) {
     const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
-    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|take(?:s|ing)?\s+\w+\s+to bed|undress(?:es|ing)?\s+(?!and\b|for\b|quickly\b)\w+|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+    // Undressing someone else (a pronoun or a capitalised name), not undressing for a shower or in one's room.
+    if (/\b[Uu]ndress(?:es|ing)?\s+(?:him|her|them|each other|one another|[A-Z][\w'-]+)\b/.test(text)) return true;
+    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|take(?:s|ing)?\s+\w+\s+to bed|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
   // A change is on the page this turn: an arc in its opening phases, or a change note due now. A change merely pending
   // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
@@ -2256,15 +2260,20 @@
     ]);
   }
   // Writes this page's version over whatever the store holds, chunks included.
+  // The page is held while it runs, and every write names the adventure it started on, so nothing else can be opened midway.
   async function overwriteStore() {
     if (!db) return;
+    if (busy || loadingAdv || deletingAdv) { setStatus(busyMsg(), true); return; }
+    const mine = adv, id = mine.id, n = mine.turns.length;
+    busy = true; setBusyUI(true);
     try {
-      let storeTurns = 0, storeRev = 0; const s = await db.doc('adventures/' + adv.id).get(); if (s.exists) { storeTurns = s.data().turnCount || 0; storeRev = s.data().rev || 0; }
-      adv.rev = Math.max(adv.rev || 0, storeRev);
-      await persistAll(adv.id);
-      for (let i = Math.ceil(adv.turns.length / CHUNK); i < Math.ceil(storeTurns / CHUNK); i++) await db.doc('adventures/' + adv.id + '/turns/' + String(i).padStart(4, '0')).delete();
-      dirty = false; saveError = null; setStatus('Saved: this page\'s version now replaces the other one.'); setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } catch (e) { setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus('Overwrite failed: ' + ((e && e.code) || (e && e.message) || 'unknown'), true); }
+      let storeTurns = 0, storeRev = 0; const s = await db.doc('adventures/' + id).get(); if (s.exists) { storeTurns = s.data().turnCount || 0; storeRev = s.data().rev || 0; }
+      mine.rev = Math.max(mine.rev || 0, storeRev);
+      await persistAll(id);
+      for (let i = Math.ceil(n / CHUNK); i < Math.ceil(storeTurns / CHUNK); i++) await db.doc('adventures/' + id + '/turns/' + String(i).padStart(4, '0')).delete();
+      if (adv === mine) { dirty = false; saveError = null; setStatus('Saved: this page\'s version now replaces the other one.'); setSaveNote('saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })); }
+    } catch (e) { if (adv === mine) { setSaveNote('save failed: ' + ((e && e.code) || 'unknown'), true); setStatus('Overwrite failed: ' + ((e && e.code) || (e && e.message) || 'unknown'), true); } }
+    finally { busy = false; setBusyUI(false); }
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncFromStore(); });
   window.addEventListener('focus', () => syncFromStore());
