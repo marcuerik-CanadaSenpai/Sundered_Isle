@@ -3140,15 +3140,32 @@
     castSel = selectKey || castSel || (activeCharacters()[0] || {}).key;
     renderCastList(); renderCastForm(); openDlg('dlgCast');
   }
+  // Edits typed into the form but not yet saved. A close the player did not ask for (the Android back gesture, Esc, a stray tap)
+  // or a tap on another name would throw them away and the player would have to start again, so while the form holds unsaved
+  // edits a close request is refused, Close and a change of person ask first (do it again to drop the edits), and if the
+  // browser closes the screen anyway it comes straight back with the edits as they were. castShown is the form as last rendered
+  // or saved; castArmed names the discarding action asked for once.
+  const CAST_FORM_FIELDS = ['#cfName', '#cfAliases', '#cfSpecies', '#cfGender', '#cfAttitude', '#cfLooks', '#cfBrief', '#cfSheet', '#cfAim', '#cfWhere'];
+  let castShown = null, castArmed = '';
+  const castSnapshot = () => CAST_FORM_FIELDS.map((id) => $(id).value).join('\u0000');
+  const castDirty = () => castShown != null && !$('#castForm').hidden && castSnapshot() !== castShown;
+  // True when the discarding action may go ahead: at once with nothing unsaved, or asked for a second time.
+  function castMayDrop(action, again) {
+    if (!castDirty() || castArmed === action) { castArmed = ''; return true; }
+    castArmed = action;
+    const c = activeCharacters().find((x) => x.key === castSel) || baseCharacter(castSel);
+    $('#cfNote').textContent = 'Unsaved edits to ' + ((c && c.name) || 'this character') + '. Save them, or ' + again + ' again to drop them.';
+    return false;
+  }
   function renderCastList() {
     const cs = castState(); const list = activeCharacters();
     const hidden = cs.hidden.map((k) => baseCharacter(k)).filter(Boolean).map((c) => Object.assign({}, c, { _hidden: true }));
     $('#castList').innerHTML = list.concat(hidden).map((c) => '<button type="button" data-key="' + esc(c.key) + '" class="' + (c.key === castSel ? 'sel' : '') + '">' + esc(nameWithRace(c)) + (c._hidden ? ' · removed' : (cs.overrides[c.key] || cs.added.some((a) => a.key === c.key) ? ' *' : '')) + '<span class="k">' + esc(c.key) + '</span></button>').join('');
-    $('#castList').querySelectorAll('button').forEach((b) => { b.onclick = () => { castSel = b.dataset.key; renderCastList(); renderCastForm(); }; });
+    $('#castList').querySelectorAll('button').forEach((b) => { b.onclick = () => { if (b.dataset.key === castSel || !castMayDrop('pick:' + b.dataset.key, 'tap the name')) return; castSel = b.dataset.key; renderCastList(); renderCastForm(); }; });
   }
   function renderCastForm() {
     const cs = castState(); const c = activeCharacters().find((x) => x.key === castSel) || baseCharacter(castSel);
-    $('#castForm').hidden = !c; if (!c) return;
+    $('#castForm').hidden = !c; castArmed = ''; if (!c) { castShown = null; return; }
     const isAdded = cs.added.some((a) => a.key === c.key);
     const genders = (W.creation && W.creation.genders) || [{ key: 'male', label: 'Man' }, { key: 'female', label: 'Woman' }, { key: 'nonbinary', label: 'Non-binary' }];
     $('#cfGender').innerHTML = genders.map((g) => '<option value="' + esc(g.key) + '">' + esc(g.label) + '</option>').join('');
@@ -3161,6 +3178,7 @@
     $('#cfAim').value = fill((c.aims && c.aims.default) || ''); $('#cfWhere').value = fill((c.where && c.where.default) || '');
     $('#cfReset').hidden = isAdded; $('#cfRemove').textContent = cs.hidden.includes(c.key) ? 'Restore to the story' : 'Remove from the story';
     $('#cfNote').textContent = isAdded ? 'Added in this adventure.' : (cs.overrides[c.key] ? 'Edited in this adventure.' : '');
+    castShown = castSnapshot();
   }
   // A renamed (or reset) person stays present however the scene lists them: by full name, given name, surname or the
   // surname's last word ("Lane" for Daisy Holt Lane), in any case, with a "(Race)" label kept. A name with no surname takes
@@ -3213,7 +3231,7 @@
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Change is not saved yet.';
   }
   async function addCast() {
-    if (busy) return;
+    if (busy || !castMayDrop('add', 'tap Add a character')) return;
     const cs = castState(); let base = 'npc' + (cs.added.length + 1); let key = base; let n = 1; while (activeCharacters().some((c) => c.key === key) || cs.hidden.includes(key)) key = base + '_' + (++n);
     const c = { key, name: 'New character', gender: 'nonbinary', pronouns: genderDef('nonbinary').pronouns, aliases: [], race: '', looks: '', brief: 'A new face on campus.', sheet: '', aims: { default: 'go about their own business' }, where: { default: 'around campus' }, attitude: 5 };
     cs.added.push(c); adv.state.attitudes[key] = 5; castSel = key; renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Character added here, but the change is not saved yet.';
@@ -3519,6 +3537,12 @@
   $('#cfRemove').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await toggleRemoveCast(); } finally { castDispatching = false; } };
   $('#castAdd').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await addCast(); } finally { castDispatching = false; } };
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => closeDlg(b.dataset.close); });
+  // The Cast screen keeps unsaved edits (see castMayDrop): Close asks first, a back gesture or Esc is refused, and a screen the
+  // browser closed anyway comes back as it was. A deliberate Close forgets the rendered form, so the close event lets it go.
+  $('#dlgCast [data-close]').onclick = () => { if (!castMayDrop('close', 'tap Close')) return; castShown = null; closeDlg('dlgCast'); };
+  $('#dlgCast').addEventListener('cancel', (e) => { if (!castDirty()) return; if (e.cancelable) e.preventDefault(); $('#cfNote').textContent = 'Unsaved edits. Save them, or tap Close to leave.'; });
+  $('#dlgCast').addEventListener('close', () => { if (!castDirty()) return; openDlg('dlgCast'); $('#cfNote').textContent = 'Unsaved edits kept. Save them, or tap Close to leave.'; });
+  $('#castForm').addEventListener('input', () => { if (castArmed) { castArmed = ''; $('#cfNote').textContent = ''; } });
   ['setNarrTier', 'setUtilTier', 'setDensity', 'setWindow', 'setAutoFit', 'setPace', 'setThoughts', 'setInventTier'].forEach((id) => {
     $('#' + id).onchange = async () => {
       adv.settings.narrTier = $('#setNarrTier').value; adv.settings.utilTier = $('#setUtilTier').value; adv.settings.density = $('#setDensity').value; adv.settings.window = Number($('#setWindow').value); adv.settings.autoFit = $('#setAutoFit').value === '1'; adv.settings.pace = $('#setPace').value; adv.settings.thoughts = $('#setThoughts').value === '1'; adv.settings.inventTier = $('#setInventTier').value;
