@@ -603,7 +603,7 @@
   }
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // Body structures an invented line may name only when the kind's own world text already has them.
-  const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls)\b/gi;
+  const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls|tongues?|tentacles?|antennae?|stingers?|quills?|mandibles?|pincers?|carapace|shells?|crests?|frills?|webbing|webbed|scaly|prehensile|forked|serpentine|reptilian|vestigial|barbed)\b/gi;
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
   const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|dozen|several|multiple|many|[3-9]|\d{2,}) (?:\w+ )?(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:\w+ )?(?:heads|mouths|faces)\b/i;
   const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:\w+ )?(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
@@ -665,7 +665,13 @@
     plan = plan || roommatePlan(W, c);
     const typed = plan.typed; const species = plan.species;
     const sp = species ? speciesPool(W, species) : null;
-    const p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null });
+    // The roommate never shares the player's given name or surname (unless the player typed it that way): an invented
+    // name that does is dropped, and a drawn one is drawn again.
+    const taken = new Set(String(c.name || '').trim().split(/\s+/).filter(Boolean).map((x) => x.toLowerCase()));
+    const clash = (f, l) => taken.has(String(f || '').toLowerCase()) || taken.has(String(l || '').toLowerCase());
+    if (given && clash(given.first, given.last)) given = Object.assign({}, given, { first: '', last: '' });
+    let p = null;
+    for (let i = 0; i < 20; i++) { p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null }); if (String(c.rmName || '').trim() || !clash(p.first, p.last)) break; }
     const race = species ? speciesRace(W, species) : cap(typed);
     const hope = sp ? sp.hope : 'whatever draws a human toward ' + p.pronouns.their + ' kind, which ' + p.pronouns.they + ' will not be the first to say';
     const aims = Object.assign({ default: 'get to know {first} and find out what kind of roommate {they} will be; hopes, in time, for ' + hope + ', and does not push' }, sp ? sp.aims : {});
@@ -1518,7 +1524,7 @@
     const hay = String(action || ''); if (!hay) return [];
     const out = [];
     for (const c of activeCharacters()) {
-      const handles = [givenName(c), c.name].concat(c.aliases || []).filter((h) => h && h.length > 2 && h !== c.last);
+      const handles = nameHandles(c).filter((h) => h && h.length > 2);
       if (handles.some((h) => properWordIn(hay, h))) out.push(givenName(c));
     }
     return out.slice(0, 3);
