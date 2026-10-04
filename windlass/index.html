@@ -646,7 +646,7 @@
     // Figures and words are one count ("2 tails" is "two tails").
     const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
     const NUM = '(' + ANATOMY_SOME + '|\\d+)', NUMS = '(' + WORDS.join('|') + '|\\d+)', words = "(?:[\\w'-]+,? ){0,3}?";
-    const nounRe = '(' + ANATOMY_PART + ')', stemOf = (w) => w.toLowerCase().replace(/(?:ves|s)$/, '');
+    const nounRe = '(' + ANATOMY_PART + ')', stemOf = (w) => { w = w.toLowerCase(); return /^hoo(?:f|fs|ves)$/.test(w) ? 'hoo' : w.replace(/(?:ves|s)$/, ''); };
     const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
     // "Two pairs of wings" must be pairs in the kind's text too.
     for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + '((?:pairs?|sets?|rows?) of ' + ANATOMY_MODS + ')?' + nounRe + '\\b', 'gi'))) {
