@@ -238,6 +238,20 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 6b. The page's own anatomy check against the Sundered cow: impossible counts and ordinals are refused, the kind's own
+  // structures and counts and ordinary habits pass.
+  async anatomyCounts() {
+    const src = fs.readFileSync(HTML, 'utf8');
+    const a = src.indexOf('  const ANATOMY_WORDS'), b = src.indexOf('  // Draws one person from the pools');
+    assert(a > 0 && b > a, 'the anatomy check must be in the page');
+    const escRe = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const fits = new Function('escRe', src.slice(a, b) + '\nreturn anatomyFits;')(escRe);
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const cow = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.cow;
+    for (const t of ['flicks her two tails when amused', 'has eleven arms', 'scratches her second head when thinking', 'rubs three long muscular arms', 'a third arm folded away']) assert.equal(fits(t, cow), false, 'refused: ' + t);
+    for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+  },
+
   // 7. The generated cast never takes the player's first name, and an invented first name with a space is refused.
   async inventedNames() {
     const h = await begin({
@@ -365,7 +379,7 @@ const S = {
       await setWriter(h, 'auto');
       const W = h.window.WINDLASS_WORLDS[onlyAdv(h.mock.store).data.worldId];
       const rich = W.wordBands.rich;
-      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.']) {
+      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.', 'i take rin to bed', 'I undress rin slowly.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.equal(c.opts.modelTier, 'complex', a + ' is romance: the complex tier on auto');
@@ -376,7 +390,7 @@ const S = {
         assert.match(p, /Use only anatomy and functions established in the world data; do not invent them/, 'established anatomy only');
         assert.doesNotMatch(p, /fade to black|sex is not depicted|sex remains off-page/i, 'no off-page rule');
       }
-      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I undress in my room.']) {
+      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');
