@@ -442,7 +442,8 @@ const S = {
       const rich = W.wordBands.rich;
       for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.', 'i take rin to bed', 'I undress rin slowly.', 'I take her gently up to bed.', 'I go to bed with Rin tonight.',
         'I undress Rin very slowly.', 'I undress her very slowly.', 'I undress Rin languidly.', 'I undress her piece by piece.', 'I take her all the way up to bed.',
-        'I take Rin by the hand to bed.', 'I take her home and to bed.', 'I take Rin and Ana up to bed.', 'I take Rin, slowly, to bed.']) {
+        'I take Rin by the hand to bed.', 'I take her home and to bed.', 'I take Rin and Ana up to bed.', 'I take Rin, slowly, to bed.',
+        'I take Rin by the hand, gently, to bed.', 'I take her back to my room and to bed.', 'I take her - slowly - to bed.', 'I take her, then Ana, to bed.', 'I take her upstairs with me to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.equal(c.opts.modelTier, 'complex', a + ' is romance: the complex tier on auto');
@@ -455,7 +456,8 @@ const S = {
       }
       for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.',
         'I take her book to bed.', "I take Rin's notebook to bed.", 'I go to bed with her book.', "I go to bed with Rin's letters.", 'I take her dolly to bed.', 'I take her butterfly to bed.', 'I take her jelly to bed.',
-        'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.']) {
+        'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.',
+        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');

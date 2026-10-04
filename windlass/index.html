@@ -1411,24 +1411,32 @@
     // After "her" the word may be her own thing ("her butterfly", "her dolly"), so only the adverbs named above count.
     const lyAdverb = /^[a-z-]+ly\b/i;
     const nameWord = "[A-Z][\\w-]*(?:['\u2019](?!s\\b)[\\w-]+)*";
-    // With whole set, the person must fill the stretch to its end: adverbs, set off by commas or dashes if need be, more
-    // people joined by "and" or "or", a closing phrase such as "by the hand", or a bare "and" or "then" before what follows
-    // ("her home and to bed"). Anything else is a clause of its own ("her downstairs and go to bed").
-    const closing = /^(?:in|on|at|into|onto|under|beside|behind|against|towards?|for|with|without|from|by|near|over|across)\b(?!.*\b(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if)\b)[^,;:\u2014\u2013]*$/i;
+    // With whole set, the person must fill the stretch to its end: adverbs, set off by commas or dashes if need be, a closing
+    // phrase such as "by the hand" or "to my room" (a few plain words, no clause inside), more people or phrases joined by
+    // "and", "or" or "then", and a bare joiner before what follows ("her home and to bed"). Anything else is a clause of its
+    // own ("her downstairs and go to bed").
+    const closing = /^(?:in|on|at|into|onto|under|beside|behind|against|to|towards?|for|with|without|from|by|near|over|across)\s+(?:(?!(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if)\b)[\w'’-]+\s*){1,4}/i;
+    const joiner = /^(?:and(?:\s+then)?|or|then)(?:\s+|$)/i;
     const person = (rest, whole) => {
       rest = String(rest || '').trim();
-      const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'\u2019])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
+      const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'’])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
         .concat(handles.map((h) => new RegExp('^' + escRe(h) + '(?!\\w)', 'i'))).map((re) => re.exec(rest)).filter(Boolean);
       return heads.some((h) => {
         let tail = rest.slice(h[0].length).trim(); const her = /^her$/i.test(h[0]);
+        const pause = (t) => whole ? t.replace(/^(?:[,—–]|-(?=\s|$))\s*/, '') : t;
         for (;;) {
-          if (whole) tail = tail.replace(/^(?:[,\u2014\u2013]|-(?=\s))\s*/, '');
+          tail = pause(tail);
           if (objectEnd.test(tail)) break;
           const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)); if (!a) return false; tail = tail.slice(a[0].length).trim();
         }
-        if (!whole || !tail || /^(?:(?:and|or)(?:\s+then)?|then)$/i.test(tail)) return true;
-        const more = /^(?:and|or)\s+/i.exec(tail);
-        return more ? person(tail.slice(more[0].length), true) : closing.test(tail);
+        if (!whole) return true;
+        for (;;) {
+          tail = pause(tail).trim();
+          if (!tail) return true;
+          const j = joiner.exec(tail);
+          if (j) { tail = tail.slice(j[0].length); if (!tail || person(tail, true)) return true; continue; }
+          const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)) || closing.exec(tail); if (!a) return false; tail = tail.slice(a[0].length);
+        }
       });
     };
     for (const m of text.matchAll(/\bundress(?:es|ing)?\s+([^.!?\n]*)/gi)) if (person(m[1])) return true;
