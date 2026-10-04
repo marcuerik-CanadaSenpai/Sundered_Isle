@@ -2,15 +2,14 @@
 // Regressions for the audit fixes: one scenario per fix. Each passes on the fixed page and fails on the page before the fixes
 // (2512da3); sunderedOnly fails on the last three-world page (d985886). Run one scenario by name: node audit-fixes.js romanceDetection
 // Against another build: WL_HTML=<index.html> WL_WORLDS=<worlds dir> node audit-fixes.js
-// Halloway and Mythaven have left the game; hallowayAttunement reads the last Halloway world file from git (HALLOWAY_REV)
+// Halloway and Mythaven have left the game; hallowayAttunement reads the last Halloway world file from test/fixtures/halloway.js
 // to exercise runProgression, the engine code only a world with a progression reaches.
 const assert = require('node:assert/strict');
-const fs = require('fs'), path = require('path'), vm = require('vm'), { execFileSync } = require('child_process');
+const fs = require('fs'), path = require('path'), vm = require('vm');
 const { boot } = require('./boot');
 
 const HTML = process.env.WL_HTML || path.join(__dirname, '..', 'windlass', 'index.html');
 const WORLDS = process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds');
-const HALLOWAY_REV = 'd985886';   // the last commit with windlass/worlds/halloway.js
 let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
 
 const advDocs = (store) => [...store.entries()].filter(([p]) => /^adventures\/[^/]+$/.test(p));
@@ -51,14 +50,14 @@ function patchTurns(h, patch) {
 const S = {
   // 1. Halloway Attunement: salt taken during a stage-crossing fever keeps that crossing's marks owed; no second crossing while
   // they are pending; a matched kin draws +1 a night from Stage 0. Halloway is no longer in the game, so its world file comes
-  // from WL_WORLDS when a build there still has it, otherwise from git; runProgression comes from the page under test.
+  // from WL_WORLDS when a build there still has it, otherwise from test/fixtures; runProgression comes from the page under test.
   async hallowayAttunement() {
     const src = fs.readFileSync(HTML, 'utf8');
     const a = src.indexOf('  function runProgression'), b = src.indexOf('  // ---------- per-species');
     assert(a > 0 && b > a, 'runProgression not found in the page');
     const local = path.join(WORLDS, 'halloway.js');
-    const hallowaySrc = fs.existsSync(local) ? fs.readFileSync(local, 'utf8')
-      : execFileSync('git', ['show', HALLOWAY_REV + ':windlass/worlds/halloway.js'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', maxBuffer: 1 << 26 });
+    // The retired world is kept as a test fixture (its last version), so the check needs no repository history.
+    const hallowaySrc = fs.readFileSync(fs.existsSync(local) ? local : path.join(__dirname, 'fixtures', 'halloway.js'), 'utf8');
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(hallowaySrc, ctx);
     const W = ctx.window.WINDLASS_WORLDS.halloway;
     const runProgression = new Function('W', 'firstName', src.slice(a, b) + '\nreturn runProgression;')(W, () => 'Wren');
