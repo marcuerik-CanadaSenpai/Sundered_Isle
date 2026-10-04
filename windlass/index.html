@@ -619,12 +619,12 @@
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face, or more than one pair or
   // set of arms, legs or heads ("three pairs of arms"; "two pairs of hands" is help, "two rows of faces" a crowd).
   const ANATOMY_COUNT = new RegExp('\\b(?:' + ANATOMY_MANY + ') ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:' + ANATOMY_SOME + ') ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b|\\b(?:' + ANATOMY_SOME + ') ' + ANATOMY_MODS + '(?:pairs|sets) of ' + ANATOMY_MODS + '(?:arms|legs|heads)\\b', 'i');
-  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms", "her fourth pair of arms"; "an extra
-  // or a second pair of hands" or "of eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is
-  // her free one); "split second" is time, and "a second, smaller head" counts where "a second, mouth open" does not;
-  // "other" counts only after a possessive ("her other head", never "the other side of her face"); "another" is left out
-  // ("another mouth to feed").
-  const ANATOMY_NEVER = new RegExp('\\b(?:' + ANATOMY_ORD + '|extra|additional|(?:second|2nd|' + ANATOMY_ORD + '|extra|additional) ' + ANATOMY_MODS + '(?:pair|set|row) of(?! ' + ANATOMY_MODS + '(?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\b(?:second|2nd)(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
+  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms", "her fourth pair of arms"). Only "an
+  // extra" or "a second pair of hands" or "of eyes" is help, not anatomy; from third on every pair is a body's ("her third
+  // pair of eyes"). "Spare" leaves out hands and arms ("her spare hand" is her free one); "split second" is time, and "a
+  // second, smaller head" counts where "a second, mouth open" does not; "other" counts only after a possessive ("her other
+  // head", never "the other side of her face"); "another" is left out ("another mouth to feed").
+  const ANATOMY_NEVER = new RegExp('\\b(?:' + ANATOMY_ORD + '|extra|additional|(?:second|2nd|extra|additional) ' + ANATOMY_MODS + '(?:pair|set|row) of(?! ' + ANATOMY_MODS + '(?:hands|eyes)\\b)|(?:' + ANATOMY_ORD + ') ' + ANATOMY_MODS + '(?:pair|set|row) of) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\b(?:second|2nd)(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
@@ -1384,18 +1384,28 @@
     // After "her" the word may be her own thing ("her butterfly", "her dolly"), so only the adverbs named above count.
     const lyAdverb = /^[a-z-]+ly\b/i;
     const nameWord = "[A-Z][\\w-]*(?:['\u2019](?!s\\b)[\\w-]+)*";
-    const person = (rest) => {
+    // With whole set, the person must fill the stretch to its end: adverbs, set off by commas or dashes if need be, more
+    // people joined by "and" or "or", a closing phrase such as "by the hand", or a bare "and" or "then" before what follows
+    // ("her home and to bed"). Anything else is a clause of its own ("her downstairs and go to bed").
+    const closing = /^(?:in|on|at|into|onto|under|beside|behind|against|towards?|for|with|without|from|by|near|over|across)\b(?!.*\b(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if)\b)[^,;:\u2014\u2013]*$/i;
+    const person = (rest, whole) => {
       rest = String(rest || '').trim();
       const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'\u2019])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
         .concat(handles.map((h) => new RegExp('^' + escRe(h) + '(?!\\w)', 'i'))).map((re) => re.exec(rest)).filter(Boolean);
       return heads.some((h) => {
         let tail = rest.slice(h[0].length).trim(); const her = /^her$/i.test(h[0]);
-        while (!objectEnd.test(tail)) { const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)); if (!a) return false; tail = tail.slice(a[0].length).trim(); }
-        return true;
+        for (;;) {
+          if (whole) tail = tail.replace(/^(?:[,\u2014\u2013]|-(?=\s))\s*/, '');
+          if (objectEnd.test(tail)) break;
+          const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)); if (!a) return false; tail = tail.slice(a[0].length).trim();
+        }
+        if (!whole || !tail || /^(?:(?:and|or)(?:\s+then)?|then)$/i.test(tail)) return true;
+        const more = /^(?:and|or)\s+/i.exec(tail);
+        return more ? person(tail.slice(more[0].length), true) : closing.test(tail);
       });
     };
     for (const m of text.matchAll(/\bundress(?:es|ing)?\s+([^.!?\n]*)/gi)) if (person(m[1])) return true;
-    for (const m of text.matchAll(/\btak(?:e|es|ing)\s+([^.!?\n]{1,40}?)\s+to bed\b/gi)) if (person(m[1])) return true;
+    for (const m of text.matchAll(/\btak(?:e|es|ing)\s+([^.!?\n]{1,40}?)\s+to bed\b/gi)) if (person(m[1], true)) return true;
     for (const m of text.matchAll(/\b(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with\s+([^.!?\n]*)/gi)) if (person(m[1])) return true;
     return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
