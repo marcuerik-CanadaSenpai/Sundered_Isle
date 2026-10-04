@@ -607,7 +607,7 @@
   const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls|tongues?|tentacles?|antennae?|stingers?|quills?|mandibles?|pincers?|carapace|shells?|crests?|frills?|webbing|webbed|scaly|prehensile|forked|serpentine|reptilian|vestigial|barbed)\b/gi;
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
   const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|dozen|several|multiple|many|[3-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:heads|mouths|faces)\b/i;
-  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:[\w'-]+,? ){0,3}(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
+  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:[\w'-]+,? ){0,3}(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b|\b(?:second|other|another|spare) (?:[\w'-]+,? ){0,3}(?:heads?|mouths?|faces?)\b/i;
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
@@ -2404,6 +2404,17 @@
   // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
   const LEGACY_WORLD = 'halloway';
   // A listed save whose world is no longer in this game: it stays listed in Adventures but is never opened on its own.
+  // Saves newest first, for opening one. When the newest fifty all belong to removed worlds, this game's own worlds are
+  // asked for directly, so an older playable save is still found.
+  async function savesNewestFirst() {
+    const page = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
+    const docs = (page.docs || []).slice();
+    if (docs.length < 50 || docs.some((d) => !retiredSave(d))) return docs;
+    const seen = new Set(docs.map((d) => d.id));
+    for (const w of WORLD_IDS) { const q = await db.collection('adventures').where('worldId', '==', w).orderBy('updatedAt', 'desc').limit(50).get(); for (const d of (q.docs || [])) if (!seen.has(d.id)) { seen.add(d.id); docs.push(d); } }
+    const at = (d) => { try { return String((d.data() || {}).updatedAt || ''); } catch (e) { return ''; } };
+    return docs.sort((a, b) => (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0));
+  }
   const retiredSave = (d) => { try { const w = (d.data() || {}).worldId || LEGACY_WORLD; return !Object.prototype.hasOwnProperty.call(WORLDS, w); } catch (e) { return false; } };
   // A previous version becomes the live turn and state on "Previous version", so only well-formed ones are kept from a save.
   // Every list field a previous version brings back into play (the feed, the suggestions, memory, the engine notes) must be
@@ -2599,7 +2610,7 @@
             setStatus('');
             if (isCur) {
               // The newest remaining save this game can open; saves from removed worlds are passed over.
-              let next = null; try { const left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get(); next = (left.docs || []).find((d) => !retiredSave(d)) || null; } catch (e) { next = null; }
+              let next = null; try { next = (await savesNewestFirst()).find((d) => !retiredSave(d)) || null; } catch (e) { next = null; }
               if (next) await loadAdventure(next.id);
               else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
             }
@@ -3076,7 +3087,8 @@
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
-    if (c.name !== name) adv.state.present = adv.state.present.map((pn) => pn === c.name ? name : pn);
+    // A renamed person stays present however they were listed: by full name, given name or surname.
+    if (c.name !== name) { const was = { [c.name]: name, [oldFirst]: parts.first }; if (oldLast && parts.last) was[oldLast] = parts.last; adv.state.present = adv.state.present.map((pn) => { const bare = String(pn).replace(/\s*\([^)]*\)\s*$/, '').trim(); return Object.prototype.hasOwnProperty.call(was, bare) && was[bare] ? String(pn).replace(bare, was[bare]) : pn; }); }
     if (att != null) adv.state.attitudes[key] = Math.max(0, Math.min(10, Math.round(att)));
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Saved.' : 'Changes are not saved yet.';
   }
@@ -3595,7 +3607,7 @@
     let snap = null, listError = null;
     try {
       // Open the adventure saved most recently on any device, so a phone session carries on from the desktop and back.
-      snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
+      const docs = await savesNewestFirst(); snap = { docs, empty: !docs.length };
     } catch (e) { listError = e; }
     // Saves from a world no longer in this game cannot open here; boot passes over them quietly (they stay listed in Adventures).
     const retired = retiredSave;

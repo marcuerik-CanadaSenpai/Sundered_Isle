@@ -216,6 +216,7 @@ const S = {
             if (p.key === 'roommate') { p.detail = 'a forked tongue behind the teeth'; p.quirk = 'flexes small folded wings at the shoulder blades when nervous'; }
             if (p.key === 'runner_human') { p.detail = 'five arms folded beneath the coat'; p.quirk = 'tucks a forked tail into a coat pocket'; }
             if (p.key === 'creamery') { p.detail = 'a chipped front tooth'; p.quirk = 'hums the same three bars while counting change'; }
+            if (p.key === 'choir') p.quirk = 'scratches her second head when thinking';
           }
           return JSON.stringify(d);
         };
@@ -226,7 +227,7 @@ const S = {
       const people = [data.roommate].concat(data.cast.generated.characters);
       const all = JSON.stringify(people);
       assert(people.length > 3 && data.cast.generated.characters.some((c) => c.key === 'runner_human'), 'the generated cast must include runner_human');
-      assert.doesNotMatch(all, /forked tongue|five arms|forked tail/, 'free-form anatomy must never reach a description or quirk');
+      assert.doesNotMatch(all, /forked tongue|five arms|forked tail|second head/, 'free-form anatomy must never reach a description or quirk');
       assert.doesNotMatch(all, /third arm/, 'an extra arm must never reach a description');
       assert.doesNotMatch(JSON.stringify(data.roommate), /folded wings/, 'wings on a kind without wings must never reach a quirk');
       const cream = data.cast.generated.characters.find((c) => c.key === 'creamery');
@@ -246,6 +247,9 @@ const S = {
           const r = m.defaultHandler(input, o, call);
           if (call.label !== 'cast invention') return r;
           const d = JSON.parse(r);
+          const others = d.people.filter((p) => !['roommate', 'creamery', 'choir'].includes(p.key) && 'first' in p);
+          if (others[0]) others[0].first = 'MIRA';
+          if (others[1]) others[1].last = 'Holt Lane';
           for (const p of d.people) {
             if (p.key === 'roommate') { p.first = 'Tessa'; p.last = 'Holt Lane'; }
             if (p.key === 'creamery') { p.first = 'Mira'; p.last = 'Quell'; }
@@ -263,6 +267,7 @@ const S = {
         assert.notEqual(String(c.first || c.name.split(' ')[0]).toLowerCase(), 'mira', c.key + ' must not share the player\'s first name: ' + c.name);
         assert.doesNotMatch(c.name, /Mary Ann/, c.key + ' must not take a two-word first name: ' + c.name);
         assert(!/\s/.test(c.first || ''), c.key + ' first name has a space: ' + c.first);
+        assert.doesNotMatch(String(c.last || ''), /holt/i, c.key + ' must not take the player\'s surname, however written: ' + c.name);
       }
       assert.notEqual(data.roommate.first, 'Mira');
       assert.doesNotMatch(data.roommate.last, /Holt/i, 'an invented roommate cannot embed the player surname in a multiword name');
@@ -272,8 +277,14 @@ const S = {
 
   // 8. Renaming the roommate in the Cast editor reaches every {rm_*} in the next turn prompt; the aliases follow the name.
   async roommateRename() {
-    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    // The narrator may list her by her given name alone; the rename must carry that entry over too.
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)); seeded.get(advKey).data.state.present = ['Daisy'];
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
     try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      assert.deepEqual(Array.from(onlyAdv(h.mock.store).data.state.present), ['Daisy'], 'the roommate is listed present by given name');
       h.click('#btnCast'); await h.sleep(20);
       assert.equal(h.$('#cfName').value, 'Daisy Clover', 'the roommate is selected in the Cast editor');
       h.$('#cfName').value = 'Bess Morrow'; h.$('#cfAliases').value = 'Daisy, Clover, Dee';
@@ -289,6 +300,7 @@ const S = {
       const { data } = onlyAdv(h.mock.store);
       const ov = data.cast.overrides[data.roommate.key];
       assert(ov, 'the rename is saved as an override');
+      assert(!data.state.present.some((x) => /Daisy/.test(x)) && data.state.present.includes('Bess'), 'a given-name presence entry follows the rename: ' + JSON.stringify(data.state.present));
       assert.deepEqual(Array.from(ov.aliases), ['Bess', 'Morrow', 'Dee'], 'the old given name and surname are swapped for the new ones; other aliases stay');
       clean(h);
     } finally { h.close(); }
@@ -553,6 +565,16 @@ const S = {
         clean(h);
       } finally { h.close(); }
     }
+    // (d) Fifty newer saves from a removed world fill the first page of the save list: the older Sundered save still opens.
+    const big = copyStore(); const base = Date.parse(store.get('adventures/' + sunId).data.updatedAt);
+    for (let i = 0; i < 50; i++) { const id = 'advretired' + String(i).padStart(2, '0'); const c = JSON.parse(JSON.stringify(store.get('adventures/' + oldId))); c.data.id = id; c.data.updatedAt = new Date(base + 120000 + i * 1000).toISOString(); big.set('adventures/' + id, c); }
+    const hd = await boot({ setup(w, m) { m.store = big; } });
+    try {
+      assert(await hd.settle(150, 8000), '(fifty retired) boot did not settle'); await hd.idle(10000); await hd.settle(100, 4000);
+      assert(!hd.$('#dlgCreate').open, '(fifty retired) the Sundered save must open, not the creation screen');
+      assert.equal(hd.window.localStorage.getItem('windlass.last'), sunId, '(fifty retired) the Sundered save must be the one opened');
+      clean(hd);
+    } finally { hd.close(); }
   },
 };
 
