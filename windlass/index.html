@@ -1188,8 +1188,24 @@
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
     if (path && !path.breasts) path.breasts = pickBreasts(W, k);
     const st = (W.transformation && W.transformation.sexStages) || {};
-    const staged = String(text || '').replace(/\{(tanner\d|genitals)\}/g, (m, key) => (st[key] != null ? st[key] : m));
+    const staged = String(text || '').replace(/\{(tanner\d|genitals)\}/g, (m, key) => (st[key] != null ? st[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
     return fill(kindText(W, k, staged, path && path.eye, path && path.breasts));
+  }
+  // A chest draw's shape alone, the part before its first semicolon: what the breasts do (a bovine woman's milk) is told by the kind's form steps.
+  const chestShape = (b) => String(b || 'breasts').split(';')[0].trim();
+  // The kind's form steps told on a path. A save from before they were kept (v69) rebuilds them: every women step of a rung whose
+  // form track is done, and the told part of one under way, for a body that is or is becoming a woman's.
+  function formToldOf(tf, k) {
+    const path = tf.paths && tf.paths[k]; if (!path) return [];
+    if (Array.isArray(path.formTold)) return path.formTold;
+    const sp = W.transformation.species[k], tracks = tf.tracks || [], form = [];
+    const womanly = path.sex ? path.sex === 'female' : (((adv && adv.player) || {}).gender === 'female' || !!(tf.sex && tf.sex.to === 'female'));
+    if (womanly) for (let i = 0; i < (tf.rungs[k] || 0); i++) {
+      const ft = tracks.find((t) => t.species === k && t.kind === 'form' && t.rung === i + 1);
+      if (ft) form.push(...ft.steps.slice(0, ft.i));
+      else form.push(...((sp.ladder[i] && sp.ladder[i].women) || []));
+    }
+    return form;
   }
   const rungContent = (sp, path, position) => sp.ladder[(path && Array.isArray(path.order) && path.order[position] != null) ? path.order[position] : position] || sp.ladder[position];
   const STEP_KEEP = 0.75, STEP_KEEP_MIN = 0.6;
@@ -1298,6 +1314,9 @@
       if (t.kind === 'sex') {
         const path = tf.paths[t.species];
         if (path) { path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]); }
+      } else if (t.kind === 'form') {
+        const path = tf.paths[t.species];
+        if (path) { path.formTold = formToldOf(tf, t.species); path.formTold.push(t.steps[t.i]); }
       }
       const last = t.i === t.steps.length - 1; t.i += 1; t.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
       if (!last) continue;
@@ -1333,6 +1352,7 @@
         tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && (x.kind === 'sex' || x.kind === 'form') && x.rung === t.rung));
         const path = (tf.paths || {})[t.species], rung = sp.ladder[t.rung - 1];
         if (path && Array.isArray(path.sexTold) && rung && rung.sex) path.sexTold = path.sexTold.filter((x) => !rung.sex.includes(x));
+        if (path && Array.isArray(path.formTold) && rung && rung.women) path.formTold = path.formTold.filter((x) => !rung.women.includes(x));
         const i = tf.traits.findIndex((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (i >= 0) tf.traits.splice(i, 1);
         tf.rungs[t.species] = Math.max(0, (tf.rungs[t.species] || 0) - 1);
         if (!tf.rungs[t.species] && !tf.traits.some((x) => x.species === t.species) && tf.paths) delete tf.paths[t.species];
@@ -1460,6 +1480,13 @@
         }
         if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
+      // The chest a path grew stays told once the body has gone over: the path's own draw, its shape alone (what it does is a form step).
+      if (path && path.sex === 'female' && tf.sex && tf.sex.species === k && tf.sex.to === 'female') parts.push('The breasts grown on this path: ' + chestShape(pathFill(tf, k, '{breasts}')) + '.');
+      // The kind's form on a woman's body, every step told.
+      if (path) {
+        const form = formToldOf(tf, k);
+        if (form.length) parts.push('The kind\'s form on a woman\'s body, told so far: ' + form.map(pf).join('; ') + '.');
+      }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
       if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + (bt.fadeAt != null ? ', fading' : '') + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
@@ -1473,10 +1500,12 @@
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
     const kinds = Object.keys(T.species);
-    const visibleTraits = compact ? tf.traits.filter((t) => t.settled === false).concat(tf.traits.filter((t) => t.settled !== false).slice(-3)) : tf.traits;
+    // Every change stays listed in the short form too: the body summary names only each kind's latest settled shape, so a trait
+    // dropped here (cow horns once the hooves have come) would leave the prompt altogether.
+    const visibleTraits = tf.traits;
     const influenceNow = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ') + (kinds.some((k) => !(tf.influence[k] || 0)) ? ' (unlisted kinds 0)' : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
-    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') + (visibleTraits.length < tf.traits.length ? '; earlier settled changes are reflected in the body summary' : '') : 'none') + '.');
+    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
     const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
     lines.push('World-authored transformation traits, steps and habits are sensory references, not permission to make ' + who + ' perform voluntary actions or to assign desires, feelings, values, memories or identity. Recast such wording as a bodily sensation or reflex, or omit it; the player chooses what ' + who + ' does and feels.');
     lines.push(compact
@@ -2290,7 +2319,7 @@
         guard.recentChars ? 'recent turns cut to their last ' + guard.recentChars + ' characters' : '',
         guard.facts != null ? 'facts cut to the latest ' + guard.facts + ', summary to its last ' + guard.summaryChars + ' characters, engine notes shortened' : '',
         guard.factsBytes != null ? 'facts capped by a 4,500-byte budget when needed' : '',
-        guard.compactTransformation ? 'transformation block in its short form (settled changes compacted, the same rules in fewer words)' : '',
+        guard.compactTransformation ? 'transformation block in its short form (every change still listed, the same rules in fewer words)' : '',
         guard.blockChars ? 'every other block cut to ' + guard.blockChars + ' characters' : ''
       ].filter(Boolean).join(', '));
       if (!fits()) throw { code: 'prompt_too_large', message: 'The prompt is too large for the runtime even after every shedding stage. The action or director note is probably very long: shorten it and try again (Debug shows the prompt).' };
