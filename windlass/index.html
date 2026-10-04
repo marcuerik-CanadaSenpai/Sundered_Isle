@@ -458,7 +458,7 @@
             <button id="cfSave" class="primary">Save</button>
             <button id="cfReset" class="quiet">Reset to the world's version</button>
             <button id="cfRemove" class="quiet danger">Remove from the story</button>
-            <span class="small" id="cfNote"></span>
+            <span class="small" id="cfNote" role="status" aria-live="polite"></span>
           </div>
         </div>
       </div>
@@ -691,9 +691,12 @@
     // The body, plus what the kind's women or men carry that the body pool leaves out (an udder, a second row of nipples): a plain sentence, never omitted.
     // The kind's facts come from one place each: {eyes} draws from the kind's eye pool (a line without the placeholder gets the
     // eyes added, unless it already describes them), {teats} is the kind's one phrase for what its women carry.
+    // What is noticed first (a woman's beauty, in her kind's way) opens the looks; the body and its plain anatomy follow.
+    const lead = sp && sp.leadByGender && sp.leadByGender[gender] && sp.leadByGender[gender].length ? pick(sp.leadByGender[gender]) : '';
     const byG = sp && sp.bodyByGender && sp.bodyByGender[gender] && sp.bodyByGender[gender].length ? '. ' + pick(sp.bodyByGender[gender]) : '';
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
-    p.looks = opts.looks || (sp && sp.body.length ? personFill(kindText(Wc, speciesKey, (pick(sp.body) + byG).replace(/\{colour\}/g, colour), p.eyes), p) : '');
+    const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
+    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText, p.eyes), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';

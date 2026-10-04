@@ -533,6 +533,23 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
+  // The Cast note is a live region so a screen reader hears the unsaved-edits question.
+  async looksLeadFirst() {
+    const h = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
+    try {
+      h.click('#btnCast'); await h.sleep(20);
+      assert.equal(h.$('#cfName').value, 'Wren Skye');
+      const looks = h.$('#cfLooks').value;
+      const leads = [/^Shorter than you and light enough to lift, fine-boned and quick/, /^A small woman built for the air/, /^Slight and poised, a head shorter than you/];
+      assert(leads.some((re) => re.test(looks)), 'the looks open with a beauty line: ' + looks.slice(0, 120));
+      assert.match(looks, /\. [A-Z][^.]*(feathers|wing|down)/i, 'the body follows as its own capitalised sentence: ' + looks.slice(0, 200));
+      assert.match(looks, /small breasts beneath the down|Down runs between the breasts/, 'the kind\'s anatomy is still stated: ' + looks);
+      assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 10. Romance is detected by what the player asks for, not by stray words. Consent and anatomy guidance stay in the romance prompt.
   async romanceDetection() {
     const h = await begin({ rmName: 'Rin Kitsuragi' });
