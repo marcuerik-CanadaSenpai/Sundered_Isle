@@ -737,9 +737,13 @@
     const race = species ? speciesRace(W, species) : cap(typed);
     const hope = sp ? sp.hope : 'whatever draws a human toward ' + p.pronouns.their + ' kind, which ' + p.pronouns.they + ' will not be the first to say';
     const aims = Object.assign({ default: 'get to know {first} and find out what kind of roommate {they} will be; hopes, in time, for ' + hope + ', and does not push' }, sp ? sp.aims : {});
-    const where = sp && sp.where && sp.where.default ? sp.where : { default: 'room 4B, Kettle Hall, or wherever ' + p.pronouns.their + ' kind gather', evening: 'wherever the evening is', night: 'room 4B' };
-    const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.';
-    const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '. ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
+    // Half of roommates spend their free hours with a club that is not their kind's expected one; the kind's night place (a roost, a pool, a tree) is kept.
+    const haunts = (W.genPools && Array.isArray(W.genPools.haunts)) ? W.genPools.haunts : [];
+    const haunt = sp && haunts.length && Math.random() < 0.5 ? pick(haunts) : null;
+    const where = haunt ? Object.assign({}, haunt.where, sp.where && sp.where.night ? { night: sp.where.night } : {}) : (sp && sp.where && sp.where.default ? sp.where : { default: 'room 4B, Kettle Hall, or wherever ' + p.pronouns.their + ' kind gather', evening: 'wherever the evening is', night: 'room 4B' });
+    const hauntBit = haunt ? ' Spends free hours with ' + haunt.club + ', which is not where ' + p.pronouns.their + ' kind are expected.' : '';
+    const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.' + hauntBit;
+    const sheet = 'Roommate in 4B. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.' + hauntBit + ' ' + (p.hello ? cap(p.hello) + '. ' : '') + 'Wants ' + p.want + '. Does not say at first: ' + p.privateMatter + '.';
     const spName = species ? (W.transformation && W.transformation.species[species] ? W.transformation.species[species].name : species) : typed;
     const template = species && W.roommates && W.roommates[species];
     const replacementKey = template && template.replaces && template.replaces[p.gender];
@@ -1131,6 +1135,14 @@
   // the hours as it does the step gap, and the unbounded pace turns fading off. The world's transformation.fade overrides these.
   const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 };
   const fadeCfg = () => Object.assign({}, FADE_DEFAULTS, (W.transformation && W.transformation.fade) || {});
+  // The elements the player carries: one per kind with at least one settled change (a change under way gives nothing yet).
+  function carriedElements(tf) {
+    const T = W.transformation; if (!T || !T.elements || !tf || !Array.isArray(tf.traits)) return [];
+    const by = {};
+    for (const t of tf.traits) { if (t.settled === false) continue; const sp = T.species[t.species]; if (!sp || !sp.element) continue; (by[sp.element] = by[sp.element] || []).includes(sp.short || t.species) || by[sp.element].push(sp.short || t.species); }
+    return Object.keys(by).map((e) => ({ element: e, kinds: by[e] }));
+  }
+  const matchesKeys = (text, keys) => { const t = String(text || '').toLowerCase(); return Array.isArray(keys) && keys.length > 0 && keys.every((k) => t.includes(String(k).toLowerCase())); };
   const fadeScale = () => { const sc = PACE_STEP_SCALE[adv.settings.pace]; return sc == null ? 1 : sc; };
   const completion = (t) => Math.round(100 * t.i / Math.max(1, t.steps.length));
   // A body change under the line whose kind has gone quiet: it does not grow this turn, it fades (see fadeTracks).
@@ -1303,6 +1315,41 @@
     }
     return out;
   }
+  // Worn charms and standing curses: one contact a story day each, read from items.wearing and items.curses by the world's keys.
+  // A cursed piece bites deeper each day worn (1, 2, then 3); a curse lifts when its days are up, with a note to the narrator.
+  function sourceExposures(state, tf, notes, next, diff) {
+    const T = W.transformation, out = [], items = state.items || {}, who = firstName(), day = Number(state.day) || 1;
+    tf.worn = tf.worn || {}; tf.cursed = tf.cursed || {};
+    const wearing = Array.isArray(items.wearing) ? items.wearing : [], seen = new Set();
+    for (const c of (T.charms || [])) {
+      if (!T.species[c.species] || !wearing.some((x) => matchesKeys(x, c.keys))) continue; seen.add(c.key);
+      const rec = tf.worn[c.key] || (tf.worn[c.key] = { since: day, day: 0 });
+      if (rec.day === day) continue; rec.day = day;
+      const daysWorn = Math.max(1, day - rec.since + 1);
+      const intensity = c.cursed ? Math.min(3, daysWorn) : Math.max(1, Math.min(3, Number(c.intensity) || 1));
+      out.push({ species: c.species, method: 'wearing ' + c.name + (c.cursed ? ' (cursed, day ' + daysWorn + ')' : ''), intensity });
+      notes.push('charm worn: ' + c.name + ' (' + c.species + ', intensity ' + intensity + (c.cursed ? ', cursed, day ' + daysWorn : '') + ')');
+    }
+    for (const k of Object.keys(tf.worn)) if (!seen.has(k)) delete tf.worn[k];
+    const curses = Array.isArray(items.curses) ? items.curses : [], seenC = new Set();
+    for (const c of (T.curses || [])) {
+      const hit = curses.find((x) => matchesKeys(x, c.keys)); if (!hit || !T.species[c.species]) continue; seenC.add(c.key);
+      const rec = tf.cursed[c.key] || (tf.cursed[c.key] = { since: day, day: 0 });
+      const days = Math.max(1, Number(c.days) || 3);
+      if (day - rec.since >= days) {
+        const keep = curses.filter((x) => x !== hit); diff.push({ path: 'items.curses', from: curses.slice(), to: keep }); items.curses = keep;
+        delete tf.cursed[c.key]; seenC.delete(c.key); notes.push('curse lifted: ' + c.name + ' after ' + days + ' days');
+        next.push('The curse has run its course (' + c.name + ', ' + T.species[c.species].name + '): its days are up and it has lifted. Say so once, in passing, as ' + who + ' would notice its weight gone, without explanation; what it brought stays, as any contact\'s does.');
+        continue;
+      }
+      if (rec.day === day) continue; rec.day = day;
+      const intensity = Math.max(1, Math.min(3, Number(c.intensity) || 1));
+      out.push({ species: c.species, method: c.name + ' (curse, day ' + (day - rec.since + 1) + ' of ' + days + ')', intensity });
+      notes.push('curse active: ' + c.name + ' (' + c.species + ', intensity ' + intensity + ', day ' + (day - rec.since + 1) + ' of ' + days + ')');
+    }
+    for (const k of Object.keys(tf.cursed)) if (!seenC.has(k)) delete tf.cursed[k];
+    return out;
+  }
   // The band widens only while a change is at its finding (older arcs) or its completion (steps): the small steps get no extra room.
   const arcActive = () => { if (!adv || !adv.state || !adv.state.tf) return false; if ((adv.state.tf.arcs || []).some((a) => a.phase <= 1)) return true; return (adv.pendingNotes || []).some((n) => /^The change completes \(/.test(n)); };
   function runTransformation(state, exposures, spaReset, diff) {
@@ -1311,7 +1358,7 @@
     ensureTf(state); const tf = state.tf; const who = firstName();
     if (spaReset && spaReset.length) {
       const keys = spaReset.includes('all') ? Object.keys(T.species) : spaReset.filter((k) => T.species[k]);
-      const restored = []; let sexUndone = false;
+      const restored = [], slipped = [], lifted = []; let sexUndone = false;
       for (const k of keys) {
         if (tf.influence[k] || (tf.rungs[k] || 0) > 0) restored.push(T.species[k].name);
         if (tf.influence[k]) { diff.push({ path: 'tf.influence.' + k, from: tf.influence[k], to: 0 }); tf.influence[k] = 0; }
@@ -1319,7 +1366,13 @@
         if (tf.traits.length !== before) diff.push({ path: 'tf.traits', from: (before - tf.traits.length) + ' ' + k + ' change(s)', to: 'removed' });
         tf.rungs[k] = 0; tf.arcs = (tf.arcs || []).filter((a) => a.species !== k); tf.tracks = (tf.tracks || []).filter((t) => t.species !== k); if (tf.paths) delete tf.paths[k];
         if (tf.sex && tf.sex.species === k) { diff.push({ path: 'tf.sex', from: tf.sex.to, to: 'as it was' }); sexUndone = true; delete tf.sex; }
+        // The font slips off the kind's cursed pieces and lifts its curses; ordinary charms stay where they are.
+        const cursedOf = (T.charms || []).filter((c) => c.cursed && c.species === k), cursesOf = (T.curses || []).filter((c) => c.species === k);
+        if (state.items && Array.isArray(state.items.wearing) && cursedOf.length) { const keep = state.items.wearing.filter((x) => !cursedOf.some((c) => matchesKeys(x, c.keys))); if (keep.length !== state.items.wearing.length) { slipped.push(...state.items.wearing.filter((x) => !keep.includes(x))); diff.push({ path: 'items.wearing', from: state.items.wearing, to: keep }); state.items.wearing = keep; } }
+        if (state.items && Array.isArray(state.items.curses) && cursesOf.length) { const keep = state.items.curses.filter((x) => !cursesOf.some((c) => matchesKeys(x, c.keys))); if (keep.length !== state.items.curses.length) { lifted.push(...state.items.curses.filter((x) => !keep.includes(x))); diff.push({ path: 'items.curses', from: state.items.curses, to: keep }); state.items.curses = keep; } }
+        for (const c of cursedOf) if (tf.worn) delete tf.worn[c.key]; for (const c of cursesOf) if (tf.cursed) delete tf.cursed[c.key];
       }
+      if (slipped.length || lifted.length) { notes.push('Spa: slipped off ' + (slipped.join(', ') || 'nothing') + '; lifted ' + (lifted.join(', ') || 'nothing')); next.push('The Spa\'s water also ' + (slipped.length ? 'slipped off ' + slipped.join(' and ') + ', which ' + (slipped.length > 1 ? 'lie' : 'lies') + ' inert on the bath\'s edge for ' + who + ' to leave or keep as a dead thing' : '') + (slipped.length && lifted.length ? ', and ' : '') + (lifted.length ? 'lifted ' + lifted.join(' and ') : '') + '. Say so in passing.'); }
       if (state.items && typeof state.items.spa_visits === 'number') { diff.push({ path: 'items.spa_visits', from: state.items.spa_visits, to: state.items.spa_visits + 1 }); state.items.spa_visits += 1; }
       if (state.flags && 'has_used_spa' in state.flags && !state.flags.has_used_spa) { state.flags.has_used_spa = true; diff.push({ path: 'flags.has_used_spa', from: false, to: true }); }
       notes.push('Spa reset: ' + (keys.join(', ') || 'nothing'));
@@ -1328,14 +1381,19 @@
         next.push(who + ' used the Restoration Spa last turn: the ' + restored.join(', ') + ' changes are gone and the body is human again where it had changed. Show the return from inside: the warm bath, the hour\'s sleep, and waking with the body plain again, in a sensation or two of absence' + (gone.length ? ' (' + gone.join('; ') + ')' : '') + ', which ' + who + ' may find a relief, a loss, or both; the player decides which. Nobody comments unless asked.' + (sexUndone ? ' The body\'s sex is as it was when ' + who + ' came to the Isle; say so once, plainly, in the same finding.' : ''));
       }
     }
+    // Worn charms and standing curses count as one contact a story day each, read from items.wearing and items.curses.
+    exposures = (exposures || []).concat(sourceExposures(state, tf, notes, next, diff));
     const gained = {};
-    for (const e of (exposures || [])) { const sp = T.species[e.species]; if (!sp) continue; gained[e.species] = (gained[e.species] || 0) + Math.max(1, Math.min(3, Math.round(Number(e.intensity) || 1))) * (sp.rate || 6); }
     // The pace of change is measured in story days: each kind can gain at most so much in one day, whatever the turns report.
+    // The most intimate contact (intensity 4) counts for the most and doubles the turn and day limits for its kind that day.
+    if (!tf.dayGain || tf.dayGain.day !== state.day) tf.dayGain = { day: state.day, by: {}, boost: {} };
+    tf.dayGain.boost = tf.dayGain.boost || {};
+    for (const e of (exposures || [])) { const sp = T.species[e.species]; if (!sp) continue; const level = Math.max(1, Math.min(4, Math.round(Number(e.intensity) || 1))); gained[e.species] = (gained[e.species] || 0) + level * (sp.rate || 6); if (level >= 4) tf.dayGain.boost[e.species] = true; }
     const perDay = PACE_PER_DAY[adv.settings.pace] != null ? PACE_PER_DAY[adv.settings.pace] : (T.maxPerDay || 10);
-    if (!tf.dayGain || tf.dayGain.day !== state.day) tf.dayGain = { day: state.day, by: {} };
     for (const k of Object.keys(gained)) {
-      let inc = Math.min(gained[k], T.maxPerTurn || 18); let capNote = gained[k] > inc ? ' (capped per turn)' : '';
-      if (perDay > 0) { const room = Math.max(0, perDay - (tf.dayGain.by[k] || 0)); if (inc > room) { capNote = ' (capped: ' + perDay + ' a day at the ' + adv.settings.pace + ' pace)'; inc = room; } }
+      const mult = tf.dayGain.boost[k] ? 2 : 1, dayCap = perDay * mult;
+      let inc = Math.min(gained[k], (T.maxPerTurn || 18) * mult); let capNote = gained[k] > inc ? ' (capped per turn)' : '';
+      if (dayCap > 0) { const room = Math.max(0, dayCap - (tf.dayGain.by[k] || 0)); if (inc > room) { capNote = ' (capped: ' + dayCap + ' a day at the ' + adv.settings.pace + ' pace' + (mult > 1 ? ', doubled by intimate contact' : '') + ')'; inc = room; } }
       const from = tf.influence[k] || 0; const to = Math.min(100, from + inc);
       if (to !== from) { diff.push({ path: 'tf.influence.' + k, from, to }); tf.influence[k] = to; tf.dayGain.by[k] = (tf.dayGain.by[k] || 0) + (to - from); notes.push(k + ' influence +' + (to - from) + capNote); }
       else if (inc === 0 && gained[k] > 0) notes.push(k + ' influence unchanged' + capNote);
@@ -1401,9 +1459,28 @@
     lines.push('Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
     const methodKinds = kinds;
     lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
+    if (T.elements) {
+      const carried = carriedElements(tf);
+      lines.push('Elements: ' + kinds.filter((k) => T.species[k].element).map((k) => k + ' ' + T.species[k].element).join(', ') + '. ' + (carried.length
+        ? who + ' carries ' + carried.map((c) => c.element + ' (' + c.kinds.join(', ') + ')').join(', ') + ': magic worked through ' + (carried.length > 1 ? 'these elements' : 'it') + ' comes easily and shows as ease; magic through any other element comes hard and shows as strain, still possible and more likely to fail; plain craft with no element is unchanged. The dice line in <action> gives the adjustment.'
+        : who + ' carries no element yet: every school and element comes at the same slow human pace, with no ease and no bar.'));
+    }
+    if ((T.charms || []).length || (T.curses || []).length) {
+      // Only the pieces in play are named here; the catalogue lives in <lore> (keyed on charm, curse, Unpriced Table and the
+      // pieces' names), so a prompt with nothing worn pays a sentence for it, not the list.
+      const items = state.items || {}, wearing = Array.isArray(items.wearing) ? items.wearing : [], curses = Array.isArray(items.curses) ? items.curses : [];
+      const worn = (T.charms || []).filter((c) => wearing.some((x) => matchesKeys(x, c.keys))), laid = (T.curses || []).filter((c) => curses.some((x) => matchesKeys(x, c.keys)));
+      const inPlay = [];
+      if (worn.length) inPlay.push('Worn now: ' + worn.map((c) => c.name + ' (' + c.species + (c.cursed ? ', cursed: will not come off by hand, bites deeper each day' : '') + ')').join('; ') + '.');
+      if (laid.length) inPlay.push('Under: ' + laid.map((c) => c.name + ' (' + c.species + ', ' + c.days + ' days)').join('; ') + '.');
+      lines.push((compact
+        ? 'Charms and curses: a charm worn against the skin (items.wearing) or a curse laid (items.curses) is a daily contact with its kind that the engine counts itself; never also report it in exposures. Add and remove them by plain names that say what each is (material and kind); the pieces and their makers are in <lore> when they come up. Cursed pieces come off only by a level-3 unbinding or the Spa. Traps (a closed place, the ring at the wrong hour, a mis-drawn sigil): one exposure, method "trap: what it was", intensity 3.'
+        : 'Charms and curses: a charm worn against the skin is a daily contact with its kind that the engine counts itself while the piece is in items.wearing, and a curse or mark the same while it is in items.curses; do not also report either in exposures. When ' + who + ' puts a piece on, add it to items.wearing by a plain name that says what it is (its material and its kind, as a goblin copper bracelet or a harpy feather on a cord); when ' + who + ' takes it off, remove it; lay a curse only when its cause happens in the story, by its name. The pieces, the Unpriced Table\'s cursed ones (which will not come off by hand: a wardcraft unbinding at level 3 or the Restoration Spa slips one off, and nothing else does, and each day worn it bites deeper), the curses and what causes them are in <lore> whenever charms, curses or the Table come up; ' + who + ' learns what a piece is only from someone who would know (its maker, a goblin, the Dean). Traps: a closed place, the fairy ring at the wrong hour, a mis-drawn sigil or a bargain at the Unpriced Table may touch ' + who + ' with a kind all at once: report it as an exposure with method "trap: what it was" at intensity 3, or lay one of the curses.')
+        + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
+    }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep. Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1816,13 +1893,14 @@
       const totals = Object.keys(st).map((k) => k + ' ' + (d6 + st[k])).join(', ');
       const skillTotals = W.skills ? '; skills, for magic and craft: ' + Object.keys(W.skills).map((k) => k + ' ' + (d6 + skillLevel((S.skills || {})[k]))).join(', ') : '';
       actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
+      if (W.transformation) { const carried = carriedElements(S.tf || {}); if (carried.length) actionLines.push('Elements on the die: ' + p.first + ' carries ' + carried.map((c) => c.element).join(' and ') + '. For a magical working, name the element it is done through in "element": through a carried element the total is 1 higher than the table, through any other element 1 lower, and judge the outcome on that adjusted total; "none" (plain craft, or no magic) leaves the table total as it is. The engine applies the same 1.'); }
     }
     actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + (turnInput.bandFloor ? 'at least ' + band[0] + ', as the director note requires' : band[0] + ' to ' + band[1] + ' when the scene earns it') + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
       'Reply with only one JSON object and nothing else, no code fence. Inside every string, escape double quotes as \\" and write paragraph breaks as \\n; never put a raw line break inside a string. Fields, in this order:',
-      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", "d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the outcome rule gives for that total against the difficulty, "reason": one sentence},',
+      '"evaluation": {"rules_in_play": [short strings], "stat": "' + Object.keys(p.stats).concat(W.skills ? Object.keys(W.skills) : []).join('|') + '|none", ' + (W.transformation && W.transformation.elements && carriedElements(S.tf || {}).length ? '"element": "' + Object.keys(W.transformation.elements).join('|') + '|none" (the element a magical working is done through; none when there is no magic), ' : '') + '"d6": the die given, "total": the total for that stat from the dice table or null, "difficulty": "Trivial|Easy|Medium|Hard|Legendary|none", "outcome": "success|partial|failure|none" as the outcome rule gives for that total against the difficulty, "reason": one sentence},',
       '"narrative": string, at most ' + band[1] + ' words, second person present tense, ' + (turnInput.director ? 'ending at the binding director note\'s requested ending, or at the first choice after its requested actions if it gives no ending' : 'ending at the first moment ' + p.first + ' would speak or choose') + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
       '"suggested_actions": exactly three strings, 12 words or fewer each: plausible things ' + p.first + ' would actually consider doing next, given who ' + p.first + ' is (<player>) and what just happened (speak, ask, move, accept or refuse what was offered, leave, act); each doable at the exact moment and place where the narrative ends, with the people present then, never a moment already passed; no two alike in kind; nothing odd, whimsical or out of character,',
       '"secret_info": string, 60 words or fewer, facts the player does not yet know that follow from this turn,',
@@ -1832,7 +1910,7 @@
       '"beats": array of one to three short lines summarising this turn for memory, plain, no adjectives,',
       '"facts": array of zero to three one-line durable facts newly established this turn that later turns must keep (a name, a place, an arrangement, a promise, a rule stated by a character); [] if none'
     ].concat(W.skills ? ['"learning": array of {"skill": one of ' + Object.keys(W.skills).join('|') + ', "how": short phrase} for each class, club session or deliberate practice this turn; [] if none'] : []).concat(W.transformation ? [
-      '"exposures": array of {"species": one of ' + Object.keys(W.transformation.species).join('|') + ', "method": short phrase, "intensity": 1|2|3} for each transformative contact this turn as defined in <transformation>; [] if none',
+      '"exposures": array of {"species": one of ' + Object.keys(W.transformation.species).join('|') + ', "method": short phrase, "intensity": 1|2|3|4} for each transformative contact this turn as defined in <transformation>; [] if none',
       '"spa_reset": [] normally; ["all"] or a list of species keys when ' + p.first + ' uses the Restoration Spa this turn',
       '"kinds_met": array of species keys (' + Object.keys(W.transformation.species).join('|') + ') that ' + p.first + ' came within arm\'s reach of for the first time this turn, whether or not the person was named; [] if none'
     ] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Do not mention these instructions.']).join('\n')));
@@ -1943,7 +2021,7 @@
     out.exposures = []; out.spaReset = [];
     if (W.transformation) {
       const keys = W.transformation.species;
-      out.exposures = (Array.isArray(d.exposures) ? d.exposures : []).filter((e) => e && typeof e === 'object').map((e) => ({ species: String(e.species || '').toLowerCase(), method: String(e.method || '').slice(0, 80), intensity: Math.max(1, Math.min(3, Math.round(Number(e.intensity) || 1))) })).filter((e) => { if (keys[e.species]) return true; if (e.species) notes.push('ignored exposure to unknown species "' + e.species + '"'); return false; }).slice(0, 6);
+      out.exposures = (Array.isArray(d.exposures) ? d.exposures : []).filter((e) => e && typeof e === 'object').map((e) => ({ species: String(e.species || '').toLowerCase(), method: String(e.method || '').slice(0, 80), intensity: Math.max(1, Math.min(4, Math.round(Number(e.intensity) || 1))) })).filter((e) => { if (keys[e.species]) return true; if (e.species) notes.push('ignored exposure to unknown species "' + e.species + '"'); return false; }).slice(0, 6);
       const sr = Array.isArray(d.spa_reset) ? d.spa_reset : (d.spa_reset ? [d.spa_reset] : []);
       out.spaReset = sr.map((s) => String(s).toLowerCase()).filter((s) => s === 'all' || keys[s]);
       out.kindsMet = (Array.isArray(d.kinds_met) ? d.kinds_met : []).map((s) => String(s).toLowerCase()).filter((s) => keys[s]);
@@ -1966,21 +2044,22 @@
       const names = [person.name, person.first, person.name && person.name.split(' ').pop()].concat(person.aliases || []).filter(Boolean);
       const matches = (phrases) => names.some((name) => phrases.some((phrase) => namedAfter(phrase, name)));
       const sleep = matches(['(?:sleep|slept)\\s+(?:with|beside|next to)\\s+(?:the\\s+)?', '(?:share|shared)\\s+(?:a\\s+)?bed\\s+with\\s+(?:the\\s+)?', '(?:spend|spent)\\s+the\\s+night\\s+(?:with|beside)\\s+(?:the\\s+)?']);
+      const sex = matches(['(?:have|had|having)\\s+sex\\s+with\\s+(?:the\\s+)?', '(?:make|made|making)\\s+love\\s+(?:to|with)\\s+(?:the\\s+)?', 'fuck(?:ed)?\\s+(?:the\\s+)?']);
       const kiss = matches(['kiss(?:ed)?\\s+', '(?:make|made)\\s+out\\s+with\\s+']);
       const hand = names.some((name) => new RegExp('^[\\s]*[Ii]\\s+(?:hold|held)\\s+' + escRe(String(name)) + "['’]s hand(?=$|[^A-Za-z])").test(text));
       const embrace = matches(['hug(?:ged)?\\s+', 'embrace(?:d)?\\s+', 'cuddle(?:d)?\\s+', 'snuggle(?:d)?\\s+', '(?:hold|held)\\s+hands\\s+with\\s+']) || hand;
       const touch = matches(['touch(?:ed)?\\s+', 'stroke(?:d)?\\s+', 'caress(?:ed)?\\s+', 'groom(?:ed)?\\s+', 'brush(?:ed)?\\s+', 'preen(?:ed)?\\s+']);
-      if (!sleep && !kiss && !embrace && !touch) continue;
+      if (!sex && !sleep && !kiss && !embrace && !touch) continue;
       const species = speciesKeyOf(person), sp = species && W.transformation.species[species];
       if (!sp) continue;
       const method = String(sp.method || '').toLowerCase();
-      const supported =
+      const supported = sex ||
         (sleep && /\bsleep|night\b/.test(method)) ||
         (kiss && /\bkiss/.test(method)) ||
         (embrace && /\b(hug\w*|cuddl\w*|touch\w*|warmth)\b/.test(method)) ||
         (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method));
       if (!supported) continue;
-      const intensity = sleep ? 3 : /\b(long|for hours|all evening|all afternoon|for a while)\b/i.test(text) ? 2 : 1;
+      const intensity = sex ? 4 : sleep ? 3 : /\b(long|for hours|all evening|all afternoon|for a while)\b/i.test(text) ? 2 : 1;
       add(species, intensity);
     }
     const cowMethod = W.transformation.species.cow && String(W.transformation.species.cow.method || '').toLowerCase();
@@ -2000,7 +2079,14 @@
     if (stat === 'none' || !(stat in stats)) { if (stat !== 'none') notes.push('evaluation named unknown stat "' + stat + '"'); return { notes, roll: out }; }
     out.stat = stat; out.statValue = stats[stat]; out.total = roll.d6 + stats[stat];
     const label = W.stats[stat] || (W.skills && W.skills[stat] ? W.skills[stat].name : stat);
-    if (ev.total != null && Number(ev.total) !== out.total) notes.push('model total ' + ev.total + ' corrected to ' + out.total + ' (d6 ' + roll.d6 + ' + ' + label + ' ' + stats[stat] + ')');
+    // A magical working through one of the player's carried elements is 1 easier; through any other element 1 harder.
+    const elems = W.transformation && W.transformation.elements; let elemText = '';
+    if (elems) {
+      const el = String(ev.element || 'none').toLowerCase(), carried = carriedElements((adv.state && adv.state.tf) || {}).map((c) => c.element);
+      if (el !== 'none' && !elems[el]) notes.push('evaluation named unknown element "' + el + '"');
+      else if (el !== 'none' && carried.length) { out.element = el; out.elementMod = carried.includes(el) ? 1 : -1; out.total += out.elementMod; elemText = (out.elementMod > 0 ? ' + 1' : ' - 1') + ' (' + el + (out.elementMod > 0 ? ' carried' : ' against ' + carried.join(', ')) + ')'; }
+    }
+    if (ev.total != null && Number(ev.total) !== out.total) notes.push('model total ' + ev.total + ' corrected to ' + out.total + ' (d6 ' + roll.d6 + ' + ' + label + ' ' + stats[stat] + elemText + ')');
     if (out.difficulty) {
       const need = D[out.difficulty]; const expect = out.total >= need ? 'success' : (out.total >= need - 2 ? 'partial' : 'failure');
       if (out.outcome && out.outcome !== 'none' && out.outcome !== expect) notes.push('outcome ' + out.outcome + ' disagrees with the numbers (' + out.total + ' vs ' + out.difficulty + ' ' + need + ' → ' + expect + ')');
