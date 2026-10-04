@@ -82,7 +82,7 @@ async function checkInferenceAndCompaction() {
 
     for (let i = 7; i <= 11; i++) assert(await h.turn('Action ' + i), 'turn ' + i + ' did not finish');
     turns = turnsIn(h, id);
-    for (const rule of ['Perspective: everything is seen from inside', 'Player knowledge: ', 'Stopping: a turn ends at the first moment', 'Variety: aims are directions, not scripts', 'Attitudes: an attitude value moves at most one point', 'Fresh detail: show people and places']) {
+    for (const rule of ['Perspective: everything is seen from inside', 'Player knowledge: ', 'Stopping and travel: ordinary scenes end at the first moment', 'Variety: aims are directions, not scripts', 'Attitudes: an attitude value moves at most one point', 'Fresh detail: show people and places']) {
       assert.equal((prompts[0].match(new RegExp(rule.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length, 1, 'shared rule should appear exactly once: ' + rule);
     }
     assert.match(prompts[0], /World-authored transformation traits, steps and habits are sensory references/);
