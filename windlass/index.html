@@ -654,13 +654,16 @@
       if (!new RegExp('\\b(?:' + n + (other ? '|' + other : '') + ') ' + words + (m[2] ? '(?:pairs?|sets?|rows?) of ' + words : '') + escRe(stemOf(m[3]))).test(kindLower)) return false;
     }
     // An ordinal is a count too: "her second tail" or "her third pair of nipples" needs the kind's text to give at least that
-    // many ("two tails"; "four pairs of small nipples"). A figure or a word up to twentieth is read; anything later is never
-    // a body's. "A second" followed by no part is time, and a comma after it ends the phrase ("a second, long tail swishing").
+    // many ("two tails"; "four pairs of small nipples"), and a bare plural gives two ("ears": a second ear, no third). A figure
+    // or a word up to twentieth is read; anything later is never a body's. A comma may set the ordinal off ("her fifth, swollen
+    // teat"), except that "a second," is time ("pauses a second, long tail swishing"); "a second" before no part is time too.
     const ORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth', 'seventeenth', 'eighteenth', 'nineteenth', 'twentieth'];
     const numOf = (w) => /^\d+$/.test(w) ? +w : WORDS.indexOf(w);
-    for (const m of text.matchAll(new RegExp('(?<!split[ -])\\b(second|2nd|' + ANATOMY_ORD + ') ' + ANATOMY_MODS + '(' + ANATOMY_PAIRS + ')?' + nounRe + '\\b', 'gi'))) {
-      const o = m[1].toLowerCase(), n = /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity);
-      const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' ' + words + (m[2] ? '(?:pairs?|sets?|rows?) of ' + words : '') + escRe(stemOf(m[3])), 'g')), (k) => numOf(k[1]));
+    for (const m of text.matchAll(new RegExp('(?<!split[ -])\\b(second|2nd|' + ANATOMY_ORD + ')' + ANATOMY_AFTER.replace('(?:', '(') + '(' + ANATOMY_PAIRS + ')?' + nounRe + '\\b', 'gi'))) {
+      const o = m[1].toLowerCase(), n = /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity), stem = escRe(stemOf(m[4]));
+      if (n === 2 && m[2][0] === ',' && /\ban? $/i.test(text.slice(0, m.index))) continue;
+      const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' ' + words + (m[3] ? '(?:pairs?|sets?|rows?) of ' + words : '') + stem, 'g')), (k) => numOf(k[1]));
+      if (!m[3] && new RegExp('\\b' + stem + '(?:e?s|ves)\\b').test(kindLower)) counts.push(2);
       if (!counts.some((c) => c >= n)) return false;
     }
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
