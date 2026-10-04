@@ -563,6 +563,138 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 10a. Elements on the die: a settled change carries its kind's element. A magical working through a carried element is one
+  // easier, through any other element one harder; a player with no change has no bonus, no bar and no "element" field.
+  async elementsOnDice() {
+    const h0 = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
+    const store = h0.mock.store; let id;
+    try {
+      patchTurns(h0, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element: 'air', d6: 3, total: 7, difficulty: 'Medium', outcome: 'success', reason: 'a ward sung on the air' }; });
+      assert(await h0.turn('I try to sing the small ward Wren taught me.')); id = onlyAdv(store).id;
+      const p0 = promptOf(lastTurn(h0)); const t0 = storedTurns(store, id).at(-1);
+      assert.match(p0, /carries no element yet/, 'a human with no change carries no element');
+      assert.doesNotMatch(p0, /Elements on the die/, 'no dice-line adjustment without a carried element');
+      assert.doesNotMatch(p0, /"element": "air\|/, 'the evaluation schema has no element field without a carried element');
+      assert.equal(t0.roll.total, t0.roll.d6 + t0.roll.statValue, 'no element: the total is the die plus Wits');
+      assert.equal(t0.roll.elementMod, undefined, 'no adjustment recorded');
+    } finally { h0.close(); }
+    // A settled harpy change: the player carries air.
+    const doc = store.get('adventures/' + id).data;
+    doc.state.tf = Object.assign(doc.state.tf || {}, {
+      influence: Object.assign(doc.state.tf.influence || {}, { harpy: 15 }), rungs: { harpy: 1 },
+      traits: [{ species: 'harpy', trait: 'down along the forearms', day: 1, settled: true }], arcs: [], paths: {}, tracks: [], last: {}, drifted: {},
+    });
+    doc.pendingNotes = [];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      let element = 'air';
+      patchTurns(h, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element, d6: 3, total: 7, difficulty: 'Medium', outcome: 'success', reason: 'a working' }; });
+      assert(await h.turn('I sing the ward again, on the air.'));
+      let p = promptOf(lastTurn(h)), t = storedTurns(h.mock.store, id).at(-1);
+      assert.match(p, /carries air \(Harpy\)/, 'the body line names the carried element: ' + (p.match(/carries [^.]*/) || [''])[0]);
+      assert.match(p, /Elements on the die: \w+ carries air\./, 'the dice line names it too');
+      assert.match(p, /"element": "air\|water\|/, 'the evaluation schema gains the element field');
+      assert.equal(t.roll.element, 'air'); assert.equal(t.roll.elementMod, 1, 'through a carried element the working is one easier');
+      assert.equal(t.roll.total, t.roll.d6 + t.roll.statValue + 1, 'the total carries the adjustment');
+      assert(t.notes.some((n) => /corrected to \d+ \(d6 \d \+ Wits \d \+ 1 \(air carried\)\)/.test(n)), 'the correction note shows the element: ' + JSON.stringify(t.notes));
+      element = 'water';
+      assert(await h.turn('I try to still the water in the basin.'));
+      t = storedTurns(h.mock.store, id).at(-1);
+      assert.equal(t.roll.elementMod, -1, 'through any other element the working is one harder'); assert.equal(t.roll.total, t.roll.d6 + t.roll.statValue - 1);
+      element = 'none';
+      assert(await h.turn('I pick the lock with a hairpin.'));
+      t = storedTurns(h.mock.store, id).at(-1);
+      assert.equal(t.roll.elementMod, undefined, 'plain craft is unchanged'); assert.equal(t.roll.total, t.roll.d6 + t.roll.statValue);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 10b. The most intimate contact counts for the most: sex with someone of the kind is intensity 4 (16 at the kind's rate), it is
+  // read from the player's own words, and it doubles the day's limit for that kind.
+  async intimacyScale() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    try {
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, id = onlyAdv(h.mock.store).id, last = () => storedTurns(h.mock.store, id).at(-1);
+      let exposures = [];
+      patchTurns(h, (r) => { r.exposures = exposures; });
+      assert(await h.turn('I have sex with Daisy.'));
+      assert(last().notes.some((n) => /explicit player action \(cow, intensity 4\)/.test(n)), 'sex named by the player is read as intensity 4: ' + JSON.stringify(last().notes));
+      assert.equal(tf().influence.cow, 16, 'intensity 4 at rate 4 gives 16, past the usual 10-a-day limit');
+      exposures = [{ species: 'cow', method: 'a mug of warm milk', intensity: 1 }];
+      assert(await h.turn('I drink the milk she pours.'));
+      assert.equal(tf().influence.cow, 20, 'the day\'s limit is doubled to 20 by the intimate contact');
+      assert(await h.turn('I drink another.'));
+      assert.equal(tf().influence.cow, 20, 'and holds there');
+      assert(last().notes.some((n) => /capped: 20 a day at the standard pace, doubled by intimate contact/.test(n)), 'the cap note says why: ' + JSON.stringify(last().notes));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /4 intimate \(sex with someone of the kind/, 'the narrator is told the scale');
+      assert.match(p, /"intensity": 1\|2\|3\|4/, 'the schema allows 4');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 10c. Charms, curses and the Spa: a worn charm is one contact a story day with its kind, a cursed piece bites deeper each day,
+  // a curse runs its days and lifts, and the Spa slips off the kind's cursed pieces and lifts its curses while ordinary charms stay.
+  async charmsCursesSpa() {
+    const h0 = await begin({ rmSpecies: 'rabbit', rmName: 'Clover Dell' });
+    const store = h0.mock.store; let id;
+    try { assert(await h0.turn('I unpack.')); id = onlyAdv(store).id; } finally { h0.close(); }
+    const doc = store.get('adventures/' + id).data;
+    doc.settings.pace = 'unbounded';  // no day cap and no fading, so the daily counts read plainly
+    doc.state.items.wearing = ['a goblin copper warming-bracelet', 'a tarnished silver collar that closes by itself'];
+    doc.state.items.curses = ['the fairy-ring mark'];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      const data = () => onlyAdv(h.mock.store).data, inf = () => data().state.tf.influence, last = () => storedTurns(h.mock.store, id).at(-1);
+      let advance = 15, spa = null;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = []; if (spa) r.spa_reset = spa; });
+      assert(await h.turn('I look at the bracelet.'));
+      assert.equal(inf().goblin, 4, 'the bracelet counts once (intensity 1): ' + JSON.stringify(inf()));
+      assert.equal(inf().cat, 4, 'the cursed collar bites at 1 on its first day');
+      assert.equal(inf().fairy, 8, 'the mark counts at its intensity of 2');
+      let notes = last().notes;
+      assert(notes.some((n) => /^charm worn: a goblin copper warming-bracelet \(goblin, intensity 1\)/.test(n)), 'the bracelet is noted: ' + JSON.stringify(notes));
+      assert(notes.some((n) => /^charm worn: a tarnished silver collar[^(]*\(cat, intensity 1, cursed, day 1\)/.test(n)), 'the collar is noted as cursed');
+      assert(notes.some((n) => /^curse active: the fairy-ring mark \(fairy, intensity 2, day 1 of 3\)/.test(n)), 'the mark is noted');
+      assert(await h.turn('I turn it on my wrist.'));
+      assert.deepEqual([inf().goblin, inf().cat, inf().fairy], [4, 4, 8], 'a second turn the same day adds nothing');
+      assert(!last().notes.some((n) => /^charm worn|^curse active/.test(n)), 'and is not noted again');
+      const p1 = promptOf(lastTurn(h));
+      assert.match(p1, /Charms and curses: a charm worn against the skin is a daily contact/, 'the narrator is told how charms work');
+      assert.match(p1, /Worn now: a goblin copper warming-bracelet \(goblin\); a tarnished silver collar that closes by itself \(cat, cursed: will not come off by hand/, 'and what is worn');
+      assert.match(p1, /Under: the fairy-ring mark \(fairy, 3 days\)\./, 'and what curse is on');
+      assert.doesNotMatch(p1, /a fox-fire bead|a mer-pearl on a chain/, 'the catalogue stays out of the prompt until it comes up');
+      // Day two, three and four: the bracelet keeps its one, the collar bites 2 then 3, the mark runs its three days and lifts.
+      advance = 720;
+      assert(await h.turn('I sleep.')); assert.equal(data().state.day, 2);
+      assert.deepEqual([inf().goblin, inf().cat, inf().fairy], [8, 12, 16], 'day two: ' + JSON.stringify(inf()));
+      assert(last().notes.some((n) => /cursed, day 2\)/.test(n)), 'the collar is on its second day');
+      assert(await h.turn('I go about the day.')); assert(await h.turn('I sleep again.')); assert.equal(data().state.day, 3);
+      assert.deepEqual([inf().goblin, inf().cat, inf().fairy], [12, 24, 24], 'day three: ' + JSON.stringify(inf()));
+      assert(await h.turn('I go about the day.')); assert(await h.turn('I sleep a third time.')); assert.equal(data().state.day, 4);
+      assert.deepEqual([inf().goblin, inf().cat, inf().fairy], [16, 36, 24], 'day four: the mark has lifted and adds nothing: ' + JSON.stringify(inf()));
+      assert.deepEqual(data().state.items.curses, [], 'the mark is gone from the curses list');
+      assert(last().notes.some((n) => /^curse lifted: the fairy-ring mark after 3 days/.test(n)), 'and noted: ' + JSON.stringify(last().notes));
+      assert(await h.turn('I stretch.'));
+      assert.match(promptOf(lastTurn(h)), /Note from the engine: The curse has run its course \(the fairy-ring mark, fairies\)/, 'the narrator is told the curse has lifted');
+      // The Spa, for the cat kind: the collar slips off and the cat influence is gone; the goblin bracelet stays where it is.
+      spa = ['cat'];
+      assert(await h.turn('I go to the Restoration Spa and ask for the cat to be washed out of me.'));
+      assert.equal(inf().cat, 0, 'the Spa clears the cat influence');
+      assert.deepEqual(data().state.items.wearing, ['a goblin copper warming-bracelet'], 'the cursed collar has slipped off; the bracelet stays');
+      assert(last().notes.some((n) => /^Spa: slipped off a tarnished silver collar/.test(n)), 'and it is noted: ' + JSON.stringify(last().notes));
+      spa = null; advance = 720;
+      assert(await h.turn('I sleep.'));
+      assert.match(promptOf(lastTurn(h)), /slipped off a tarnished silver collar that closes by itself, which lies inert on the bath's edge/, 'the narrator is told so on the next turn');
+      assert(await h.turn('I sleep on.'));
+      assert.equal(inf().cat, 0, 'with the collar gone the cat kind no longer grows');
+      assert.equal(inf().goblin, 24, 'the bracelet goes on counting (day six)');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
   // The Cast note is a live region so a screen reader hears the unsaved-edits question.
   async looksLeadFirst() {
@@ -582,7 +714,9 @@ const S = {
 
   // 10. Romance is detected by what the player asks for, not by stray words. Consent and anatomy guidance stay in the romance prompt.
   async romanceDetection() {
-    const h = await begin({ rmName: 'Rin Kitsuragi' });
+    // A human roommate: with a mythkin one, "I make love with Rin" is a contact with her kind (intensity 4) and starts a change,
+    // whose scene would widen the band and add the Body detail line on its own. This scenario is about the wording alone.
+    const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
     try {
       await setWriter(h, 'auto');
       const W = h.window.WINDLASS_WORLDS[onlyAdv(h.mock.store).data.worldId];
