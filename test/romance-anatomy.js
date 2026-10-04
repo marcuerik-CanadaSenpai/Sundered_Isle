@@ -166,8 +166,10 @@ async function main() {
       'romance must be grounded in each character’s opinion of the player');
     assert.match(sunderedRules, /species customs, exposure methods, role descriptions, opening beats .* possibilities, not scripts/i,
       'species behavior and recurring beats must remain individual suggestions');
-    assert.match(sunderedRules, /never use "radiating heat".*stock shorthand/i,
-      'generic body-heat descriptions must be avoided');
+    assert.match(sunderedRules, /do not let "radiating heat" or a warm body become a recurring default/i,
+      'heat descriptions may be used but should not become a recurring default');
+    assert.doesNotMatch(sunderedRules, /never use "radiating heat"/i,
+      'sensory variety must not categorically ban heat descriptions');
     assert.match(sunderedRules, /paths can progress together on one body; they do not compete for a limited number of parts/i,
       'multiple species paths must coexist without arbitrary replacement');
     assert.match(prompts[1], /successive ten-percent increments from first alteration to fully established form/,
