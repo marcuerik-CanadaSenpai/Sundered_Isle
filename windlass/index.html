@@ -610,21 +610,27 @@
   // closes her eyes"), and so does a comma right before the part ("a second glance, head tilted").
   const ANATOMY_STOP = '(?:a|an|the|her|his|their|its|my|your|our|one|of|to|at|in|on|with|for|from|by|and|or|but|as|over|under|into|onto|before|after|while|when|then|than|that|this|these|those)';
   const ANATOMY_MOD = '(?:(?:(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+,? ){0,2}(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+ )', ANATOMY_MODS = ANATOMY_MOD + '?';
+  // One vocabulary of counts for every check below: three or more, then two or more, in words or figures.
+  const ANATOMY_TEEN = '(?:thir|four|fif|six|seven|eigh|nine)teen', ANATOMY_TY = '(?:twen|thir|for|fif|six|seven|eigh|nine)t';
+  const ANATOMY_MANY = 'three|four|five|six|seven|eight|nine|ten|eleven|twelve|' + ANATOMY_TEEN + '|' + ANATOMY_TY + 'y|hundreds?|thousands?|dozens?|several|multiple|many|countless|numerous|[3-9]|\\d{2,}';
+  const ANATOMY_SOME = 'two|2|' + ANATOMY_MANY;
+  // Ordinals from third on, in words or figures ("seventh", "13th").
+  const ANATOMY_ORD = 'third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|' + ANATOMY_TEEN + 'th|' + ANATOMY_TY + 'ieth|hundredth|(?:[3-9]|\\d{2,})(?:st|nd|rd|th)';
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face, or more than one pair or
   // set of arms, legs or heads ("three pairs of arms"; "two pairs of hands" is help, "two rows of faces" a crowd).
-  const ANATOMY_COUNT = new RegExp('\\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:pairs|sets) of ' + ANATOMY_MODS + '(?:arms|legs|heads)\\b', 'i');
+  const ANATOMY_COUNT = new RegExp('\\b(?:' + ANATOMY_MANY + ') ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:' + ANATOMY_SOME + ') ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b|\\b(?:' + ANATOMY_SOME + ') ' + ANATOMY_MODS + '(?:pairs|sets) of ' + ANATOMY_MODS + '(?:arms|legs|heads)\\b', 'i');
   // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms", "her fourth pair of arms"; "an extra
   // or a second pair of hands" or "of eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is
   // her free one); "split second" is time, and "a second, smaller head" counts where "a second, mouth open" does not;
   // "other" counts only after a possessive ("her other head", never "the other side of her face"); "another" is left out
   // ("another mouth to feed").
-  const ANATOMY_NEVER = new RegExp('\\b(?:third|fourth|fifth|sixth|extra|additional|(?:second|third|fourth|fifth|sixth|extra|additional) ' + ANATOMY_MODS + '(?:pair|set|row) of(?! ' + ANATOMY_MODS + '(?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\bsecond(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
+  const ANATOMY_NEVER = new RegExp('\\b(?:' + ANATOMY_ORD + '|extra|additional|(?:second|2nd|' + ANATOMY_ORD + '|extra|additional) ' + ANATOMY_MODS + '(?:pair|set|row) of(?! ' + ANATOMY_MODS + '(?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\b(?:second|2nd)(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
     // Figures and words are one count ("2 tails" is "two tails").
-    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-    const NUM = '(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many|\\d+)';
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+    const NUM = '(' + ANATOMY_SOME + '|\\d+)';
     const nounRe = '(' + ANATOMY_WORDS.source.slice(3, -3) + ')';
     const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
     // "Two pairs of wings" must be pairs in the kind's text too.
@@ -1369,17 +1375,22 @@
     // book" are not romance.
     const handles = activeCharacters().concat((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).flatMap(nameHandles).filter((h) => h && h.length >= 2);
     // The person must be the whole object: only adverbs may follow before the phrase ends at punctuation, a conjunction or a
-    // preposition ("rin slowly, then", "her gently", "Rin up"). "Her book", "Rin's notebook" and "a book" are things.
+    // preposition ("rin slowly, then", "her gently", "Rin very slowly", "Rin up"). "Her book", "Rin's notebook" and "a book"
+    // are things.
     const objectEnd = /^(?:$|[,;:.!?\u2014\u2013]|-\s|(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if|in|on|at|into|onto|under|beside|behind|against|to|towards?|for|with|without|from|by|near|over|across)\b)/i;
-    const adverb = /^(?:(?!(?:family|belly|lily|jelly|ally|bully|folly|holly|dolly|telly|lolly|fly)\b)[a-z-]+ly|back|up|down|off|home|upstairs|downstairs|inside|again|now|tonight|together|close|closer|already|too|also|straight|away|here|there|first|right)\b/i;
+    // Adverbs by name: place, time and degree words, and the manner words a player reaches for at a bedside.
+    const adverb = /^(?:back|up|down|off|home|upstairs|downstairs|inside|again|now|tonight|together|close|closer|already|too|also|straight|away|here|there|first|right|very|really|quite|rather|more|most|ever|just|even|still|all the way|once (?:more|again)|a (?:little|bit)(?: more)?|piece by piece|bit by bit|little by little|(?:slow|gent|soft|quick|quiet|careful|tender|eager|loving|playful|shy|nervous|hesitant|bold|firm|light|warm|sweet|fond|patient|deliberate|unhurried|languid|hungri|desperate|urgent|rough|clumsi|awkward|deft|swift|sudden|final|immediate|silent|calm|happi|gleeful|teasing|coy|reverent|breathless|greedi|fervent|passionate|delicate|easi|steadi|wordless|willing|gradual|cautious|impatient|hasti|hurried|expert|smooth|lingering|sleepi|drowsi|giddi|kind|readi|proper|ful|complete|partial|shaki|eventual|lazi|reluctant|affectionate|ginger|tentative|mischievous)ly)\b/i;
+    // After a name, a handle, "him" or "them", only an adverb can follow, so any "-ly" word there is one ("Rin languidly").
+    // After "her" the word may be her own thing ("her butterfly", "her dolly"), so only the adverbs named above count.
+    const lyAdverb = /^[a-z-]+ly\b/i;
     const nameWord = "[A-Z][\\w-]*(?:['\u2019](?!s\\b)[\\w-]+)*";
     const person = (rest) => {
       rest = String(rest || '').trim();
       const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'\u2019])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
         .concat(handles.map((h) => new RegExp('^' + escRe(h) + '(?!\\w)', 'i'))).map((re) => re.exec(rest)).filter(Boolean);
       return heads.some((h) => {
-        let tail = rest.slice(h[0].length).trim();
-        while (!objectEnd.test(tail)) { const a = adverb.exec(tail); if (!a) return false; tail = tail.slice(a[0].length).trim(); }
+        let tail = rest.slice(h[0].length).trim(); const her = /^her$/i.test(h[0]);
+        while (!objectEnd.test(tail)) { const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)); if (!a) return false; tail = tail.slice(a[0].length).trim(); }
         return true;
       });
     };
