@@ -435,6 +435,63 @@ const S = {
     } finally { h.close(); }
   },
 
+  // Fading: a change under half done stops growing and loses a step after six quiet story hours, then another every six, and at
+  // nothing told it is gone (trait, rung, influence to five under the line). A change at or past half has set and keeps its ground.
+  // Exposure to the kind resets the quiet. Influence drifts down two a day after a quiet day, never below the last change's line.
+  async fadingChanges() {
+    const h0 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    const store = h0.mock.store; let id;
+    try { assert(await h0.turn('I sit at the desk.')); id = onlyAdv(store).id; } finally { h0.close(); }
+    const doc = store.get('adventures/' + id).data;
+    const nowMin = ((doc.state.day || 1) - 1) * 1440 + (() => { const [hh, mm] = doc.state.time.split(':').map(Number); return hh * 60 + mm; })();
+    const steps = (k) => ['a first ' + k + ' sensation', 'a second ' + k + ' sign', 'a third ' + k + ' sign', 'a fourth ' + k + ' sign', 'the ' + k + ' change complete'];
+    doc.state.tf = Object.assign(doc.state.tf || {}, {
+      influence: Object.assign(doc.state.tf.influence || {}, { cow: 20, fox: 20 }), rungs: { cow: 1, fox: 1 },
+      traits: [{ species: 'cow', trait: 'ears lengthen and soften', day: 1, settled: false }, { species: 'fox', trait: 'ears that turn toward a sound', day: 1, settled: false }],
+      arcs: [], paths: {},
+      tracks: [{ species: 'cow', rung: 1, kind: 'body', trait: 'ears lengthen and soften', steps: steps('ear'), anatomy: '', habits: [], noticed: '', i: 2, nextAt: 1e9, beganAt: nowMin },
+        { species: 'fox', rung: 1, kind: 'body', trait: 'ears that turn toward a sound', steps: steps('fox'), anatomy: '', habits: [], noticed: '', i: 3, nextAt: 1e9, beganAt: nowMin }],
+      last: { cow: nowMin, fox: nowMin }, drifted: {},
+    });
+    doc.pendingNotes = [];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, track = (k) => tf().tracks.find((t) => t.species === k && t.kind === 'body');
+      let advance = 420, expose = true;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = expose ? [{ species: 'cow', method: 'a mug of warm milk', intensity: 1 }] : []; });
+      // Seven hours with a brush of the kind: nothing fades, influence rises.
+      assert(await h.turn('I drink the milk Daisy pours and work through the afternoon.'));
+      assert.equal(track('cow').i, 2, 'with exposure this turn the cow change keeps its steps'); assert.equal(tf().influence.cow, 24, 'the exposure counts');
+      // Seven quiet hours: the cow change (40 of 100) loses a step; the fox change (60 of 100) has set and keeps its ground.
+      expose = false;
+      assert(await h.turn('I keep to my room and my books.'));
+      assert.equal(track('cow').i, 1, 'a change under the line fades a step after six quiet hours'); assert.equal(track('fox').i, 3, 'a change past the line does not fade');
+      assert(track('cow').fadeAt != null, 'the cow track is marked fading');
+      assert(await h.turn('I read on.'));
+      let p = promptOf(lastTurn(h));
+      assert.match(p, /Note from the engine: The change is fading \(bovine mythkin\): ears lengthen and soften/, 'the narrator is told the change is fading');
+      assert.match(p, /Under way \(ears lengthen and soften, fading\)/, 'the body line says so too');
+      assert.doesNotMatch(p, /fading \(fox mythkin/, 'the fox change is not fading');
+      assert(!track('cow'), 'another six quiet hours and the cow change is gone'); assert.equal(tf().rungs.cow, 0, 'its rung is undone');
+      assert.equal(tf().influence.cow, 10, 'influence sits five under the line of 15, so the body remembers');
+      assert(!tf().traits.some((t) => t.species === 'cow'), 'the trait is gone'); assert(tf().traits.some((t) => t.species === 'fox'), 'the fox trait stays');
+      assert(await h.turn('I go down to supper.'));
+      p = promptOf(lastTurn(h));
+      assert.match(p, /Note from the engine: The change has faded \(bovine mythkin\): ears lengthen and soften/, 'the narrator is told the change has faded');
+      assert.equal(tf().influence.fox, 20, 'fox influence holds through the first quiet day (21 h)');
+      // A second quiet day and more: fox influence drifts two a day down toward its floor of 15; the fox change, set, never fades.
+      advance = 720;
+      assert(await h.turn('I sleep.')); assert(await h.turn('I sleep on.'));
+      assert.equal(tf().influence.fox, 18, 'two points off after a second quiet day (52 h): ' + JSON.stringify(tf().influence));
+      assert.equal(track('fox').i, 3, 'the set fox change keeps its steps through it all');
+      // Influence never drifts below the line of the change begun.
+      for (let i = 0; i < 6; i++) assert(await h.turn('I sleep again.'));
+      assert.equal(tf().influence.fox, 15, 'the floor is the fox rung\'s line');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // Cast screen: unsaved edits survive a stray close. A back gesture or Esc (the dialog's cancel event) is refused, a screen the
   // browser closes anyway comes straight back with the typed text, and Close or another name asks once before dropping edits.
   async castEditsKept() {

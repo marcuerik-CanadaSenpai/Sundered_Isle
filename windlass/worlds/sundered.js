@@ -319,6 +319,7 @@ window.WINDLASS_WORLDS.sundered = {
     maxPerTurn: 12,
     maxPerDay: 10,  // the slow burn: at most this much influence per kind per story day (the Settings pace overrides it)
     stepGapHours: 1.5,  // story hours between one small step of a change and the next on the same path (the Settings pace scales it)
+    fade: { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 },  // a change under half done fades a step after six quiet story hours and another every six; at half it has set; influence drifts two a day after a quiet day, never below the last change's line
     sexChange: { cow: { to: 'female', chance: 0.5 }, wolf: { to: 'female', chance: 0.5 }, harpy: { to: 'female', chance: 1 }, goblin: { to: 'female', chance: 0.5 }, fairy: { to: 'female', chance: 0.5 }, fox: { to: 'female', chance: 0.5 }, cat: { to: 'female', chance: 0.5 }, mer: { to: 'female', chance: 0.5 }, dryad: { to: 'female', chance: 0.5 }, rabbit: { to: 'female', chance: 1 } },  // paths that may also carry the body toward a woman's, rolled once when the path's first change begins
     rungOrder: {shuffle: [1, 2, 3], keep: {harpy: [[2, 3]], goblin: [[1, 2]], fairy: [[2, 3]], fox: [[2, 3]], cat: [[2, 3]], mer: [[2, 3]], dryad: [[1, 3], [2, 3]]}},  // the middle rungs come in an order drawn once per path; keep lists content pairs that must stay in order
     thresholdsNote: 'first change at 15, then 30, 50, 70, 85, 100',
