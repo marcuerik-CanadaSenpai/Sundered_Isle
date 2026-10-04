@@ -240,6 +240,23 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // If the boot load is still running when the restored screen stops waiting, Begin then Cancel still lands on the newest save.
+  async slowBootBegin() {
+    const { ls, store, savedId } = await reloadMidCreationWithSave();
+    const h = await boot({ setup(w, m) { m.dbDelay = (op, path) => (op === 'query' && path === 'adventures' ? 21000 : 0); for (const [k, v] of Object.entries(ls)) w.localStorage.setItem(k, v); m.store = store; } });
+    try {
+      assert(h.$('#dlgCreate').open && h.$('#cBegin').disabled, 'the restored screen waits for the boot');
+      for (let t = 0; t < 250 && h.$('#cBegin').disabled; t++) await h.sleep(100);
+      assert(!h.$('#cBegin').disabled, 'Begin is offered after the wait even while the save list is slow');
+      h.mock.sampleHandler = null; slowInvention(h.window, h.mock);
+      h.click('#cBegin'); await h.sleep(300); h.click('#dlgCreate [data-close]');
+      for (let t = 0; t < 100 && h.window.localStorage.getItem('windlass.last') !== savedId; t++) await h.sleep(100);
+      assert(await h.settle(150, 10000), 'boot did not settle');
+      assert.equal(h.window.localStorage.getItem('windlass.last'), savedId, 'the boot load must still open the newest save');
+      assert.doesNotMatch(h.$('#feed').textContent, /You are Alex Rowan/, 'not on the placeholder');
+      clean(h);
+    } finally { h.close(); }
+  },
   // Begin now still begins with whoever has arrived.
   async beginNow() {
     const h = await boot({ setup(w, m) { slowInvention(w, m); } });
@@ -291,7 +308,7 @@ const S = {
   },
   // Old or foreign drafts are dropped quietly (and logged); the normal randomised creation opens.
   async staleDraft() {
-    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, '{not json']) {
+    for (const d of [{ v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() - 7 * 3600e3 }, { v: 1, worldId: 'atlantis', choices: { name: 'Old Name' }, at: Date.now() }, '{not json', { v: 1, worldId: 'sundered', choices: { name: 'Old Name', strengths: {} }, at: Date.now() }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 'yesterday' }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: 1e100 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now() + 864e5 }, { v: 1, worldId: 'sundered', choices: { name: 'Old Name' }, at: Date.now(), tick: 0 }, { v: 1, worldId: '__proto__', choices: { name: 'Old Name' }, at: Date.now() }, { v: 1, worldId: 'constructor', choices: { name: 'Old Name' }, at: Date.now() }]) {
       const h = await boot({ setup(w) { w.localStorage.setItem('windlass.createDraft', typeof d === 'string' ? d : JSON.stringify(d)); } });
       try {
         assert(await h.settle(150, 6000)); assert(h.$('#dlgCreate').open);
@@ -313,7 +330,8 @@ const S = {
   const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(S);
   let failed = 0;
   for (const n of names) {
-    try { await S[n](); console.log('PASS', n); }
+    const before = unhandled;
+    try { await S[n](); await new Promise((r) => setTimeout(r, 50)); assert.equal(unhandled - before, 0, 'unhandled promise rejections during the scenario'); console.log('PASS', n); }
     catch (e) { failed += 1; console.log('FAIL', n, '-', String((e && e.message) || e).split('\n')[0].slice(0, 220)); }
   }
   if (failed) { console.error('CREATE INTERRUPT FAILED: ' + failed + ' of ' + names.length + ' scenarios'); process.exit(1); }
