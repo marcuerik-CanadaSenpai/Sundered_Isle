@@ -635,12 +635,10 @@
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
     p.looks = opts.looks || (sp && sp.body.length ? personFill(kindText(Wc, speciesKey, (pick(sp.body) + byG).replace(/\{colour\}/g, colour), p.eyes), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
-    // The invented distinguishing detail; the anatomy stays the kind's: a detail naming a body part the kind's own text does
-    // not (a tail on a human, a third arm on anyone) is dropped, never added to the description the narrator treats as canon.
-    if (given.detail && p.looks && anatomyFits(given.detail, sp)) p.looks += '. ' + given.detail[0].toUpperCase() + given.detail.slice(1);
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
     p.temperament = given.temperament || pick(G.temperaments);
+    // An invented habit is kept unless it names a body part the kind does not have (the looks never take an invented line).
     p.quirk = (given.quirk && anatomyFits(given.quirk, sp) ? given.quirk : '') || personFill(pick(G.quirks), p);
     p.want = given.want || personFill(pick(opts.wants || G.wants), p);
     p.privateMatter = given.private || personFill(pick(G.privates), p);
@@ -667,8 +665,9 @@
     const sp = species ? speciesPool(W, species) : null;
     // The roommate never shares the player's given name or surname (unless the player typed it that way): an invented
     // name that does is dropped, and a drawn one is drawn again.
-    const taken = new Set(String(c.name || '').trim().split(/\s+/).filter(Boolean).map((x) => x.toLowerCase()));
-    const clash = (f, l) => taken.has(String(f || '').toLowerCase()) || taken.has(String(l || '').toLowerCase());
+    const normaliseName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const taken = new Set([adv.player && adv.player.name, adv.player && adv.player.first, adv.player && adv.player.last, c.name].flatMap((name) => normaliseName(name).split(' ')).filter(Boolean));
+    const clash = (f, l) => [f, l].some((name) => normaliseName(name).split(' ').some((part) => taken.has(part)));
     if (given && clash(given.first, given.last)) given = Object.assign({}, given, { first: '', last: '' });
     let p = null;
     for (let i = 0; i < 20; i++) { p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null }); if (String(c.rmName || '').trim() || !clash(p.first, p.last)) break; }
@@ -2395,6 +2394,8 @@
   }
   // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
   const LEGACY_WORLD = 'halloway';
+  // A listed save whose world is no longer in this game: it stays listed in Adventures but is never opened on its own.
+  const retiredSave = (d) => { try { const w = (d.data() || {}).worldId || LEGACY_WORLD; return !Object.prototype.hasOwnProperty.call(WORLDS, w); } catch (e) { return false; } };
   // A previous version becomes the live turn and state on "Previous version", so only well-formed ones are kept from a save.
   // Every list field a previous version brings back into play (the feed, the suggestions, memory, the engine notes) must be
   // a list, and it must be a version of the turn it is stored on.
@@ -2588,8 +2589,9 @@
             await db.doc('adventures/' + a.id).delete();
             setStatus('');
             if (isCur) {
-              let left = null; try { left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(1).get(); } catch (e) { left = null; }
-              if (left && !left.empty) await loadAdventure(left.docs[0].id);
+              // The newest remaining save this game can open; saves from removed worlds are passed over.
+              let next = null; try { const left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get(); next = (left.docs || []).find((d) => !retiredSave(d)) || null; } catch (e) { next = null; }
+              if (next) await loadAdventure(next.id);
               else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
             }
           } catch (e) { setStatus('Could not remove that adventure: ' + ((e && e.message) || 'error'), true); }
@@ -2787,7 +2789,8 @@
     for (const r of results) { if (!r) continue; Object.assign(given, r.given); notes.push(...r.notes); if (!prompt) prompt = r.prompt; raw += (raw ? '\n\n' : '') + (r.raw || ''); }
     return { given, notes, prompt, raw };
   }
-  const CAST_FIELDS = ['first', 'last', 'course', 'temperament', 'quirk', 'want', 'private', 'detail'];
+  // No free-form physical detail is invented: the species data is the anatomy source of truth. Habits are, and are screened in genPerson.
+  const CAST_FIELDS = ['first', 'last', 'course', 'temperament', 'quirk', 'want', 'private'];
   // Before an adventure begins: the plan (kinds, genders, variants) is drawn, the people are invented to it, and what they
   // were given is remembered so the next save gets different people.
   async function prepareCreation(Wc, c, signal, onProgress) {
@@ -2798,7 +2801,7 @@
     const slots = [];
     const rp = prep.roommate; slots.push(inventSlot('roommate', { race: rp.species ? speciesRace(Wc, rp.species) : (rp.typed || 'human'), gender: rp.gender, year: 'second-year', role: 'the player\'s roommate in room 4B, Kettle Hall.', style: styleOf(rp.species), fields: CAST_FIELDS.concat(['greeting']) }));
     (Wc.castRoles || []).forEach((role, i) => { const pl = prep.cast.characters[i]; const staff = /staff/.test(String(role.year || '')); slots.push(inventSlot(role.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, year: role.year, course: role.course, role: vfill(role.role, pl.variant), style: styleOf(pl.species), fields: staff ? CAST_FIELDS.filter((f) => f !== 'course') : CAST_FIELDS })); });
-    (Wc.minorRoles || []).forEach((m, i) => { const pl = prep.cast.minors[i]; slots.push(inventSlot(m.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, role: vfill(m.text, pl.variant), style: styleOf(pl.species), fields: ['first', 'last', 'detail'] })); });
+    (Wc.minorRoles || []).forEach((m, i) => { const pl = prep.cast.minors[i]; slots.push(inventSlot(m.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, role: vfill(m.text, pl.variant), style: styleOf(pl.species), fields: ['first', 'last'] })); });
     const inv = await inventAll(Wc, slots, 'cast invention', { signal, onProgress });
     if (inv) { prep.given = inv.given; prep.notes = inv.notes; prep.prompt = inv.prompt; prep.raw = inv.raw; }
     return prep;
@@ -3581,7 +3584,7 @@
       snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
     } catch (e) { listError = e; }
     // Saves from a world no longer in this game cannot open here; boot passes over them quietly (they stay listed in Adventures).
-    const retired = (d) => { try { const w = (d.data() || {}).worldId || LEGACY_WORLD; return !Object.prototype.hasOwnProperty.call(WORLDS, w); } catch (e) { return false; } };
+    const retired = retiredSave;
     const ids = (snap && snap.docs ? snap.docs.filter((d) => !retired(d)).map((d) => d.id) : []);
     const listed = ids.slice();
     if (bootLast && !ids.includes(bootLast) && !(snap && snap.docs && snap.docs.some((d) => d.id === bootLast && retired(d)))) ids.push(bootLast);
