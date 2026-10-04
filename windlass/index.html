@@ -609,9 +609,10 @@
   const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:\w+ )?(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text)) return false;
-    const kindText = sp ? JSON.stringify(sp).toLowerCase() : '';
-    const stem = (w) => w.toLowerCase().replace(/(?:ves|s)$/, '').replace(/ed$/, '');
-    return (text.match(ANATOMY_WORDS) || []).every((w) => kindText && kindText.includes(stem(w)));
+    // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
+    const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
+    const kindWords = new Set(sp ? (JSON.stringify(sp).match(/[a-z]+/gi) || []).map(norm) : []);
+    return (text.match(ANATOMY_WORDS) || []).every((w) => kindWords.has(norm(w)));
   }
   // Draws one person from the pools: name, looks and a personality of their own. opts: species (a key or a list of keys to
   // choose from), gender, name, course, looks, wants, speciesText.

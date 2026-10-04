@@ -14,6 +14,7 @@
     "writer-toggle": "node writer-toggle.js",
     "boot-pointer": "node boot-pointer.js",
     "create-interrupt": "node create-interrupt.js",
+    "audit-fixes": "node audit-fixes.js",
     "long-game": "node probe2.js",
     "import-export": "node probe3.js",
     "serve": "node server.js 4173"
