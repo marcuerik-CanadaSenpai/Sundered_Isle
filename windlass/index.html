@@ -1163,7 +1163,7 @@
     return completion(t) < cfg.line && now - (tf.last[t.species] != null ? tf.last[t.species] : t.beganAt || 0) >= Math.round(cfg.afterHours * 60 * sc);
   }
   const bodyTrackOf = (tf, t) => t.kind === 'body' ? t : (tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.rung === t.rung);
-  const trackBusy = (tf, k) => (tf.arcs || []).some((a) => a.species === k) || (tf.tracks || []).some((t) => t.species === k);
+  const trackBusy = (tf, k) => (tf.arcs || []).some((a) => a.species === k) || (tf.tracks || []).some((t) => t.species === k && !t.catchUp);
   // A change that reaches its threshold begins. A rung with step data opens a track: its steps are told one at a time, story
   // hours apart, alongside any other track (a path may also carry the body toward a woman's or a man's, rolled once when its
   // first change begins, with its own steps woven in). A rung without step data runs the older three-turn arc. One change per
@@ -1193,19 +1193,33 @@
   }
   // A chest draw's shape alone, the part before its first semicolon: what the breasts do (a bovine woman's milk) is told by the kind's form steps.
   const chestShape = (b) => String(b || 'breasts').split(';')[0].trim();
-  // The kind's form steps told on a path. A save from before they were kept (v69) rebuilds them: every women step of a rung whose
-  // form track is done, and the told part of one under way, for a body that is or is becoming a woman's.
+  // The kind's form steps told on a path. A save from before they were kept (v69) has only the told part of the form tracks still
+  // under way to go on: a finished or missing track proves nothing was told, so its steps are queued again (queueFormSteps), never assumed.
   function formToldOf(tf, k) {
     const path = tf.paths && tf.paths[k]; if (!path) return [];
     if (Array.isArray(path.formTold)) return path.formTold;
-    const sp = W.transformation.species[k], tracks = tf.tracks || [], form = [];
-    const womanly = path.sex ? path.sex === 'female' : (((adv && adv.player) || {}).gender === 'female' || !!(tf.sex && tf.sex.to === 'female'));
-    if (womanly) for (let i = 0; i < (tf.rungs[k] || 0); i++) {
-      const ft = tracks.find((t) => t.species === k && t.kind === 'form' && t.rung === i + 1);
-      if (ft) form.push(...ft.steps.slice(0, ft.i));
-      else form.push(...((sp.ladder[i] && sp.ladder[i].women) || []));
+    return (tf.tracks || []).filter((t) => t.species === k && t.kind === 'form').sort((a, b) => a.rung - b.rung).flatMap((t) => t.steps.slice(0, t.i));
+  }
+  // A body that is a woman's, or that this path is making one: this path's going over, else one gone over on any path, else the player's own.
+  const womanlyPath = (tf, path, p) => (path && path.sex) ? path.sex === 'female' : (tf.sex ? tf.sex.to === 'female' : (p || {}).gender === 'female');
+  // A woman's body on a path whose earlier rungs' form steps were never told (they were reached before the body went over, or the
+  // save is older than form steps) has them told now, one rung at a time, the earliest first. These catch-up tracks do not hold the
+  // ladder, and on a path still going over a rung's form steps still wait for its sex steps.
+  function queueFormSteps(state) {
+    const T = W.transformation, tf = state.tf; const p = adv.player || defaultPlayer(); const now = storyMin(state);
+    for (const k of Object.keys(tf.paths || {})) {
+      const path = tf.paths[k], sp = T.species[k]; if (!path || !sp) continue;
+      if (!Array.isArray(path.formTold)) path.formTold = formToldOf(tf, k).slice();
+      if (!womanlyPath(tf, path, p) || tf.tracks.some((t) => t.species === k && t.kind === 'form' && t.catchUp)) continue;
+      for (let i = 0; i < Math.min(tf.rungs[k] || 0, sp.ladder.length); i++) {
+        const women = sp.ladder[i].women || [];
+        if (!women.length || tf.tracks.some((t) => t.species === k && t.kind === 'form' && t.rung === i + 1)) continue;
+        const rest = women.filter((x) => !path.formTold.includes(x)); if (!rest.length) continue;
+        const form = { species: k, rung: i + 1, kind: 'form', catchUp: true, trait: rungContent(sp, path, i).trait, steps: rest, i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day };
+        if (tf.tracks.some((t) => t.species === k && t.kind === 'sex' && t.rung === i + 1)) form.after = 'sex';
+        tf.tracks.push(form); break;
+      }
     }
-    return form;
   }
   const rungContent = (sp, path, position) => sp.ladder[(path && Array.isArray(path.order) && path.order[position] != null) ? path.order[position] : position] || sp.ladder[position];
   const STEP_KEEP = 0.75, STEP_KEEP_MIN = 0.6;
@@ -1229,7 +1243,7 @@
             const sc = (T.sexChange || {})[k];
             const sexPathExists = !!tf.sex || Object.values(tf.paths || {}).some((path) => path && path.sex) || (tf.tracks || []).some((track) => track.kind === 'sex');
             const roll = !!(!sexPathExists && sc && sc.to && p.gender !== sc.to && Math.random() < (sc.chance == null ? 0.5 : sc.chance));
-            tf.paths[k] = { sex: roll ? sc.to : null, sexTold: [], day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
+            tf.paths[k] = { sex: roll ? sc.to : null, sexTold: [], formTold: [], day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
             if (roll) notes.push(k + ' path drawn: the body will also go toward a ' + (sc.to === 'female' ? 'woman' : 'man') + '\'s');
             if (tf.paths[k].eye) notes.push(k + ' path drawn: the eyes will go ' + eyeColour(tf.paths[k].eye));
             if (tf.paths[k].order.some((c, i) => c !== i)) notes.push(k + ' path drawn: the changes come in the order ' + tf.paths[k].order.map((c) => c + 1).join(' '));
@@ -1242,8 +1256,7 @@
           // A woman's body (the player's own, one that has gone over, or one this path is making) takes the kind's form where a woman's
           // differs: the rung's women steps, told alongside. On a path still going over they wait for that rung's sex steps, so the
           // breasts are grown before they fill; a path going toward a man's body has none.
-          const womanly = tf.paths[k].sex ? tf.paths[k].sex === 'female' : (p.gender === 'female' || !!(tf.sex && tf.sex.to === 'female'));
-          if (womanly && rung.women && rung.women.length) {
+          if (womanlyPath(tf, tf.paths[k], p) && rung.women && rung.women.length) {
             const form = { species: k, rung: r + 1, kind: 'form', trait: content.trait, steps: rung.women.slice(), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day };
             if (tf.paths[k].sex) form.after = 'sex';
             tf.tracks.push(form);
@@ -1305,7 +1318,7 @@
   // makes the body a woman's (or a man's). Called once per committed turn, after the clock has moved.
   function advanceTracks(state, notes) {
     const T = W.transformation; if (!T || !state.tf) return [];
-    const tf = state.tf; tf.tracks = tf.tracks || []; const now = storyMin(state); const gap = stepGapMin(); const out = [];
+    const tf = state.tf; tf.tracks = tf.tracks || []; queueFormSteps(state); const now = storyMin(state); const gap = stepGapMin(); const out = [];
     const held = (t) => { const b = bodyTrackOf(tf, t); return !!b && fadeHeld(tf, b, now); };
     const waits = (t) => !!t.after && tf.tracks.some((x) => x !== t && x.species === t.species && x.rung === t.rung && x.kind === t.after);
     const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t) && !waits(t)).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
@@ -1316,7 +1329,7 @@
         if (path) { path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]); }
       } else if (t.kind === 'form') {
         const path = tf.paths[t.species];
-        if (path) { path.formTold = formToldOf(tf, t.species); path.formTold.push(t.steps[t.i]); }
+        if (path) { path.formTold = formToldOf(tf, t.species).slice(); path.formTold.push(t.steps[t.i]); }
       }
       const last = t.i === t.steps.length - 1; t.i += 1; t.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
       if (!last) continue;

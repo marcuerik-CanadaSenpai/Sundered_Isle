@@ -875,10 +875,14 @@ const S = {
     const cow = Wd.genPools.species.cow.breasts || [];
     assert(cow.length >= 3, 'the bovine chest pool is found');
     for (const b of cow) assert.doesNotMatch(b.split(';')[0], /milk|lactat/i, 'a bovine draw keeps its milk after the shape: ' + b);
+    // A chest draw also fills the player's Tanner stages and grown-chest summary, so it names no one's pronouns.
+    const draws = [].concat(Wd.genPools.breasts || [], ...Object.values(Wd.genPools.species || {}).map((sp) => sp.breasts || []));
+    assert(draws.length > 10, 'the chest pools are found');
+    for (const b of draws) assert.doesNotMatch(b, /\b(she|her|hers|herself|he|him|his)\b/i, 'a chest draw is person-neutral: ' + b);
   },
 
   // 8j. The kind's form steps are kept on the path and stay in the body summary after the turn that told them (a save from before
-  // they were kept rebuilds the finished rungs'), and the short form of the transformation block lists every change.
+  // they were kept has the earlier rungs' told again rather than assumed), and the short form of the transformation block lists every change.
   async formStepsKept() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const cowL = ctx.window.WINDLASS_WORLDS.sundered.transformation.species.cow.ladder;
@@ -904,12 +908,15 @@ const S = {
       assert(await h.turn('I get on with the day.'));
       const told = tf().paths.cow.formTold;
       assert(Array.isArray(told), 'the path keeps the form steps told: ' + JSON.stringify(tf().paths.cow));
-      assert.equal(JSON.stringify(told), JSON.stringify(cowL.slice(0, 4).flatMap((r) => r.women || [])), 'the earlier rungs\' are rebuilt, then the udder: ' + JSON.stringify(told.map((x) => x.slice(0, 30))));
+      assert.equal(JSON.stringify(told), JSON.stringify(cowL[3].women.slice(0, 1)), 'only the udder, the step actually rolled: ' + JSON.stringify(told.map((x) => x.slice(0, 30))));
+      assert(tf().tracks.some((t) => t.species === 'cow' && t.kind === 'form' && t.catchUp && t.rung === 2), 'the earlier rungs\' form steps are queued to be told: ' + JSON.stringify(tf().tracks.map((t) => [t.kind, t.rung, t.catchUp])));
       assert(await h.turn('I get on with the day.'));
       assert.match(promptOf(lastTurn(h)), /the kind's form on a woman's body\): the udder beginning/, 'the udder step is told');
+      for (let n = 0; n < 6 && !tf().paths.cow.formTold.some((x) => /nipples lengthening/.test(x)); n++) assert(await h.turn('I get on with the day.'));
       assert(await h.turn('I get on with the day.'));
       let p = promptOf(lastTurn(h));
-      assert.match(p, /The kind's form on a woman's body, told so far: the breasts fuller and heavier by the week[^\n]*; the udder beginning: a heaviness low on the belly/, 'a turn later the narrator still has every form step');
+      const toldLine = (p.match(/The kind's form on a woman's body, told so far: [^\n]*/) || [''])[0];
+      for (const re of [/the breasts fuller and heavier by the week/, /the nipples lengthening and thickening/, /the udder beginning: a heaviness low on the belly/]) assert.match(toldLine, re, 'turns later the narrator has every form step told: ' + toldLine);
       // A very long action forces the short form of the transformation block: every change stays listed, the horns among them.
       assert(await h.turn('I walk the long way round. ' + 'The path winds past the Creamery and on along the old wall by the river, and I take it slowly. '.repeat(560)));
       p = promptOf(lastTurn(h));
@@ -917,7 +924,7 @@ const S = {
       assert(notes.some((n) => /transformation block in its short form/.test(n)), 'the prompt was compacted: ' + JSON.stringify(notes.filter((n) => /size cap/.test(n))));
       const line = (p.match(/Changes so far: [^\n]*/) || [''])[0];
       for (const t of ['horns curling from the brow', 'a tufted tail', 'a brush of a tail', 'a wolf\'s nose', 'slit pupils', 'long ears', 'hooves in place of feet']) assert(line.includes(t), 'the short form still lists ' + t + ': ' + line);
-      assert.match(p, /told so far: the breasts fuller[^\n]*the udder beginning/, 'and the form steps');
+      assert.match(p, /told so far: [^\n]*the udder beginning[^\n]*the breasts fuller/, 'and the form steps');
       clean(h);
     } finally { h.close(); }
   },
@@ -960,6 +967,57 @@ const S = {
       assert.doesNotMatch(grown, /milk|lactat/i, 'as its shape alone: ' + grown);
       clean(h);
     } finally { h.close(); }
+  },
+
+  // 8l. Form steps are never assumed told. A save from before they were kept, on a path still going over with no form track, shows
+  // none of its rungs' form (the milk above all) until each is told; and a man's path that never had form tracks, on a body that
+  // has since gone over on another path, has its form told then, not listed as if it always had been.
+  async formStepsNotAssumed() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const T = ctx.window.WINDLASS_WORLDS.sundered.transformation;
+    const run = async (label, tfSeed, k) => {
+      const first = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi', gender: 'male' });
+      let seeded; try { seeded = new Map([...first.mock.store].map(([key, v]) => [key, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+      const advKey = [...seeded.keys()].find((key) => /^adventures\/[^/]+$/.test(key)); const doc = seeded.get(advKey).data;
+      doc.state.tf = Object.assign({ arcs: [], last: {}, drifted: {} }, tfSeed); doc.settings.pace = 'unbounded';
+      const h = await boot({ setup(w, m) { m.store = seeded; } });
+      try {
+        assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+        patchTurns(h, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
+        const tf = () => onlyAdv(h.mock.store).data.state.tf;
+        // Each form step by a fragment free of placeholders; a summary may list only those already told as a step.
+        const key = (x) => x.replace(/\{\w+\}/g, '').replace(/^[\s,]+/, '').slice(0, 25);
+        const keys = Object.values(T.species).flatMap((sp) => sp.ladder.flatMap((r) => r.women || [])).map(key);
+        const mine = key(T.species[k].ladder.find((r) => r.women).women[0]);
+        const seen = new Set();
+        for (let n = 0; n < 4; n++) {
+          assert(await h.turn('I get on with the day.'));
+          const p = promptOf(lastTurn(h));
+          // A step rolled at the end of a turn is told, and kept, from the next prompt on.
+          for (const m of p.matchAll(/the kind's form on a woman's body\): ([^\n]*)/g)) for (const x of keys) if (m[1].includes(x)) seen.add(x);
+          const summary = (p.match(/The kind's form on a woman's body, told so far: [^\n]*/) || [''])[0];
+          for (const x of keys) if (summary.includes(x)) assert(seen.has(x), label + ': a form step is listed before it was told (turn ' + (n + 1) + '): ' + x);
+          assert.doesNotMatch(p, /Body now[^\n]*milk: a bead of it/, label + ': the milk is never listed as established');
+        }
+        assert(seen.has(mine), label + ': the earliest form step is told as a step: ' + JSON.stringify(tf().tracks.map((t) => [t.species, t.kind, t.rung, t.i, t.catchUp, t.after])));
+        assert(tf().paths[k].formTold.some((x) => key(x) === mine), label + ': and then kept: ' + JSON.stringify(tf().paths[k].formTold));
+        clean(h);
+      } finally { h.close(); }
+    };
+    // A v68/v69 cow save at rung 5, going over, its rung-5 sex steps unfinished and no form track: the old rebuild listed every rung's
+    // form, the milk among them.
+    await run('legacy cow', {
+      influence: { cow: 90 }, rungs: { cow: 5 }, traits: [{ species: 'cow', trait: 'the body fills toward the bovine shape', day: 1, settled: false }],
+      paths: { cow: { sex: 'female', sexTold: ['{tanner2}'], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'brown' } },
+      tracks: [{ species: 'cow', rung: 5, kind: 'sex', to: 'female', trait: 'the body fills toward the bovine shape', steps: ['{tanner5}', '{genitals}'], i: 0, nextAt: 1e9, day: 1 }],
+    }, 'cow');
+    // A man's fox path that is not going over (built as 1e47c04 built one, with no form history), on a body that has gone over on the harpy path.
+    await run('fox after the harpy path', {
+      influence: { fox: 75, harpy: 90 }, rungs: { fox: 4, harpy: 5 },
+      traits: [{ species: 'fox', trait: 'a brush of a tail', day: 1, settled: true }, { species: 'harpy', trait: 'wings', day: 1, settled: true }],
+      paths: { fox: { sex: null, sexTold: [], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'amber' }, harpy: { sex: 'female', sexTold: [], formTold: [], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'gold' } },
+      tracks: [], sex: { to: 'female', species: 'harpy', rung: 5, day: 1 },
+    }, 'fox');
   },
 
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
