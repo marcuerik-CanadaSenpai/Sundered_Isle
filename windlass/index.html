@@ -620,12 +620,15 @@
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
+    // Figures and words are one count ("2 tails" is "two tails").
+    const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
     const NUM = '(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many|\\d+)';
     const nounRe = '(' + ANATOMY_WORDS.source.slice(3, -3) + ')';
     const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
     for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + nounRe + '\\b', 'gi'))) {
+      const n = m[1].toLowerCase(), other = /^\d+$/.test(n) ? WORDS[+n] : (WORDS.includes(n) ? String(WORDS.indexOf(n)) : '');
       const stem = m[2].toLowerCase().replace(/(?:ves|s)$/, '');
-      if (!new RegExp('\\b' + m[1].toLowerCase() + ' (?:[\\w\'-]+,? ){0,3}?' + escRe(stem)).test(kindLower)) return false;
+      if (!new RegExp('\\b(?:' + n + (other ? '|' + other : '') + ') (?:[\\w\'-]+,? ){0,3}?' + escRe(stem)).test(kindLower)) return false;
     }
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
     const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
@@ -1362,10 +1365,24 @@
     // (in any case: "rin" is Rin), or a capitalised name. "I undress in my room", "I take tea to bed" and "I go to bed with a
     // book" are not romance.
     const handles = activeCharacters().concat((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).flatMap(nameHandles).filter((h) => h && h.length >= 2);
-    const person = (rest) => { rest = String(rest || '').trim(); return /^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))\b/i.test(rest) || /^[A-Z][\w'-]+/.test(rest) || handles.some((h) => new RegExp('^' + escRe(h) + '(?![A-Za-z])', 'i').test(rest)); };
-    for (const m of text.matchAll(/\bundress(?:es|ing)?\s+(.{0,40})/gi)) if (person(m[1])) return true;
-    for (const m of text.matchAll(/\btak(?:e|es|ing)\s+(.{1,40}?)\s+to bed\b/gi)) if (person(m[1])) return true;
-    for (const m of text.matchAll(/\b(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with\s+(.{0,40})/gi)) if (person(m[1])) return true;
+    // The person must be the whole object: only adverbs may follow before the phrase ends at punctuation, a conjunction or a
+    // preposition ("rin slowly, then", "her gently", "Rin up"). "Her book", "Rin's notebook" and "a book" are things.
+    const objectEnd = /^(?:$|[,;:.!?\u2014\u2013]|-\s|(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if|in|on|at|into|onto|under|beside|behind|against|to|towards?|for|with|without|from|by|near|over|across)\b)/i;
+    const adverb = /^(?:(?!(?:family|belly|lily|jelly|ally|bully|folly|holly|dolly|telly|lolly|fly)\b)[a-z-]+ly|back|up|down|off|home|upstairs|downstairs|inside|again|now|tonight|together|close|closer|already|too|also|straight|away|here|there|first|right)\b/i;
+    const nameWord = "[A-Z][\\w-]*(?:['\u2019](?!s\\b)[\\w-]+)*";
+    const person = (rest) => {
+      rest = String(rest || '').trim();
+      const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'\u2019])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
+        .concat(handles.map((h) => new RegExp('^' + escRe(h) + '(?!\\w)', 'i'))).map((re) => re.exec(rest)).filter(Boolean);
+      return heads.some((h) => {
+        let tail = rest.slice(h[0].length).trim();
+        while (!objectEnd.test(tail)) { const a = adverb.exec(tail); if (!a) return false; tail = tail.slice(a[0].length).trim(); }
+        return true;
+      });
+    };
+    for (const m of text.matchAll(/\bundress(?:es|ing)?\s+([^.!?\n]*)/gi)) if (person(m[1])) return true;
+    for (const m of text.matchAll(/\btak(?:e|es|ing)\s+([^.!?\n]{1,40}?)\s+to bed\b/gi)) if (person(m[1])) return true;
+    for (const m of text.matchAll(/\b(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with\s+([^.!?\n]*)/gi)) if (person(m[1])) return true;
     return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
   // A change is on the page this turn: an arc in its opening phases, or a change note due now. A change merely pending

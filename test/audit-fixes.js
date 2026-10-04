@@ -255,7 +255,11 @@ const S = {
       'takes a second to scratch her head before answering', 'gives another shake of her head', 'touches the other side of her face when thinking',
       'for the third time rubs her eyes', 'counts to three and closes her eyes', 'takes a second glance, head tilted', 'pauses a split second, head tilted',
       'waits a second, mouth open', 'holds her mug in her spare hand', 'never wants another mouth to feed', 'could use an extra pair of hands',
-      'spends two hours brushing her tail']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'spends two hours brushing her tail', 'counts to two while swishing her tail', 'hums three notes while her tail sways']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+    // A figure is the same count as the word: the fox's own two tails pass either way, and no kind has two heads.
+    const fox = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.fox;
+    for (const t of ['flicks her two tails when amused', 'flicks her 2 tails when amused']) { assert.equal(fits(t, fox), true, 'the fox kept: ' + t); assert.equal(fits(t, cow), false, 'the cow refused: ' + t); }
+    for (const t of ['has 2 heads', 'flicks her 3 tails', 'flicks her three tails']) assert.equal(fits(t, fox), false, 'the fox refused: ' + t);
   },
 
   // 7. The generated cast never takes the player's first name, and an invented first name with a space is refused.
@@ -411,7 +415,7 @@ const S = {
       await setWriter(h, 'auto');
       const W = h.window.WINDLASS_WORLDS[onlyAdv(h.mock.store).data.worldId];
       const rich = W.wordBands.rich;
-      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.', 'i take rin to bed', 'I undress rin slowly.']) {
+      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.', 'i take rin to bed', 'I undress rin slowly.', 'I take her gently up to bed.', 'I go to bed with Rin tonight.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.equal(c.opts.modelTier, 'complex', a + ' is romance: the complex tier on auto');
@@ -422,7 +426,8 @@ const S = {
         assert.match(p, /Use only anatomy and functions established in the world data; do not invent them/, 'established anatomy only');
         assert.doesNotMatch(p, /fade to black|sex is not depicted|sex remains off-page/i, 'no off-page rule');
       }
-      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.']) {
+      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.',
+        'I take her book to bed.', "I take Rin's notebook to bed.", 'I go to bed with her book.', "I go to bed with Rin's letters.", 'I take her dolly to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');
