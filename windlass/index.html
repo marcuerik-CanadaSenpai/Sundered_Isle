@@ -482,8 +482,6 @@
   </dialog>
 </div>
 
-<script src="worlds/halloway.js"></script>
-<script src="worlds/mythaven.js"></script>
 <script src="worlds/sundered.js"></script>
 <script>
 (function () {
@@ -2534,7 +2532,7 @@
       if (snap.empty) { el.innerHTML = '<div class="small">No saved adventures yet.</div>'; return; }
       snap.docs.forEach((d) => {
         const a = d.data(); const row = document.createElement('div'); row.className = 'advrow';
-        const aw = a.worldId || LEGACY_WORLD; const wt = WORLDS[aw] ? WORLDS[aw].title : aw;
+        const aw = a.worldId || LEGACY_WORLD; const wt = WORLDS[aw] ? WORLDS[aw].title : cap(aw) + ' (a world no longer in this game)';
         const isCur = adv && adv.id === a.id;
         row.innerHTML = '<span class="t">' + esc(a.title) + '</span><span class="m">' + esc(wt + ' · ' + (a.turnCount || 0) + ' turns · Day ' + (a.state && a.state.day) + ' ' + (a.state && a.state.time) + ' · ' + new Date(a.updatedAt).toLocaleString()) + '</span>' +
           '<span class="acts"><button data-act="open"' + (WORLDS[aw] ? '' : ' disabled') + '>' + (isCur ? 'Current' : 'Continue') + '</button><button data-act="rename" class="quiet">Rename</button><button data-act="copy" class="quiet"' + (isCur ? '' : ' disabled title="Open it first"') + '>Save a copy</button><button data-act="delete" class="quiet danger">Delete</button></span>';
@@ -3289,6 +3287,7 @@
   function closeDlg(id) { const d = document.getElementById(id); if (d.open) d.close(); else d.removeAttribute('open'); }
 
   // ---------- wiring ----------
+  $('#newWorld').hidden = WORLD_IDS.length < 2;   // one world: nothing to choose
   $('#newWorld').innerHTML = WORLD_IDS.map((id) => '<option value="' + esc(id) + '"' + (id === DEFAULT_WORLD ? ' selected' : '') + '>' + esc(WORLDS[id].title) + '</option>').join('');
   $('#send').onclick = onSend;
   $('#regen').onclick = () => onRegenerate('');
@@ -3566,9 +3565,11 @@
       // Open the adventure saved most recently on any device, so a phone session carries on from the desktop and back.
       snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
     } catch (e) { listError = e; }
-    const ids = (snap && snap.docs ? snap.docs.map((d) => d.id) : []);
+    // Saves from a world no longer in this game cannot open here; boot passes over them quietly (they stay listed in Adventures).
+    const retired = (d) => { try { const w = (d.data() || {}).worldId || LEGACY_WORLD; return !Object.prototype.hasOwnProperty.call(WORLDS, w); } catch (e) { return false; } };
+    const ids = (snap && snap.docs ? snap.docs.filter((d) => !retired(d)).map((d) => d.id) : []);
     const listed = ids.slice();
-    if (bootLast && !ids.includes(bootLast)) ids.push(bootLast);
+    if (bootLast && !ids.includes(bootLast) && !(snap && snap.docs && snap.docs.some((d) => d.id === bootLast && retired(d)))) ids.push(bootLast);
     const skipped = [];
     for (const id of ids) {
       if (bootSuperseded()) { setSaveNote(skipped.length ? 'some saves could not be loaded (see Debug)' : 'ready'); return; }
