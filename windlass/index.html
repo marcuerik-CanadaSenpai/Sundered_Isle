@@ -602,18 +602,6 @@
     return String(text || '').replace(/(^|\. )\{eyes\}/g, (m, pre) => pre + cap(ph)).replace(/\{eyes\}/g, ph).replace(/\{eye\}/g, e ? eyeColour(e) : 'a new colour').replace(/\{teats\}/g, (sp && sp.teats) || 'a second pair of small nipples');
   }
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  // Body structures an invented line may name only when the kind's own world text already has them.
-  const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls|tongues?|tentacles?|antennae?|stingers?|quills?|mandibles?|pincers?|carapace|shells?|crests?|frills?|webbing|webbed|scaly|prehensile|forked|serpentine|reptilian|vestigial|barbed)\b/gi;
-  // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
-  const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|dozen|several|multiple|many|[3-9]|\d{2,}) (?:\w+ )?(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:\w+ )?(?:heads|mouths|faces)\b/i;
-  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:\w+ )?(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
-  function anatomyFits(text, sp) {
-    text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
-    // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
-    const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
-    const kindWords = new Set(sp ? (JSON.stringify(sp).match(/[a-z]+/gi) || []).map(norm) : []);
-    return (text.match(ANATOMY_WORDS) || []).every((w) => kindWords.has(norm(w)));
-  }
   // Draws one person from the pools: name, looks and a personality of their own. opts: species (a key or a list of keys to
   // choose from), gender, name, course, looks, wants, speciesText.
   function genPerson(Wc, opts) {
@@ -635,13 +623,10 @@
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
     p.looks = opts.looks || (sp && sp.body.length ? personFill(kindText(Wc, speciesKey, (pick(sp.body) + byG).replace(/\{colour\}/g, colour), p.eyes), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
-    // The invented distinguishing detail; the anatomy stays the kind's: a detail naming a body part the kind's own text does
-    // not (a tail on a human, a third arm on anyone) is dropped, never added to the description the narrator treats as canon.
-    if (given.detail && p.looks && anatomyFits(given.detail, sp)) p.looks += '. ' + given.detail[0].toUpperCase() + given.detail.slice(1);
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
     p.temperament = given.temperament || pick(G.temperaments);
-    p.quirk = (given.quirk && anatomyFits(given.quirk, sp) ? given.quirk : '') || personFill(pick(G.quirks), p);
+    p.quirk = personFill(pick(G.quirks), p);
     p.want = given.want || personFill(pick(opts.wants || G.wants), p);
     p.privateMatter = given.private || personFill(pick(G.privates), p);
     p.course = opts.course || given.course || pick(G.courses);
@@ -667,8 +652,9 @@
     const sp = species ? speciesPool(W, species) : null;
     // The roommate never shares the player's given name or surname (unless the player typed it that way): an invented
     // name that does is dropped, and a drawn one is drawn again.
-    const taken = new Set(String(c.name || '').trim().split(/\s+/).filter(Boolean).map((x) => x.toLowerCase()));
-    const clash = (f, l) => taken.has(String(f || '').toLowerCase()) || taken.has(String(l || '').toLowerCase());
+    const normaliseName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const taken = new Set([adv.player && adv.player.name, adv.player && adv.player.first, adv.player && adv.player.last, c.name].flatMap((name) => normaliseName(name).split(' ')).filter(Boolean));
+    const clash = (f, l) => [f, l].some((name) => normaliseName(name).split(' ').some((part) => taken.has(part)));
     if (given && clash(given.first, given.last)) given = Object.assign({}, given, { first: '', last: '' });
     let p = null;
     for (let i = 0; i < 20; i++) { p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null }); if (String(c.rmName || '').trim() || !clash(p.first, p.last)) break; }
@@ -2787,7 +2773,8 @@
     for (const r of results) { if (!r) continue; Object.assign(given, r.given); notes.push(...r.notes); if (!prompt) prompt = r.prompt; raw += (raw ? '\n\n' : '') + (r.raw || ''); }
     return { given, notes, prompt, raw };
   }
-  const CAST_FIELDS = ['first', 'last', 'course', 'temperament', 'quirk', 'want', 'private', 'detail'];
+  // Keep free-form physical details and quirks out of invented fields; the species data is the anatomy source of truth.
+  const CAST_FIELDS = ['first', 'last', 'course', 'temperament', 'want', 'private'];
   // Before an adventure begins: the plan (kinds, genders, variants) is drawn, the people are invented to it, and what they
   // were given is remembered so the next save gets different people.
   async function prepareCreation(Wc, c, signal, onProgress) {
@@ -2798,7 +2785,7 @@
     const slots = [];
     const rp = prep.roommate; slots.push(inventSlot('roommate', { race: rp.species ? speciesRace(Wc, rp.species) : (rp.typed || 'human'), gender: rp.gender, year: 'second-year', role: 'the player\'s roommate in room 4B, Kettle Hall.', style: styleOf(rp.species), fields: CAST_FIELDS.concat(['greeting']) }));
     (Wc.castRoles || []).forEach((role, i) => { const pl = prep.cast.characters[i]; const staff = /staff/.test(String(role.year || '')); slots.push(inventSlot(role.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, year: role.year, course: role.course, role: vfill(role.role, pl.variant), style: styleOf(pl.species), fields: staff ? CAST_FIELDS.filter((f) => f !== 'course') : CAST_FIELDS })); });
-    (Wc.minorRoles || []).forEach((m, i) => { const pl = prep.cast.minors[i]; slots.push(inventSlot(m.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, role: vfill(m.text, pl.variant), style: styleOf(pl.species), fields: ['first', 'last', 'detail'] })); });
+    (Wc.minorRoles || []).forEach((m, i) => { const pl = prep.cast.minors[i]; slots.push(inventSlot(m.key, { race: pl.species ? speciesRace(Wc, pl.species) : 'human', gender: pl.gender, role: vfill(m.text, pl.variant), style: styleOf(pl.species), fields: ['first', 'last'] })); });
     const inv = await inventAll(Wc, slots, 'cast invention', { signal, onProgress });
     if (inv) { prep.given = inv.given; prep.notes = inv.notes; prep.prompt = inv.prompt; prep.raw = inv.raw; }
     return prep;

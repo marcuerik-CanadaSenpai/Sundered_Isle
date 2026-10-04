@@ -197,7 +197,7 @@ const S = {
     }
   },
 
-  // 6. An invented detail or quirk naming anatomy the kind does not have is dropped; a harmless one is kept, capitalised.
+  // 6. Free-form invention cannot add anatomy that is absent from the kind's world data.
   async inventedAnatomyDropped() {
     const h = await begin({
       name: 'Mira Holt', rmSpecies: 'cow',
@@ -207,8 +207,8 @@ const S = {
           if (call.label !== 'cast invention') return r;
           const d = JSON.parse(r);
           for (const p of d.people) {
-            if (p.key === 'roommate') { p.detail = 'a third arm folded under the shirt'; p.quirk = 'flexes small folded wings at the shoulder blades when nervous'; }
-            if (p.key === 'runner_human') { p.detail = 'a forked tail curled at the hem'; p.quirk = 'tucks a forked tail into a coat pocket'; }
+            if (p.key === 'roommate') { p.detail = 'a forked tongue behind the teeth'; p.quirk = 'flexes small folded wings at the shoulder blades when nervous'; }
+            if (p.key === 'runner_human') { p.detail = 'five arms folded beneath the coat'; p.quirk = 'tucks a forked tail into a coat pocket'; }
             if (p.key === 'creamery') p.detail = 'a chipped front tooth';
           }
           return JSON.stringify(d);
@@ -220,12 +220,11 @@ const S = {
       const people = [data.roommate].concat(data.cast.generated.characters);
       const all = JSON.stringify(people);
       assert(people.length > 3 && data.cast.generated.characters.some((c) => c.key === 'runner_human'), 'the generated cast must include runner_human');
+      assert.doesNotMatch(all, /forked tongue|five arms|forked tail/, 'free-form anatomy must never reach a description or quirk');
       assert.doesNotMatch(all, /third arm/, 'an extra arm must never reach a description');
-      assert.doesNotMatch(all, /forked tail/, 'a tail on a kind without tails must never reach a description or quirk');
-      // Body words are matched as whole words: the cow's text saying "showing" does not give a cow wings.
       assert.doesNotMatch(JSON.stringify(data.roommate), /folded wings/, 'wings on a kind without wings must never reach a quirk');
       const cream = data.cast.generated.characters.find((c) => c.key === 'creamery');
-      assert.match(JSON.stringify(cream), /\. A chipped front tooth/, 'a harmless invented detail is kept and capitalised: ' + (cream.looks || '').slice(-120));
+      assert.doesNotMatch(JSON.stringify(cream), /chipped front tooth/, 'free-form anatomy details are not appended to the world-defined body');
       clean(h);
     } finally { h.close(); }
   },
@@ -240,6 +239,7 @@ const S = {
           if (call.label !== 'cast invention') return r;
           const d = JSON.parse(r);
           for (const p of d.people) {
+            if (p.key === 'roommate') { p.first = 'Tessa'; p.last = 'Holt Lane'; }
             if (p.key === 'creamery') { p.first = 'Mira'; p.last = 'Quell'; }
             if (p.key === 'choir') { p.first = 'Mary Ann'; p.last = 'Stroud'; }
           }
@@ -257,6 +257,7 @@ const S = {
         assert(!/\s/.test(c.first || ''), c.key + ' first name has a space: ' + c.first);
       }
       assert.notEqual(data.roommate.first, 'Mira');
+      assert.doesNotMatch(data.roommate.last, /Holt/i, 'an invented roommate cannot embed the player surname in a multiword name');
       clean(h);
     } finally { h.close(); }
   },
@@ -298,6 +299,27 @@ const S = {
       assert(line, 'Ines must be in <characters>');
       assert.match(line, /Second-year, Stage 3 in fourteen months/, 'Ines in the scene and named must get her full sheet: ' + line.slice(0, 160));
       assert.match(p, /Focus: the action names Ines\b/, 'the Focus line must name Ines');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Surname-only actions name the generated cast member in the Focus line.
+  async surnameFocus() {
+    const h = await begin({
+      setup(w, m) {
+        m.sampleHandler = (input, o, call) => {
+          const r = m.defaultHandler(input, o, call);
+          if (call.label !== 'cast invention') return r;
+          const d = JSON.parse(r);
+          const creamery = d.people.find((p) => p.key === 'creamery');
+          creamery.first = 'Tessa'; creamery.last = 'Varga';
+          return JSON.stringify(d);
+        };
+      },
+    });
+    try {
+      assert(await h.turn('Ask Varga about the Quiet Table.'));
+      assert.match(promptOf(lastTurn(h)), /Focus: the action names Tessa\b/, 'the surname must resolve to the generated cast member');
       clean(h);
     } finally { h.close(); }
   },
