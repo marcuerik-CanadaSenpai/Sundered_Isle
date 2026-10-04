@@ -437,6 +437,7 @@
             <div class="field"><label for="cfName">Name</label><input type="text" id="cfName"></div>
             <div class="field"><label for="cfAliases">Also called (comma-separated)</label><input type="text" id="cfAliases"></div>
             <div class="field"><label for="cfSpecies">Species or kind</label><input type="text" id="cfSpecies" placeholder="e.g. fox mythkin, human, werewolf"></div>
+            <div class="field"><label for="cfGender">Gender and pronouns</label><select id="cfGender"></select><span class="small">Changing this updates pronouns, not appearance; edit Looks separately if needed.</span></div>
             <div class="field"><label for="cfAttitude">Attitude to the player (0–10)</label><input type="number" id="cfAttitude" min="0" max="10"></div>
           </div>
           <div class="field"><label for="cfLooks">Looks</label><textarea id="cfLooks" placeholder="What they look like, one or two lines"></textarea></div>
@@ -521,7 +522,7 @@
   const CORE_RULES = [
     'Perspective: everything is seen from inside {first}. What is new to {first} is called out as new, through the senses beyond sight (smell, sound, touch, warmth, weight) and an inward reaction: a thought, a noticing, a reflex, a thing not said. Not everything is dialogue; a turn can carry a paragraph of looking and thinking. {first}\'s reflexes and sensations are yours; {first}\'s decisions, words and settled feelings are the player\'s.',
     'Player knowledge: {first} knows only what the player has read (the "earlier" notes, the opening, the turns) plus <player>. Never have {first} recognise, name or recall a person, place or fact beyond that; when someone mentions one {first} has not met on the page, make clear who or what it is, or leave it for {first} to ask. Invent no surname, family, past, belongings or opinions for {first}: <player> is the whole of it, and any words given to {first} come from the stated action or what the player knows.',
-    'Stopping: a turn ends at the first moment {first} would speak or choose: someone addresses {first}, an offer or a question, arriving somewhere new, a person worth meeting. Never carry {first} through several such moments in one turn (a walk, then a queue, then being served, then sitting down); stop at the first, however short the turn. Ending short is always right; padding never is.',
+    'Stopping and travel: ordinary scenes end at the first moment {first} would speak or choose: someone addresses {first}, an offer or question, arriving somewhere new, or a person worth meeting. When {first} explicitly travels to a destination, make the journey legible through a few concrete details of route and passage instead of cutting straight to arrival. Keep the stated destination and stop there; let {first} interrupt or stop en route if the player says so. An occasional, plausible person or event may offer a choice during the journey, but do not force a detour or interruption; if one does create a real choice, stop for it. Do not carry {first} through an unrequested queue, service, or other separate scene.',
     'Variety: aims are directions, not scripts: a character pursues one by different means each scene and lets it rest for a few turns after {first} answers or ignores a bid. A signature habit (a hum, a gesture, a running joke) appears at most once a scene and not in consecutive turns unless {first} engages with it; each turn shows a different side of the people present (a new topic, a want, a mood, a piece of their day). Do not end consecutive turns on the same image.',
     'Attitudes: an attitude value moves at most one point per turn and only for a cause shown in the narrative.',
     'Fresh detail: show people and places through details and images not already used in <recent_turns> or <style_examples>.'
@@ -2943,6 +2944,10 @@
     const cs = castState(); const c = activeCharacters().find((x) => x.key === castSel) || baseCharacter(castSel);
     $('#castForm').hidden = !c; if (!c) return;
     const isAdded = cs.added.some((a) => a.key === c.key);
+    const genders = (W.creation && W.creation.genders) || [{ key: 'male', label: 'Man' }, { key: 'female', label: 'Woman' }, { key: 'nonbinary', label: 'Non-binary' }];
+    $('#cfGender').innerHTML = genders.map((g) => '<option value="' + esc(g.key) + '">' + esc(g.label) + '</option>').join('');
+    const pronounGender = genders.find((g) => g.pronouns && c.pronouns && g.pronouns.they === c.pronouns.they);
+    $('#cfGender').value = genders.some((g) => g.key === c.gender) ? c.gender : ((pronounGender || genders.find((g) => g.key === 'nonbinary') || genders[0] || {}).key || '');
     $('#cfName').value = c.name || ''; $('#cfAliases').value = (c.aliases || []).join(', '); $('#cfSpecies').value = raceOf(c);
     $('#cfAttitude').value = adv.state.attitudes[c.key] != null ? adv.state.attitudes[c.key] : (c.attitude != null ? c.attitude : 5);
     // Shown as the narrator reads them, placeholders filled; a field saved unchanged keeps the world's template (see saveCast).
@@ -2957,6 +2962,7 @@
     const attText = $('#cfAttitude').value.trim(), att = attText ? Number(attText) : null;
     if (attText && !Number.isFinite(att)) { $('#cfNote').textContent = 'Attitude must be a number.'; return; }
     const name = $('#cfName').value.trim() || c.name;
+    const gender = genderDef($('#cfGender').value);
     // A field left as it was shown keeps the template it was filled from (so a later rename still resolves); an edited one is kept as typed.
     const field = (id, raw) => { const typed = $(id).value.trim(); return typed === fill(raw || '').trim() ? (raw || '') : typed; };
     const fieldChanged = (id, raw) => $(id).value.trim() !== fill(raw || '').trim();
@@ -2965,7 +2971,7 @@
     if (aimEdited) { const text = $('#cfAim').value.trim(); aims.default = text; Object.keys(aims).forEach((k) => { if (k !== 'default') aims[k] = text; }); }
     if (whereEdited) { const text = $('#cfWhere').value.trim(); where.default = text; Object.keys(where).forEach((k) => { if (k !== 'default') where[k] = text; }); }
     const parts = name === c.name ? { first: c.first || name.split(' ')[0], last: c.last || name.split(' ').slice(1).join(' ') } : (() => { const plain = name.replace(/^(?:dean|professor|prof\.|doctor|dr\.|madam|master|mr\.|mrs\.|ms\.|mx\.)\s+/i, '').trim().split(/\s+/); return { first: plain[0] || name, last: plain.slice(1).join(' ') }; })();
-    const o = { name, first: parts.first, last: parts.last, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
+    const o = { name, first: parts.first, last: parts.last, gender: gender.key, pronouns: gender.pronouns, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
@@ -2989,7 +2995,7 @@
   async function addCast() {
     if (busy) return;
     const cs = castState(); let base = 'npc' + (cs.added.length + 1); let key = base; let n = 1; while (activeCharacters().some((c) => c.key === key) || cs.hidden.includes(key)) key = base + '_' + (++n);
-    const c = { key, name: 'New character', aliases: [], race: '', looks: '', brief: 'A new face on campus.', sheet: '', aims: { default: 'go about their own business' }, where: { default: 'around campus' }, attitude: 5 };
+    const c = { key, name: 'New character', gender: 'nonbinary', pronouns: genderDef('nonbinary').pronouns, aliases: [], race: '', looks: '', brief: 'A new face on campus.', sheet: '', aims: { default: 'go about their own business' }, where: { default: 'around campus' }, attitude: 5 };
     cs.added.push(c); adv.state.attitudes[key] = 5; castSel = key; renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Character added here, but the change is not saved yet.';
   }
 
