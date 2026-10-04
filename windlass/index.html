@@ -660,8 +660,11 @@
     const ORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth', 'seventeenth', 'eighteenth', 'nineteenth', 'twentieth'];
     const numOf = (w) => /^\d+$/.test(w) ? +w : WORDS.indexOf(w);
     for (const m of text.matchAll(new RegExp('(?<!split[ -])\\b(second|2nd|' + ANATOMY_ORD + ')' + ANATOMY_AFTER.replace('(?:', '(') + '(' + ANATOMY_PAIRS + ')?' + nounRe + '\\b', 'gi'))) {
-      const o = m[1].toLowerCase(), n = /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity), stem = escRe(stemOf(m[4]));
-      if (n === 2 && m[2][0] === ',' && /\ban? $/i.test(text.slice(0, m.index))) continue;
+      const ordN = (o) => { o = o.toLowerCase(); return /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity); };
+      let n = ordN(m[1]), pre = text.slice(0, m.index); const stem = escRe(stemOf(m[4]));
+      // Ordinals joined before this one ("her fifth and third pairs of", "third, fifth and second") are the same claim: the largest counts.
+      for (let c; (c = new RegExp('\\b(second|2nd|' + ANATOMY_ORD + ')(?:,|,? (?:and|or))? $', 'i').exec(pre));) { n = Math.max(n, ordN(c[1])); pre = pre.slice(0, c.index); }
+      if (n === 2 && m[2][0] === ',' && /\b(?:an?|one|another) $/i.test(text.slice(0, m.index))) continue;
       const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' ' + words + (m[3] ? '(?:pairs?|sets?|rows?) of ' + words : '') + stem, 'g')), (k) => numOf(k[1]));
       if (!m[3] && new RegExp('\\b' + stem + '(?:e?s|ves)\\b').test(kindLower)) counts.push(2);
       if (!counts.some((c) => c >= n)) return false;
@@ -1417,6 +1420,7 @@
     // own ("her downstairs and go to bed").
     const closing = /^(?:in|on|at|into|onto|under|beside|behind|against|to|towards?|for|with|without|from|by|near|over|across)\s+(?:(?!(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if)\b)[\w'’-]+\s*){1,4}/i;
     const joiner = /^(?:and(?:\s+then)?|or|then)(?:\s+|$)/i;
+    const predicate = /\b(?:i|we|you|go|goes|going|went|gone|get|gets|getting|got|head|heads|heading|headed|crawl\w*|climb\w*|slip\w*|retire\w*|return\w*|come|comes|coming|came|run|runs|running|ran|sneak\w*|stumble\w*|hurr(?:y|ies|ying|ied)|fall|falls|falling|fell|put|puts|putting|take|takes|taking|took|carry|carries|carrying|carried|bring|brings|bringing|brought|lead|leads|leading|led|walk\w*|send\w*|sent|turn\w*|tuck\w*|settle\w*)\b/i;
     const person = (rest, whole) => {
       rest = String(rest || '').trim();
       const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'’])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
@@ -1435,7 +1439,9 @@
           if (!tail) return true;
           const j = joiner.exec(tail);
           if (j) { tail = tail.slice(j[0].length); if (!tail || person(tail, true)) return true; continue; }
-          const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)) || closing.exec(tail); if (!a) return false; tail = tail.slice(a[0].length);
+          let a = adverb.exec(tail) || (!her && lyAdverb.exec(tail));
+          if (!a) { a = closing.exec(tail); if (!a || predicate.test(a[0])) return false; }
+          tail = tail.slice(a[0].length);
         }
       });
     };

@@ -269,12 +269,14 @@ const S = {
       'counts to seventeen while her tail sways', 'for the seventh time rubs her eyes',
       // A pair of things, then her own hands or eyes; a teat she has; "a second" as time before a comma.
       'darns her third pair of stockings, both hands busy', 'sits in the third row of benches, both hands in her lap', 'hauls the third set of nets, bare hands raw', 'reads the third set of minutes, tired eyes narrowed',
-      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'taps her third hoof', 'has three hooves on each hand', 'grips the mug with two hoof-fingers', 'pauses a second, long tail swishing', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'taps her third hoof', 'has three hooves on each hand', 'grips the mug with two hoof-fingers', 'pauses a second, long tail swishing', 'waits one second, long tail swishing', 'gives it another second, soft ears forward', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
     // The kind's own counts set the bar: the fox's two tails, the cat's four pairs of nipples, the wolf's two more pairs.
     assert.equal(fits('flicks her second tail', species.fox), true, 'the fox has a second tail');
     for (const t of ['flicks her third tail', 'flicks her second pair of tails']) assert.equal(fits(t, species.fox), false, 'refused for the fox: ' + t);
     assert.equal(fits('the fur over her third pair of nipples is paler', species.cat), true, 'the cat has four pairs');
     assert.equal(fits('the fur over her fifth pair of nipples is paler', species.cat), false, 'the cat has no fifth pair');
+    for (const t of ['the fur over her fifth and third pairs of nipples is paler', 'the fur over her third, fifth and second pairs of nipples is paler', 'the fur over her third or fifth pairs of nipples is paler']) assert.equal(fits(t, species.cat), false, 'joined ordinals take the largest: ' + t);
+    assert.equal(fits('the fur over her second and third pairs of nipples is paler', species.cat), true, 'joined ordinals the cat has');
     assert.equal(fits('the fur over her second pair of nipples is paler', species.wolf), true, 'the wolf has two more pairs');
     assert.equal(fits('the fur over her second pair of nipples is paler', cow), false, 'the cow has no pairs');
     // A figure is the same count as the word: the fox's own two tails pass either way, and no kind has two heads.
@@ -498,7 +500,7 @@ const S = {
       for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.',
         'I take her book to bed.', "I take Rin's notebook to bed.", 'I go to bed with her book.', "I go to bed with Rin's letters.", 'I take her dolly to bed.', 'I take her butterfly to bed.', 'I take her jelly to bed.',
         'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.',
-        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
+        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take her home and in the morning go to bed.', 'I take her home and by morning go to bed.', 'I take her back and after that we go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');
