@@ -60,6 +60,8 @@ async function main() {
     assert(prompts.length > 2, 'the director-note storyteller prompt was not captured');
     assert.match(prompts[2], /Director note \(binding\): Walk with Luna to the quad and stop there\./,
       'the exact director note must reach the narrator');
+    assert.match(prompts[2], /When .* explicitly travels to a destination, make the journey legible through a few concrete details/,
+      'a requested journey should show the route and remain interruptible');
     assert.match(prompts[2], /Treat its concrete actions, requested people, and ending as required for this turn/,
       'the narrator must treat concrete director-note instructions as required');
     assert.match(prompts[2], /overrides prior-scene momentum, default pacing, and the generic stop-at-choice instruction/,
@@ -105,11 +107,14 @@ async function main() {
     assert(await h.settle(80, 4000), 'adding a character did not finish');
     h.type('#cfName', 'Luna');
     h.type('#cfSpecies', 'Werewolf');
+    h.$('#cfGender').value = 'female';
     h.click('#cfSave');
     assert(await h.settle(80, 4000), 'saving the test character did not finish');
     assert(await h.turn('Stay at the table', { director: 'Luna arrives and sits down.' }), 'director-arrival turn did not finish');
     assert.match(prompts[13], /Focus: the action or director note names Luna/,
       'a person the director note brings in must be in focus, not shut out by it');
+    assert.match(prompts[13], /Luna \(Werewolf\).*gender: Woman.*she\/her/,
+      'cast edits must preserve an explicit gender and matching pronouns in the storyteller prompt');
     assert.match(prompts[13], /unless the action or the director note invites it/,
       'the focus rule must leave room for the director note');
     assert(await h.turn('Stay at the table', { director: 'Have Luna write 100 words in her journal.' }), 'in-story writing turn did not finish');
@@ -118,6 +123,8 @@ async function main() {
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');
+    assert.doesNotMatch(adventure.data.opening.narrative, /Sundering|humans once had magic/i,
+      'the player-facing opening must not disclose Sundering history');
     const id = adventurePath.split('/')[1];
     const savedTurns = h.mock.store.get('adventures/' + id + '/turns/0000').data.turns;
     assert.deepEqual(Array.from(savedTurns[0].band), Array.from(h.window.WINDLASS_WORLDS.sundered.wordBands.rich),
@@ -150,6 +157,22 @@ async function main() {
       assert.doesNotMatch(rules, /Content: no sexual content/i, id + ' must not blanket-suppress romance');
     }
 
+    const sunderedRules = worlds.sundered.rules.join('\n');
+    assert.match(sunderedRules, /nobody is offended, disappointed or otherwise penalized when .* uses it/i,
+      'Spa use must not cause NPC disappointment or other social penalty');
+    assert.match(sunderedRules, /dating or caring for more than one person is allowed and has no automatic penalty/i,
+      'multiple romances must not carry an automatic consequence');
+    assert.match(sunderedRules, /Use each character's attitude .* current opinion/i,
+      'romance must be grounded in each character’s opinion of the player');
+    assert.match(sunderedRules, /species customs, exposure methods, role descriptions, opening beats .* possibilities, not scripts/i,
+      'species behavior and recurring beats must remain individual suggestions');
+    assert.match(sunderedRules, /never use "radiating heat".*stock shorthand/i,
+      'generic body-heat descriptions must be avoided');
+    assert.match(sunderedRules, /paths can progress together on one body; they do not compete for a limited number of parts/i,
+      'multiple species paths must coexist without arbitrary replacement');
+    assert.match(prompts[1], /successive ten-percent increments from first alteration to fully established form/,
+      'ten-step anatomical progress must be described between its endpoints');
+
     const sunderedCow = worlds.sundered.genPools.species.cow.bodyByGender.female.join(' ');
     assert.match(sunderedCow, /udder.*four teats/i, 'Sundered must retain its established bovine anatomy');
     const sunderedWolf = worlds.sundered.genPools.species.wolf.bodyByGender.female.join(' ');
@@ -158,6 +181,12 @@ async function main() {
     assert.match(mythavenUdder, /udder develops low on the abdomen with four teats/i, 'Mythaven must use the sourced bovine anatomy');
     assert.match(worlds.mythaven.genPools.species.cow.bodyByGender.female.join(' '), /udder.*four teats/i,
       'Mythaven roommate profiles must retain the sourced bovine anatomy');
+    const wolfTeeth = worlds.sundered.transformation.species.wolf.ladder.find((step) => step.at === 30).steps;
+    assert.equal(wolfTeeth.length, 10, 'wolf canine progression must have ten incremental steps');
+    assert.match(wolfTeeth[0], /canine catches.*looks unchanged/i, 'the first canine stage must remain subtle');
+    assert.match(wolfTeeth[9], /settled into long, sharply tapered wolf canines/i, 'the final canine stage must establish the complete feature');
+    assert.doesNotMatch(worlds.sundered.premise, /Sundering|humans once had magic/i,
+      'the opening premise must not reveal the Sundering history');
 
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
