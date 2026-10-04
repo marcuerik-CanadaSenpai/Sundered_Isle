@@ -269,12 +269,14 @@ const S = {
       'counts to seventeen while her tail sways', 'for the seventh time rubs her eyes',
       // A pair of things, then her own hands or eyes; a teat she has; "a second" as time before a comma.
       'darns her third pair of stockings, both hands busy', 'sits in the third row of benches, both hands in her lap', 'hauls the third set of nets, bare hands raw', 'reads the third set of minutes, tired eyes narrowed',
-      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'taps her third hoof', 'has three hooves on each hand', 'grips the mug with two hoof-fingers', 'pauses a second, long tail swishing', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'taps her third hoof', 'has three hooves on each hand', 'grips the mug with two hoof-fingers', 'pauses a second, long tail swishing', 'waits one second, long tail swishing', 'gives it another second, soft ears forward', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
     // The kind's own counts set the bar: the fox's two tails, the cat's four pairs of nipples, the wolf's two more pairs.
     assert.equal(fits('flicks her second tail', species.fox), true, 'the fox has a second tail');
     for (const t of ['flicks her third tail', 'flicks her second pair of tails']) assert.equal(fits(t, species.fox), false, 'refused for the fox: ' + t);
     assert.equal(fits('the fur over her third pair of nipples is paler', species.cat), true, 'the cat has four pairs');
     assert.equal(fits('the fur over her fifth pair of nipples is paler', species.cat), false, 'the cat has no fifth pair');
+    for (const t of ['the fur over her fifth and third pairs of nipples is paler', 'the fur over her third, fifth and second pairs of nipples is paler', 'the fur over her third or fifth pairs of nipples is paler']) assert.equal(fits(t, species.cat), false, 'joined ordinals take the largest: ' + t);
+    assert.equal(fits('the fur over her second and third pairs of nipples is paler', species.cat), true, 'joined ordinals the cat has');
     assert.equal(fits('the fur over her second pair of nipples is paler', species.wolf), true, 'the wolf has two more pairs');
     assert.equal(fits('the fur over her second pair of nipples is paler', cow), false, 'the cow has no pairs');
     // A figure is the same count as the word: the fox's own two tails pass either way, and no kind has two heads.
@@ -433,6 +435,63 @@ const S = {
     } finally { h.close(); }
   },
 
+  // Fading: a change under half done stops growing and loses a step after six quiet story hours, then another every six, and at
+  // nothing told it is gone (trait, rung, influence to five under the line). A change at or past half has set and keeps its ground.
+  // Exposure to the kind resets the quiet. Influence drifts down two a day after a quiet day, never below the last change's line.
+  async fadingChanges() {
+    const h0 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    const store = h0.mock.store; let id;
+    try { assert(await h0.turn('I sit at the desk.')); id = onlyAdv(store).id; } finally { h0.close(); }
+    const doc = store.get('adventures/' + id).data;
+    const nowMin = ((doc.state.day || 1) - 1) * 1440 + (() => { const [hh, mm] = doc.state.time.split(':').map(Number); return hh * 60 + mm; })();
+    const steps = (k) => ['a first ' + k + ' sensation', 'a second ' + k + ' sign', 'a third ' + k + ' sign', 'a fourth ' + k + ' sign', 'the ' + k + ' change complete'];
+    doc.state.tf = Object.assign(doc.state.tf || {}, {
+      influence: Object.assign(doc.state.tf.influence || {}, { cow: 20, fox: 20 }), rungs: { cow: 1, fox: 1 },
+      traits: [{ species: 'cow', trait: 'ears lengthen and soften', day: 1, settled: false }, { species: 'fox', trait: 'ears that turn toward a sound', day: 1, settled: false }],
+      arcs: [], paths: {},
+      tracks: [{ species: 'cow', rung: 1, kind: 'body', trait: 'ears lengthen and soften', steps: steps('ear'), anatomy: '', habits: [], noticed: '', i: 2, nextAt: 1e9, beganAt: nowMin },
+        { species: 'fox', rung: 1, kind: 'body', trait: 'ears that turn toward a sound', steps: steps('fox'), anatomy: '', habits: [], noticed: '', i: 3, nextAt: 1e9, beganAt: nowMin }],
+      last: { cow: nowMin, fox: nowMin }, drifted: {},
+    });
+    doc.pendingNotes = [];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, track = (k) => tf().tracks.find((t) => t.species === k && t.kind === 'body');
+      let advance = 420, expose = true;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = expose ? [{ species: 'cow', method: 'a mug of warm milk', intensity: 1 }] : []; });
+      // Seven hours with a brush of the kind: nothing fades, influence rises.
+      assert(await h.turn('I drink the milk Daisy pours and work through the afternoon.'));
+      assert.equal(track('cow').i, 2, 'with exposure this turn the cow change keeps its steps'); assert.equal(tf().influence.cow, 24, 'the exposure counts');
+      // Seven quiet hours: the cow change (40 of 100) loses a step; the fox change (60 of 100) has set and keeps its ground.
+      expose = false;
+      assert(await h.turn('I keep to my room and my books.'));
+      assert.equal(track('cow').i, 1, 'a change under the line fades a step after six quiet hours'); assert.equal(track('fox').i, 3, 'a change past the line does not fade');
+      assert(track('cow').fadeAt != null, 'the cow track is marked fading');
+      assert(await h.turn('I read on.'));
+      let p = promptOf(lastTurn(h));
+      assert.match(p, /Note from the engine: The change is fading \(bovine mythkin\): ears lengthen and soften/, 'the narrator is told the change is fading');
+      assert.match(p, /Under way \(ears lengthen and soften, fading\)/, 'the body line says so too');
+      assert.doesNotMatch(p, /fading \(fox mythkin/, 'the fox change is not fading');
+      assert(!track('cow'), 'another six quiet hours and the cow change is gone'); assert.equal(tf().rungs.cow, 0, 'its rung is undone');
+      assert.equal(tf().influence.cow, 10, 'influence sits five under the line of 15, so the body remembers');
+      assert(!tf().traits.some((t) => t.species === 'cow'), 'the trait is gone'); assert(tf().traits.some((t) => t.species === 'fox'), 'the fox trait stays');
+      assert(await h.turn('I go down to supper.'));
+      p = promptOf(lastTurn(h));
+      assert.match(p, /Note from the engine: The change has faded \(bovine mythkin\): ears lengthen and soften/, 'the narrator is told the change has faded');
+      assert.equal(tf().influence.fox, 20, 'fox influence holds through the first quiet day (21 h)');
+      // A second quiet day and more: fox influence drifts two a day down toward its floor of 15; the fox change, set, never fades.
+      advance = 720;
+      assert(await h.turn('I sleep.')); assert(await h.turn('I sleep on.'));
+      assert.equal(tf().influence.fox, 18, 'two points off after a second quiet day (52 h): ' + JSON.stringify(tf().influence));
+      assert.equal(track('fox').i, 3, 'the set fox change keeps its steps through it all');
+      // Influence never drifts below the line of the change begun.
+      for (let i = 0; i < 6; i++) assert(await h.turn('I sleep again.'));
+      assert.equal(tf().influence.fox, 15, 'the floor is the fox rung\'s line');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // Cast screen: unsaved edits survive a stray close. A back gesture or Esc (the dialog's cancel event) is refused, a screen the
   // browser closes anyway comes straight back with the typed text, and Close or another name asks once before dropping edits.
   async castEditsKept() {
@@ -474,6 +533,53 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 9a. Fade deadlines are absolute: a long quiet turn that passes two of them eases one step now and the other next turn.
+  async fadeCatchesUp() {
+    const h0 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    const store = h0.mock.store; let id;
+    try { assert(await h0.turn('I sit at the desk.')); id = onlyAdv(store).id; } finally { h0.close(); }
+    const doc = store.get('adventures/' + id).data;
+    const nowMin = ((doc.state.day || 1) - 1) * 1440 + (() => { const [hh, mm] = doc.state.time.split(':').map(Number); return hh * 60 + mm; })();
+    doc.state.tf = Object.assign(doc.state.tf || {}, {
+      influence: Object.assign(doc.state.tf.influence || {}, { cow: 20 }), rungs: { cow: 1 },
+      traits: [{ species: 'cow', trait: 'ears lengthen and soften', day: 1, settled: false }], arcs: [], paths: {},
+      tracks: [{ species: 'cow', rung: 1, kind: 'body', trait: 'ears lengthen and soften', steps: ['a first ear sensation', 'a second ear sign', 'a third ear sign', 'a fourth ear sign', 'the ear change complete'], anatomy: '', habits: [], noticed: '', i: 2, nextAt: 1e9, beganAt: nowMin }],
+      last: { cow: nowMin }, drifted: {},
+    });
+    doc.pendingNotes = [];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, track = () => tf().tracks.find((t) => t.species === 'cow' && t.kind === 'body');
+      let advance = 720;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = []; });
+      // Twelve quiet hours in one turn pass the six-hour and twelve-hour deadlines: one step eases now, the other is owed.
+      assert(await h.turn('I sleep the day away.'));
+      assert.equal(track().i, 1, 'one step eases per turn'); assert.equal(track().fadeAt, nowMin + 720, 'the next deadline is the twelve-hour one, not six hours from now');
+      advance = 30;
+      assert(await h.turn('I stretch.'));
+      assert(!track(), 'the owed step eases on the next turn, half an hour later, and the change is gone'); assert.equal(tf().rungs.cow, 0);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
+  // The Cast note is a live region so a screen reader hears the unsaved-edits question.
+  async looksLeadFirst() {
+    const h = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
+    try {
+      h.click('#btnCast'); await h.sleep(20);
+      assert.equal(h.$('#cfName').value, 'Wren Skye');
+      const looks = h.$('#cfLooks').value;
+      const leads = [/^Shorter than you and light enough to lift, fine-boned and quick/, /^A small woman built for the air/, /^Slight and poised, a head shorter than you/];
+      assert(leads.some((re) => re.test(looks)), 'the looks open with a beauty line: ' + looks.slice(0, 120));
+      assert.match(looks, /\. [A-Z][^.]*(feathers|wing|down)/i, 'the body follows as its own capitalised sentence: ' + looks.slice(0, 200));
+      assert.match(looks, /small breasts beneath the down|Down runs between the breasts/, 'the kind\'s anatomy is still stated: ' + looks);
+      assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 10. Romance is detected by what the player asks for, not by stray words. Consent and anatomy guidance stay in the romance prompt.
   async romanceDetection() {
     const h = await begin({ rmName: 'Rin Kitsuragi' });
@@ -498,7 +604,7 @@ const S = {
       for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.',
         'I take her book to bed.', "I take Rin's notebook to bed.", 'I go to bed with her book.', "I go to bed with Rin's letters.", 'I take her dolly to bed.', 'I take her butterfly to bed.', 'I take her jelly to bed.',
         'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.',
-        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
+        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take her home and in the morning go to bed.', 'I take her home and by morning go to bed.', 'I take her back and after that we go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');

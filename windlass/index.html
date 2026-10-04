@@ -458,7 +458,7 @@
             <button id="cfSave" class="primary">Save</button>
             <button id="cfReset" class="quiet">Reset to the world's version</button>
             <button id="cfRemove" class="quiet danger">Remove from the story</button>
-            <span class="small" id="cfNote"></span>
+            <span class="small" id="cfNote" role="status" aria-live="polite"></span>
           </div>
         </div>
       </div>
@@ -660,8 +660,11 @@
     const ORDS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth', 'seventeenth', 'eighteenth', 'nineteenth', 'twentieth'];
     const numOf = (w) => /^\d+$/.test(w) ? +w : WORDS.indexOf(w);
     for (const m of text.matchAll(new RegExp('(?<!split[ -])\\b(second|2nd|' + ANATOMY_ORD + ')' + ANATOMY_AFTER.replace('(?:', '(') + '(' + ANATOMY_PAIRS + ')?' + nounRe + '\\b', 'gi'))) {
-      const o = m[1].toLowerCase(), n = /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity), stem = escRe(stemOf(m[4]));
-      if (n === 2 && m[2][0] === ',' && /\ban? $/i.test(text.slice(0, m.index))) continue;
+      const ordN = (o) => { o = o.toLowerCase(); return /^\d/.test(o) ? parseInt(o, 10) : (ORDS.indexOf(o) > 0 ? ORDS.indexOf(o) : Infinity); };
+      let n = ordN(m[1]), pre = text.slice(0, m.index); const stem = escRe(stemOf(m[4]));
+      // Ordinals joined before this one ("her fifth and third pairs of", "third, fifth and second") are the same claim: the largest counts.
+      for (let c; (c = new RegExp('\\b(second|2nd|' + ANATOMY_ORD + ')(?:,|,? (?:and|or))? $', 'i').exec(pre));) { n = Math.max(n, ordN(c[1])); pre = pre.slice(0, c.index); }
+      if (n === 2 && m[2][0] === ',' && /\b(?:an?|one|another) $/i.test(text.slice(0, m.index))) continue;
       const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' ' + words + (m[3] ? '(?:pairs?|sets?|rows?) of ' + words : '') + stem, 'g')), (k) => numOf(k[1]));
       if (!m[3] && new RegExp('\\b' + stem + '(?:e?s|ves)\\b').test(kindLower)) counts.push(2);
       if (!counts.some((c) => c >= n)) return false;
@@ -688,9 +691,12 @@
     // The body, plus what the kind's women or men carry that the body pool leaves out (an udder, a second row of nipples): a plain sentence, never omitted.
     // The kind's facts come from one place each: {eyes} draws from the kind's eye pool (a line without the placeholder gets the
     // eyes added, unless it already describes them), {teats} is the kind's one phrase for what its women carry.
+    // What is noticed first (a woman's beauty, in her kind's way) opens the looks; the body and its plain anatomy follow.
+    const lead = sp && sp.leadByGender && sp.leadByGender[gender] && sp.leadByGender[gender].length ? pick(sp.leadByGender[gender]) : '';
     const byG = sp && sp.bodyByGender && sp.bodyByGender[gender] && sp.bodyByGender[gender].length ? '. ' + pick(sp.bodyByGender[gender]) : '';
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
-    p.looks = opts.looks || (sp && sp.body.length ? personFill(kindText(Wc, speciesKey, (pick(sp.body) + byG).replace(/\{colour\}/g, colour), p.eyes), p) : '');
+    const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
+    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText, p.eyes), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
@@ -1109,6 +1115,7 @@
     for (const k of Object.keys(W.transformation.species)) if (typeof state.tf.influence[k] !== 'number') state.tf.influence[k] = 0;
     state.tf.traits = state.tf.traits || []; state.tf.rungs = state.tf.rungs || {}; state.tf.arcs = state.tf.arcs || [];
     state.tf.tracks = state.tf.tracks || []; state.tf.paths = state.tf.paths || {};
+    state.tf.last = state.tf.last || {}; state.tf.drifted = state.tf.drifted || {};
   }
   // Story time in minutes from the start of Day 1, for pacing the steps of a change.
   const storyMin = (state) => ((Number(state.day) || 1) - 1) * 1440 + timeToMin(state.time);
@@ -1116,6 +1123,22 @@
   function stepGapMin() { const T = W.transformation || {}; const h = T.stepGapHours != null ? T.stepGapHours : 1.5; const sc = PACE_STEP_SCALE[adv.settings.pace]; return Math.round(h * 60 * (sc == null ? 1 : sc)); }
   const hasSteps = (rung) => !!(rung && Array.isArray(rung.steps) && rung.steps.length);
   const lastSexRung = (sp) => sp.ladder.reduce((m, r, i) => (r.sex && r.sex.length ? i + 1 : m), 0);
+  // Fading. A change has a completion: the steps told over the steps in all, 0 (as it was) to 100 (the paw). One not yet at the
+  // line (half done) with no exposure to its kind for afterHours of story time stops growing and loses a step, then another every
+  // everyHours, told as the body going back toward how it was; one at or past the line has set and only completes. A change faded
+  // to nothing is gone (the trait, the rung, and influence to five under the rung's line, so the body remembers). Influence itself
+  // drifts down after a quiet day, influencePerDay a day, never below the line of the last change begun. The pace setting scales
+  // the hours as it does the step gap, and the unbounded pace turns fading off. The world's transformation.fade overrides these.
+  const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 };
+  const fadeCfg = () => Object.assign({}, FADE_DEFAULTS, (W.transformation && W.transformation.fade) || {});
+  const fadeScale = () => { const sc = PACE_STEP_SCALE[adv.settings.pace]; return sc == null ? 1 : sc; };
+  const completion = (t) => Math.round(100 * t.i / Math.max(1, t.steps.length));
+  // A body change under the line whose kind has gone quiet: it does not grow this turn, it fades (see fadeTracks).
+  function fadeHeld(tf, t, now) {
+    const sc = fadeScale(); if (!sc || t.kind !== 'body') return false; const cfg = fadeCfg();
+    return completion(t) < cfg.line && now - (tf.last[t.species] != null ? tf.last[t.species] : t.beganAt || 0) >= Math.round(cfg.afterHours * 60 * sc);
+  }
+  const bodyTrackOf = (tf, t) => t.kind === 'body' ? t : (tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.rung === t.rung);
   const trackBusy = (tf, k) => (tf.arcs || []).some((a) => a.species === k) || (tf.tracks || []).some((t) => t.species === k);
   // A change that reaches its threshold begins. A rung with step data opens a track: its steps are told one at a time, story
   // hours apart, alongside any other track (a path may also carry the body toward a woman's or a man's, rolled once when its
@@ -1170,7 +1193,8 @@
           }
           const content = rungContent(sp, tf.paths[k], r); const now = storyMin(state);
           tf.traits.push({ species: k, trait: content.trait, day: state.day, settled: false });
-          tf.tracks.push({ species: k, rung: r + 1, kind: 'body', trait: content.trait, steps: drawSteps(content.steps), anatomy: content.anatomy || '', habits: shuffled(sp.habits || []).slice(0, 2), noticed: pick(sp.noticed || []) || '', i: 0, nextAt: now, day: state.day });
+          if (tf.last[k] == null || tf.last[k] < now) tf.last[k] = now;
+          tf.tracks.push({ species: k, rung: r + 1, kind: 'body', trait: content.trait, steps: drawSteps(content.steps), anatomy: content.anatomy || '', habits: shuffled(sp.habits || []).slice(0, 2), noticed: pick(sp.noticed || []) || '', i: 0, nextAt: now, day: state.day, beganAt: now });
           if (tf.paths[k].sex && rung.sex && rung.sex.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'sex', to: tf.paths[k].sex, trait: content.trait, steps: rung.sex.slice(), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day });
           diff.push({ path: 'tf.traits', from: '', to: sp.short + ': ' + content.trait + ' (beginning)' });
         } else {
@@ -1229,7 +1253,8 @@
   function advanceTracks(state, notes) {
     const T = W.transformation; if (!T || !state.tf) return [];
     const tf = state.tf; tf.tracks = tf.tracks || []; const now = storyMin(state); const gap = stepGapMin(); const out = [];
-    const due = tf.tracks.filter((t) => t.nextAt <= now).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
+    const held = (t) => { const b = bodyTrackOf(tf, t); return !!b && fadeHeld(tf, b, now); };
+    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t)).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
     for (const t of due) {
       out.push(stepNote(t, tf, t.steps[t.i]));
       if (t.kind === 'sex') {
@@ -1243,6 +1268,39 @@
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
+    return out.concat(fadeTracks(state, notes));
+  }
+  // The fading itself: one step back per held change per turn, on its own clock (the first when the quiet reaches afterHours, then
+  // every everyHours), told to the narrator as the step easing. At nothing told the change is gone, with its sex steps.
+  function fadeTracks(state, notes) {
+    const T = W.transformation; if (!T || !state.tf) return [];
+    const tf = state.tf; const now = storyMin(state); const cfg = fadeCfg(); const sc = fadeScale(); const who = firstName(); const out = [];
+    const every = Math.round(cfg.everyHours * 60 * sc), after = Math.round(cfg.afterHours * 60 * sc);
+    for (const t of tf.tracks.slice()) {
+      if (!fadeHeld(tf, t, now)) { if (t.fadeAt != null) delete t.fadeAt; continue; }
+      // Deadlines are absolute, counted from the last exposure of the kind (or the change's start), so a long quiet turn that
+      // passes several of them loses none: one step eases per turn until the change has caught up.
+      if (t.fadeAt == null) t.fadeAt = (tf.last[t.species] != null ? tf.last[t.species] : t.beganAt || 0) + after;
+      if (now < t.fadeAt) continue;
+      const sp = T.species[t.species]; t.fadeAt += every;
+      if (t.i > 0) {
+        t.i -= 1; t.nextAt = Math.max(t.nextAt, now + stepGapMin()); const step = pathFill(tf, t.species, t.steps[t.i]);
+        notes.push(t.species + ' change fading: step ' + (t.i + 1) + ' of ' + t.steps.length + ' eased (' + completion(t) + ' of 100)');
+        if (t.i > 0) out.push('The change is fading (' + sp.name + '): ' + t.trait + '. Nothing of its kind has touched ' + who + ' for a while, and the body is going back a little toward how it was. One small thing this turn, in your own words, found in passing: what this had brought is easing (' + step + '), the way an ache goes or a shoe fits again. A sentence or two from inside ' + who + '\'s body; then the scene goes on. Nobody remarks on it and nobody names it; whether ' + who + ' is relieved, sorry or unsure is the player\'s.');
+        else out.push('The change has faded (' + sp.name + '): ' + t.trait + '. The last of it is gone (' + step + ' no longer), and the body is as it was before it began. Say so once, in passing, as ' + who + ' would notice an absence in a mirror, a shoe or a touch, without explanation; then the scene goes on. Nobody comments. How ' + who + ' takes it is the player\'s.');
+      }
+      if (t.i === 0) {
+        // Gone: the trait, the rung, the sex steps of the same rung, and influence to just under the line, so the body remembers.
+        tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && x.kind === 'sex' && x.rung === t.rung));
+        const path = (tf.paths || {})[t.species], rung = sp.ladder[t.rung - 1];
+        if (path && Array.isArray(path.sexTold) && rung && rung.sex) path.sexTold = path.sexTold.filter((x) => !rung.sex.includes(x));
+        const i = tf.traits.findIndex((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (i >= 0) tf.traits.splice(i, 1);
+        tf.rungs[t.species] = Math.max(0, (tf.rungs[t.species] || 0) - 1);
+        if (!tf.rungs[t.species] && !tf.traits.some((x) => x.species === t.species) && tf.paths) delete tf.paths[t.species];
+        const line = rung ? rung.at : 0; if ((tf.influence[t.species] || 0) > line - 5) tf.influence[t.species] = Math.max(0, line - 5);
+        notes.push(t.species + ' change faded away: rung ' + t.rung + ' undone, influence ' + tf.influence[t.species]);
+      }
+    }
     return out;
   }
   // The band widens only while a change is at its finding (older arcs) or its completion (steps): the small steps get no extra room.
@@ -1282,6 +1340,19 @@
       if (to !== from) { diff.push({ path: 'tf.influence.' + k, from, to }); tf.influence[k] = to; tf.dayGain.by[k] = (tf.dayGain.by[k] || 0) + (to - from); notes.push(k + ' influence +' + (to - from) + capNote); }
       else if (inc === 0 && gained[k] > 0) notes.push(k + ' influence unchanged' + capNote);
     }
+    // Exposure met this turn marks the kind met now; a kind quiet for a day or more loses influence slowly, never below the line
+    // of its last change begun (a change under way or set keeps its ground; a change that fades away lowers influence itself).
+    const now = storyMin(state), cfg = fadeCfg(), sc = fadeScale();
+    for (const k of Object.keys(T.species)) {
+      if (gained[k] > 0) { tf.last[k] = now; delete tf.drifted[k]; continue; }
+      if (!sc || !(tf.influence[k] > 0)) continue;
+      if (tf.last[k] == null) { tf.last[k] = now; continue; }   // an older save: the quiet starts counting now
+      const r = tf.rungs[k] || 0, floor = r > 0 ? T.species[k].ladder[r - 1].at : 0; if (tf.influence[k] <= floor) continue;
+      const quiet = now - tf.last[k] - Math.round(cfg.influenceAfterDays * 1440 * sc); if (quiet < 0) continue;
+      const owed = Math.floor(quiet / Math.round(1440 * sc / Math.max(1, cfg.influencePerDay))) - (tf.drifted[k] || 0); if (owed <= 0) continue;
+      const from = tf.influence[k], to = Math.max(floor, from - owed); tf.drifted[k] = (tf.drifted[k] || 0) + owed;
+      if (to !== from) { tf.influence[k] = to; diff.push({ path: 'tf.influence.' + k, from, to }); notes.push(k + ' influence -' + (from - to) + ' (nothing of its kind for ' + Math.round((now - tf.last[k]) / 60) + ' h)'); }
+    }
     manifestDue(state, diff, notes, next);
     return { notes, next };
   }
@@ -1305,7 +1376,7 @@
         if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
-      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
+      if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + (bt.fadeAt != null ? ', fading' : '') + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
     }
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
@@ -1417,6 +1488,7 @@
     // own ("her downstairs and go to bed").
     const closing = /^(?:in|on|at|into|onto|under|beside|behind|against|to|towards?|for|with|without|from|by|near|over|across)\s+(?:(?!(?:and|or|but|then|while|as|before|after|until|till|when|so|because|if)\b)[\w'’-]+\s*){1,4}/i;
     const joiner = /^(?:and(?:\s+then)?|or|then)(?:\s+|$)/i;
+    const predicate = /\b(?:i|we|you|go|goes|going|went|gone|get|gets|getting|got|head|heads|heading|headed|crawl\w*|climb\w*|slip\w*|retire\w*|return\w*|come|comes|coming|came|run|runs|running|ran|sneak\w*|stumble\w*|hurr(?:y|ies|ying|ied)|fall|falls|falling|fell|put|puts|putting|take|takes|taking|took|carry|carries|carrying|carried|bring|brings|bringing|brought|lead|leads|leading|led|walk\w*|send\w*|sent|turn\w*|tuck\w*|settle\w*)\b/i;
     const person = (rest, whole) => {
       rest = String(rest || '').trim();
       const heads = [/^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))(?![\w'’])/i, new RegExp('^' + nameWord + '(?:\\s+' + nameWord + ')*')]
@@ -1435,7 +1507,9 @@
           if (!tail) return true;
           const j = joiner.exec(tail);
           if (j) { tail = tail.slice(j[0].length); if (!tail || person(tail, true)) return true; continue; }
-          const a = adverb.exec(tail) || (!her && lyAdverb.exec(tail)) || closing.exec(tail); if (!a) return false; tail = tail.slice(a[0].length);
+          let a = adverb.exec(tail) || (!her && lyAdverb.exec(tail));
+          if (!a) { a = closing.exec(tail); if (!a || predicate.test(a[0])) return false; }
+          tail = tail.slice(a[0].length);
         }
       });
     };
@@ -3399,7 +3473,7 @@
       const keys = Object.keys(T.species).sort((a, b) => (S.tf.influence[b] || 0) - (S.tf.influence[a] || 0));
       $('#influence').innerHTML = keys.map((k) => { const v = num(S.tf.influence[k]); return '<div class="bar"><span>' + esc(T.species[k].short) + '</span><div class="track"><div class="fill" style="width:' + v + '%"></div></div><span class="num">' + v + '</span></div>'; }).join('');
       $('#tfNote').textContent = T.thresholdsNote || '';
-      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · under way, step ' + num(bt.i) + ' of ' + num(bt.steps && bt.steps.length) : ' · beginning'; };
+      const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · ' + (bt.fadeAt != null ? 'fading' : 'under way') + ', step ' + num(bt.i) + ' of ' + num(bt.steps && bt.steps.length) : ' · beginning'; };
       $('#traits').innerHTML = (S.tf.traits.length ? S.tf.traits.slice().reverse().map((t) => '<li><span>Day ' + num(t.day) + ' · ' + esc(T.species[t.species].short) + (t.settled === false ? trackLabel(t) : '') + '</span>' + esc(t.trait) + '</li>').join('') : '<li class="small">None yet.</li>') + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '') + Object.keys(S.tf.paths || {}).filter((k) => S.tf.paths[k] && S.tf.paths[k].sex && !(S.tf.sex && S.tf.sex.species === k)).map((k) => '<li class="small"><span>' + esc(T.species[k].short) + ' path</span>also going toward ' + (S.tf.paths[k].sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body</li>').join('');
     }
     const items = $('#items'); items.innerHTML = '';
