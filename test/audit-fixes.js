@@ -353,7 +353,7 @@ const S = {
       await setWriter(h, 'auto');
       const W = h.window.WINDLASS_WORLDS[onlyAdv(h.mock.store).data.worldId];
       const rich = W.wordBands.rich;
-      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.']) {
+      for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.equal(c.opts.modelTier, 'complex', a + ' is romance: the complex tier on auto');
@@ -364,7 +364,7 @@ const S = {
         assert.match(p, /Use only anatomy and functions established in the world data; do not invent them/, 'established anatomy only');
         assert.doesNotMatch(p, /fade to black|sex is not depicted|sex remains off-page/i, 'no off-page rule');
       }
-      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.']) {
+      for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I undress in my room.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');
@@ -426,6 +426,39 @@ const S = {
       assert.equal(t.action, 'I look around the room.');
       assert.match(JSON.stringify(t), /story story story/, 'the narrative is saved as written');
       assert.match(JSON.stringify(t.notes || t), /skipped/, 'a note says the fit was skipped');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 12b. Stop pressed while the memory fold runs keeps the finished turn, saved, with its memory unfolded and a note.
+  async stopDuringMemoryFold() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store);
+      let foldStarted = false, k = 0;
+      h.mock.sampleHandler = (input, o, call) => {
+        if (call.label === 'memory fold') { foldStarted = true; return new Promise((r) => setTimeout(() => r(JSON.stringify({ summary: 'folded' })), 800)); }
+        if (!/^turn/.test(call.label)) return h.mock.defaultHandler(input, o, call);
+        const r = JSON.parse(h.mock.defaultHandler(input, o, call));
+        r.beats = Array.from({ length: 6 }, () => 'beat ' + (++k) + ' of the evening'); return JSON.stringify(r);
+      };
+      let turns = 0, n0 = 0;
+      while (!foldStarted && turns < 12) {
+        n0 = onlyAdv(h.mock.store).data.turnCount;
+        h.$('#action').value = 'I look around the room ' + turns + '.'; h.click('#send'); turns++;
+        // Poll rather than wait for idle: the fold must still be pending when Stop is pressed.
+        const t0 = Date.now(); while (!foldStarted && Date.now() - t0 < 15000 && !(Date.now() - t0 > 300 && h.$('#stop').hidden)) await h.sleep(5);
+        if (!foldStarted) await h.settle(50, 3000);
+      }
+      assert(foldStarted, 'a memory fold must start once enough beats build up');
+      h.click('#stop'); assert(await h.idle(10000)); await h.settle(100, 4000);
+      const after = onlyAdv(h.mock.store).data;
+      assert.equal(after.turnCount, n0 + 1, 'the finished turn is kept and saved (' + n0 + ' → ' + after.turnCount + '; status: ' + h.$('#status').textContent + ')');
+      assert.notEqual(after.memory.summary, 'folded', 'the stopped fold changed nothing');
+      assert(after.memory.beats.length > 36, 'the beats stay unfolded for the next turn to fold');
+      const t = storedTurns(h.mock.store, id).at(-1);
+      assert.match(JSON.stringify(t.notes || t), /summary fold skipped/, 'a note says the fold was skipped: ' + JSON.stringify(t.notes));
       clean(h);
     } finally { h.close(); }
   },

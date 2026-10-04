@@ -709,9 +709,13 @@
   function generateCast(plan, given) {
     if (!W.castRoles || !W.genPools) return null;
     plan = plan || castPlan(W); given = given || {};
-    const G = W.genPools; const used = new Set((adv.roommate ? [adv.roommate.name, adv.roommate.first, adv.roommate.last] : []).concat(adv.player ? [adv.player.name, adv.player.first, adv.player.last] : []).filter(Boolean));
+    const G = W.genPools;
+    // Names compared word by word, ignoring case: "MIRA" or "Holt Lane" collides with a player called Mira Holt.
+    const parts = (n) => String(n || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const used = new Set([].concat(adv.roommate ? [adv.roommate.name, adv.roommate.first, adv.roommate.last] : [], adv.player ? [adv.player.name, adv.player.first, adv.player.last] : []).flatMap(parts));
+    const taken = (p) => [p.first, p.last].some((n) => parts(n).some((w) => used.has(w)));
     // No two generated people share a name or a surname while the pools allow it; an invented name that collides is dropped for a drawn one.
-    const draw = (opts) => { let p = null; for (let i = 0; i < 40; i++) { p = genPerson(W, opts); if (!used.has(p.name) && !used.has(p.first) && !used.has(p.last)) break; if (opts.given && opts.given.first) opts = Object.assign({}, opts, { given: Object.assign({}, opts.given, { first: '', last: '' }) }); } used.add(p.name); used.add(p.first); used.add(p.last); return p; };
+    const draw = (opts) => { let p = null; for (let i = 0; i < 40; i++) { p = genPerson(W, opts); if (!taken(p)) break; if (opts.given && opts.given.first) opts = Object.assign({}, opts, { given: Object.assign({}, opts.given, { first: '', last: '' }) }); } [p.first, p.last].flatMap(parts).forEach((w) => used.add(w)); return p; };
     const vfill = (text, v) => v ? String(text || '').replace(/\{v_([a-z_]+)\}/g, (m, k) => (k in v ? v[k] : m)) : String(text || '');
     // A title may depend on the drawn gender ({ male: 'Mr', female: 'Mrs', nonbinary: 'Mx' }).
     const titleFor = (role, gender) => { const t = role.title; if (!t) return ''; return typeof t === 'object' ? (t[gender] || '') : t; };
@@ -1339,7 +1343,9 @@
     const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
     // Undressing someone else (a pronoun or a capitalised name), not undressing for a shower or in one's room.
     if (/\b[Uu]ndress(?:es|ing)?\s+(?:him|her|them|each other|one another|[A-Z][\w'-]+)\b/.test(text)) return true;
-    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|take(?:s|ing)?\s+\w+\s+to bed|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+    // Taking someone to bed: a pronoun or a name (one or more capitalised words), not "a book" or "medicine".
+    if (/\b[Tt]ak(?:e|es|ing)\s+(?:him|her|them|[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)*)\s+to bed\b/.test(text)) return true;
+    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
   // A change is on the page this turn: an arc in its opening phases, or a change note due now. A change merely pending
   // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
@@ -1571,7 +1577,7 @@
     const castLevel = L.castLevel || (L.briefCast ? 'brief' : '');
     const chars = activeCharacters().map((c) => {
       const names = nameHandles(c).filter((n) => n.length > 2).map((n) => n.toLowerCase());
-      const full = names.some((n) => S.present.some((pp) => pp.toLowerCase().includes(n)) || wordIn(mentioned, n));
+      const full = names.some((n) => S.present.some((pp) => wordIn(String(pp).toLowerCase(), n)) || wordIn(mentioned, n));
       const where = (c.where && (c.where[slot] || c.where.default)) || 'unknown';
       const aim = (c.aims && ((slot === 'evening' && S.day > 1 && /mixer/i.test(c.aims[slot] || '') ? '' : c.aims[slot]) || c.aims.default)) || '';
       const att = S.attitudes[c.key];
@@ -2273,7 +2279,7 @@
     if (!db) return;
     if (busy || loadingAdv || deletingAdv) { setStatus(busyMsg(), true); return; }
     const mine = adv, id = mine.id, n = mine.turns.length;
-    busy = true; setBusyUI(true);
+    busy = true; setBusyUI(true); $('#stop').hidden = true;   // a save cannot be stopped midway
     try {
       let storeTurns = 0, storeRev = 0; const s = await db.doc('adventures/' + id).get(); if (s.exists) { storeTurns = s.data().turnCount || 0; storeRev = s.data().rev || 0; }
       mine.rev = Math.max(mine.rev || 0, storeRev);
