@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html lang="en"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Windlass</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -133,7 +133,13 @@
 
   dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); padding: 0; max-width: min(900px, calc(100vw - 32px)); width: 100%; }
   dialog::backdrop { background: rgba(0,0,0,0.35); }
-  dialog .dlg { padding: 18px 20px; display: grid; gap: 14px; max-height: calc(100vh - 80px); overflow: auto; }
+  dialog .dlg { padding: 18px 20px; display: grid; gap: 14px; max-height: calc(100vh - 80px); max-height: calc(100dvh - 80px); overflow: auto; }
+  /* Long option text and the native file input must not widen a dialog past a phone screen. */
+  dialog .dlg > *, .field > * { min-width: 0; }
+  select, input[type=file] { max-width: 100%; }
+  .field > select { width: 100%; }
+  .row > label { min-width: 0; max-width: 100%; }
+  .row > label > input[type=file] { min-width: 0; flex: 1 1 0; }
   dialog h3 { margin: 0; font-family: var(--serif); font-weight: 600; font-size: 1.15rem; }
   dialog h4 { margin: 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
   dialog .close { margin-left: auto; }
@@ -183,10 +189,11 @@
     html, body { height: auto; }
     /* Top bar: one slim row (brand, clock, connection dot, Menu); the buttons drop down from Menu. */
     .topbar { padding: 8px 12px; gap: 6px 10px; flex-wrap: wrap; }
-    .brand { font-size: 1.05rem; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .brand { font-size: 1.05rem; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .brand .world { display: none; }
     .clock { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .clock .loc, .clock .wd-long { display: none; }
+    .clock .loc, .clock .wd-long, .clock .slot { display: none; }
+    @media (max-width: 420px) { .brand { max-width: 22vw; } }
     .clock .wd-short { display: inline; }
     .conn.ok #connText { display: none; }
     .menubtn { display: inline-block; min-height: 36px; }
@@ -266,7 +273,7 @@
             <button id="rewriteCancel" class="quiet">Cancel</button>
           </div>
           <div class="banner warn" id="testBanner" hidden></div>
-          <div class="banner" id="status" hidden></div>
+          <div class="banner" id="status" role="status" aria-live="polite" hidden></div>
         </div>
       </div>
     </section>
@@ -294,7 +301,7 @@
       </section>
       <section class="panel memory">
         <h2>Summary <span class="right small" id="beatCount"></span></h2>
-        <textarea id="summary"></textarea>
+        <textarea id="summary" aria-label="Story summary"></textarea>
         <div class="row"><button id="saveSummary">Save summary</button><span class="small" id="summaryNote"></span></div>
       </section>
       <section class="panel">
@@ -597,6 +604,15 @@
     return String(text || '').replace(/(^|\. )\{eyes\}/g, (m, pre) => pre + cap(ph)).replace(/\{eyes\}/g, ph).replace(/\{eye\}/g, e ? eyeColour(e) : 'a new colour').replace(/\{teats\}/g, (sp && sp.teats) || 'a second pair of small nipples');
   }
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // Body structures an invented line may name only when the kind's own world text already has them.
+  const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls)\b/gi;
+  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:\w+ )?(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
+  function anatomyFits(text, sp) {
+    text = String(text || ''); if (ANATOMY_NEVER.test(text)) return false;
+    const kindText = sp ? JSON.stringify(sp).toLowerCase() : '';
+    const stem = (w) => w.toLowerCase().replace(/(?:ves|s)$/, '').replace(/ed$/, '');
+    return (text.match(ANATOMY_WORDS) || []).every((w) => kindText && kindText.includes(stem(w)));
+  }
   // Draws one person from the pools: name, looks and a personality of their own. opts: species (a key or a list of keys to
   // choose from), gender, name, course, looks, wants, speciesText.
   function genPerson(Wc, opts) {
@@ -618,11 +634,13 @@
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
     p.looks = opts.looks || (sp && sp.body.length ? personFill(kindText(Wc, speciesKey, (pick(sp.body) + byG).replace(/\{colour\}/g, colour), p.eyes), p) : '');
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
-    if (given.detail && p.looks) p.looks += '. ' + given.detail;  // the invented distinguishing detail; the anatomy stays the kind's
+    // The invented distinguishing detail; the anatomy stays the kind's: a detail naming a body part the kind's own text does
+    // not (a tail on a human, a third arm on anyone) is dropped, never added to the description the narrator treats as canon.
+    if (given.detail && p.looks && anatomyFits(given.detail, sp)) p.looks += '. ' + given.detail[0].toUpperCase() + given.detail.slice(1);
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
     p.temperament = given.temperament || pick(G.temperaments);
-    p.quirk = given.quirk || personFill(pick(G.quirks), p);
+    p.quirk = (given.quirk && anatomyFits(given.quirk, sp) ? given.quirk : '') || personFill(pick(G.quirks), p);
     p.want = given.want || personFill(pick(opts.wants || G.wants), p);
     p.privateMatter = given.private || personFill(pick(G.privates), p);
     p.course = opts.course || given.course || pick(G.courses);
@@ -684,7 +702,7 @@
   function generateCast(plan, given) {
     if (!W.castRoles || !W.genPools) return null;
     plan = plan || castPlan(W); given = given || {};
-    const G = W.genPools; const used = new Set(adv.roommate ? [adv.roommate.name, adv.roommate.first, adv.roommate.last] : []);
+    const G = W.genPools; const used = new Set((adv.roommate ? [adv.roommate.name, adv.roommate.first, adv.roommate.last] : []).concat(adv.player ? [adv.player.name, adv.player.first, adv.player.last] : []).filter(Boolean));
     // No two generated people share a name or a surname while the pools allow it; an invented name that collides is dropped for a drawn one.
     const draw = (opts) => { let p = null; for (let i = 0; i < 40; i++) { p = genPerson(W, opts); if (!used.has(p.name) && !used.has(p.first) && !used.has(p.last)) break; if (opts.given && opts.given.first) opts = Object.assign({}, opts, { given: Object.assign({}, opts.given, { first: '', last: '' }) }); } used.add(p.name); used.add(p.first); used.add(p.last); return p; };
     const vfill = (text, v) => v ? String(text || '').replace(/\{v_([a-z_]+)\}/g, (m, k) => (k in v ? v[k] : m)) : String(text || '');
@@ -781,7 +799,10 @@
     }
   }
   function vars() {
-    const p = (adv && adv.player) || defaultPlayer(); const r = adv && adv.roommate;
+    const p = (adv && adv.player) || defaultPlayer();
+    // The roommate as the Cast editor last left them: a rename or a new kind there reaches every {rm_*} in the prompt.
+    const rm = adv && adv.roommate, ro = rm && adv.cast && adv.cast.overrides && adv.cast.overrides[rm.key];
+    const r = ro ? Object.assign({}, rm, { name: ro.name || rm.name, first: ro.first || rm.first, last: ro.last != null ? ro.last : rm.last, speciesName: ro.speciesName || rm.speciesName }) : rm;
     const v = { name: p.name, first: p.first, name_last: p.last || p.first, they: p.pronouns.they, them: p.pronouns.them, their: p.pronouns.their, theirs: p.pronouns.theirs, They: cap(p.pronouns.they), Their: cap(p.pronouns.their), themself: p.pronouns.they === 'he' ? 'himself' : (p.pronouns.they === 'she' ? 'herself' : 'themself'), gender_noun: p.noun };
     // Verb agreement for singular they: "{they} notice{s}", "{they} {are}", "{they} go{es}", "{they} tr{ies}".
     const sg = p.pronouns.they !== 'they'; Object.assign(v, { s: sg ? 's' : '', es: sg ? 'es' : '', ies: sg ? 'ies' : 'y', are: sg ? 'is' : 'are', were: sg ? 'was' : 'were', have: sg ? 'has' : 'have', do: sg ? 'does' : 'do' });
@@ -947,22 +968,26 @@
       const from = st[pk]; st[pk] = Math.min(100, (Number(st[pk]) || 0) + (cf.saltProgress || 35)); rec('items.' + pk, from, st[pk]);
       const ff = st.fever; st.fever = true; rec('items.fever', ff, true);
       const fd = st.fever_days_remaining; st.fever_days_remaining = cf.feverDays || 3; rec('items.fever_days_remaining', fd, st.fever_days_remaining);
-      st.salt_fever = true;
+      // Salt during a stage-crossing fever keeps that crossing's marks owed: the fever still ends in them.
+      st.salt_fever = !st.marks_pending;
       state.flags[cf.saltTaken] = false; notes.push('reach-salt taken: progress +' + (cf.saltProgress || 35) + ', fever for ' + (cf.feverDays || 3) + ' days');
       next.push(who + ' took reach-salt last turn: the fever is starting (day 1 of ' + (cf.feverDays || 3) + '), with vivid shared dreams; the Attunement is being forced forward.');
     }
+    // A kin matched but not yet bound (Stage 0) still draws the Attunement on by sleeping near: the world promises +1 a night from the match.
+    const kinMatched = typeof st.kin === 'string' && st.kin.trim() && !/^(?:none|n\/a|no kin)\b/i.test(st.kin.trim());
     for (let i = 0; i < daysCrossed; i++) {
-      if ((Number(st[sk]) || 0) >= 1 && !st.fever) { const from = st[pk]; st[pk] = Math.min(100, (Number(st[pk]) || 0) + 1); rec('items.' + pk, from, st[pk]); notes.push('night with kin: progress +1'); }
+      if (((Number(st[sk]) || 0) >= 1 || kinMatched) && !st.fever) { const from = st[pk]; st[pk] = Math.min(100, (Number(st[pk]) || 0) + 1); rec('items.' + pk, from, st[pk]); notes.push('night with kin: progress +1'); }
       if (st.fever && st.fever_days_remaining > 0) {
         st.fever_days_remaining -= 1;
-        if (st.fever_days_remaining === 0) { st.fever = false; rec('items.fever', true, false); next.push('The fever has broken this morning.' + (st.salt_fever ? ' The salt-fever has not changed the stage; no new marks appear.' : ' Describe the new Stage ' + st[sk] + ' marks (' + (P.stages[st[sk]] || {}).text + ') as ' + who + ' discovers them.')); st.salt_fever = false; notes.push('fever broke'); }
+        if (st.fever_days_remaining === 0) { st.fever = false; rec('items.fever', true, false); next.push('The fever has broken this morning.' + (st.salt_fever && !st.marks_pending ? ' The salt-fever has not changed the stage; no new marks appear.' : ' Describe the new Stage ' + st[sk] + ' marks (' + (P.stages[st[sk]] || {}).text + ') as ' + who + ' discovers them.')); st.salt_fever = false; st.marks_pending = false; notes.push('fever broke'); }
         else next.push(who + ' is feverish (day ' + ((cf.feverDays || 3) - st.fever_days_remaining + 1) + ' of ' + (cf.feverDays || 3) + '), sleeping badly, dreaming as the kin.');
       }
     }
-    if ((Number(st[pk]) || 0) >= 100 && (Number(st[sk]) || 0) < P.stages.length - 1) {
+    // One crossing at a time: progress waits at 100 until the last crossing's fever has broken and its marks are described.
+    if ((Number(st[pk]) || 0) >= 100 && (Number(st[sk]) || 0) < P.stages.length - 1 && !st.marks_pending) {
       const from = st[sk]; st[sk] = from + 1; rec('items.' + sk, from, st[sk]);
       const fp = st[pk]; st[pk] = 0; rec('items.' + pk, fp, 0);
-      st.salt_fever = false;
+      st.salt_fever = false; st.marks_pending = true;
       if (!st.fever) { st.fever = true; rec('items.fever', false, true); st.fever_days_remaining = cf.feverDays || 3; }
       notes.push('Attunement crossed into Stage ' + st[sk]);
       next.push('The Attunement has crossed into Stage ' + st[sk] + ' (' + P.stages[st[sk]].name + '): the fever begins tonight; the new marks appear only when it breaks. Do not describe new marks yet.');
@@ -995,7 +1020,7 @@
     for (const k of Object.keys(G)) if (speciesRace(W, k).toLowerCase() === race) return k;
     return race.replace(/\s+mythkin$/, '').replace(/\s+/g, '_');
   }
-  const kindLabel = (k) => speciesRace(W, k);
+  const kindLabel = (k) => String(speciesRace(W, k)).replace(/_/g, ' ');
   function ensureMet(state) { if (!Array.isArray(state.met)) state.met = []; return state.met; }
   // Adds the kinds of everyone present by name, plus any keys the narrator reported; humans are not a kind to be met.
   function recordMet(state, extraKeys) {
@@ -1304,15 +1329,17 @@
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
   function isRomanceScene(input) {
     const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
-    return /\b(?:date\w*|romanc\w*|flirt\w*|confess\w*|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender\w*|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? out|caress\w*|copulat\w*|intercourse|sex\w*|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|take(?:s|ing)?\s+\w+\s+to bed|undress(?:es|ing)?\s+(?!and\b|for\b|quickly\b)\w+|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
+  // A change is on the page this turn: an arc in its opening phases, or a change note due now. A change merely pending
+  // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
   function transformationSceneActive() {
-    return !!(adv.state.tf && ((adv.state.tf.tracks || []).length || (adv.state.tf.arcs || []).length)) ||
+    return arcActive() ||
       (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
   }
   function isTransition(input) {
     const a = String(input.action || '').trim();
-    return /^(i\s+)?(go|walk|head|return|leave|unpack|sleep|go to bed|lie down|wait|follow|sit|get up|wake|eat|shower|wash|dress|take the stairs|climb|cross)\b/i.test(a) && wc(a) <= 9 && !input.director && !input.rewrite;
+    return /^(i\s+)?(go|walk|head|return|leave|unpack|sleep|go to bed|lie down|wait|follow|sit|get up|wake|eat|shower|wash|dress|take the stairs|climb|cross)\b/i.test(a) && wc(a) <= 9 && !input.director && !input.rewrite && !isRomanceScene(input);
   }
   function sceneDensity(input) {
     const a = String(input.action || '');
@@ -1460,7 +1487,7 @@
   // lean (near the prompt cap): the passing oddities are left out, and partial knowledge is kept only for people in the scene.
   function gmBlock(S, first, lean) {
     const out = []; const sec = W.secrets || {}; const found = dungeonsFound(S), cleared = dungeonsCleared(S);
-    const inScene = (k) => { const c = charByKey(k); return !!c && S.present.some((pn) => String(pn).toLowerCase().includes(String(c.first || c.name.split(' ')[0]).toLowerCase())); };
+    const inScene = (k) => { const c = charByKey(k); return !!c && S.present.some((pn) => String(pn).toLowerCase().includes(String(givenName(c)).toLowerCase())); };
     if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (each settled change takes fifteen; the Spa restores it). ' + (h >= HUMANITY_LINE ? 'Above the line of ' + HUMANITY_LINE + ': the closed places will answer.' : 'Below the line of ' + HUMANITY_LINE + ': no closed place will open and no guardian can be faced until the Spa has given enough back; the doors simply stay shut, and nobody says why.')); }
     if (sec.rule) out.push(fill(sec.rule));
     if (!lean && sec.hints && sec.hints.length) out.push('Oddities that may surface in passing, at most one every few turns, never explained:\n' + sec.hints.map((h) => '- ' + fill(h)).join('\n'));
@@ -1479,12 +1506,17 @@
     return out.join('\n\n');
   }
   // The cast members an action names, by first name, surname or alias as whole words, so the prompt can hold the scene to them.
+  // Every name a cast member answers to: their given name (a world's authored people may carry only a full name, "Ines
+  // Varga", "Professor Adaline Marsh", whose given name is the first word after any title), the full name, the surname, aliases.
+  const NAME_TITLE = /^(?:professor|prof\.?|dr\.?|doctor|mr\.?|mrs\.?|ms\.?|mx\.?|miss|sir|lady|lord|warden|dean|madam|master)$/i;
+  function givenName(c) { return c.first || String(c.name || '').split(' ').filter((w) => !NAME_TITLE.test(w))[0] || c.name; }
+  function nameHandles(c) { const words = String(c.name || '').split(' ').filter(Boolean); return [givenName(c), c.name, words.length > 1 ? words[words.length - 1] : ''].concat(c.aliases || []).filter(Boolean); }
   function focusNames(action) {
     const hay = String(action || ''); if (!hay) return [];
     const out = [];
     for (const c of activeCharacters()) {
-      const handles = [c.first || '', c.name].concat(c.aliases || []).filter((h) => h && h.length > 2 && h !== c.last);
-      if (handles.some((h) => properWordIn(hay, h))) out.push(c.first || (c.aliases && c.aliases[0]) || c.name);
+      const handles = [givenName(c), c.name].concat(c.aliases || []).filter((h) => h && h.length > 2 && h !== c.last);
+      if (handles.some((h) => properWordIn(hay, h))) out.push(givenName(c));
     }
     return out.slice(0, 3);
   }
@@ -1528,7 +1560,7 @@
     // 'brief' clips everyone to a line.
     const castLevel = L.castLevel || (L.briefCast ? 'brief' : '');
     const chars = activeCharacters().map((c) => {
-      const names = [c.name.split(' ').pop()].concat(c.aliases || []).map((n) => n.toLowerCase());
+      const names = nameHandles(c).filter((n) => n.length > 2).map((n) => n.toLowerCase());
       const full = names.some((n) => S.present.some((pp) => pp.toLowerCase().includes(n)) || wordIn(mentioned, n));
       const where = (c.where && (c.where[slot] || c.where.default)) || 'unknown';
       const aim = (c.aims && ((slot === 'evening' && S.day > 1 && /mixer/i.test(c.aims[slot] || '') ? '' : c.aims[slot]) || c.aims.default)) || '';
@@ -1847,12 +1879,12 @@
     if (allowFit && adv.settings.autoFit && sample && words > band[1] * (input.bandHard ? 1 : 1.12)) {
       setStatus('fitting length (' + words + ' words)…');
       try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= (input.bandFloor ? band[0] : 50) && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length fitted ' + words + ' → ' + wc(fitted) + ' words'); out.narrative = fitted; words = wc(fitted); } else notes.push('length fit returned unusable text; kept the original'); }
-      catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length fit failed: ' + (e && e.code)); }
+      catch (e) { notes.push(e && e.code === 'cancelled' ? 'length fit skipped: Stop was pressed; the finished scene is kept as written' : 'length fit failed: ' + (e && e.code)); }
     } else if (allowFit && adv.settings.autoFit && sample && input.bandFloor && words < band[0]) {
       // The director asked for at least this length, so a reply below it is expanded rather than kept.
       setStatus('fitting length (' + words + ' words)…');
       try { const fitted = await fitLength(out.narrative, band); if (wc(fitted) >= band[0] && wc(fitted) <= band[1] && !/^(I (?:can(?:not|'t)|won't)|sorry[,.:])/i.test(fitted)) { notes.push('length expanded ' + words + ' → ' + wc(fitted) + ' words for the director note'); out.narrative = fitted; words = wc(fitted); } else notes.push('length expansion returned unusable text; kept the original'); }
-      catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('length expansion failed: ' + (e && e.code)); }
+      catch (e) { notes.push(e && e.code === 'cancelled' ? 'length expansion skipped: Stop was pressed; the finished scene is kept as written' : 'length expansion failed: ' + (e && e.code)); }
     } else if (words > band[1]) notes.push('length ' + words + ' over the band ' + band.join('–'));
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
@@ -1881,7 +1913,7 @@
     };
     if (regen) { turn.alts = capAlts((regen.alts || []).map(stripAlts).concat([stripAlts(regen)])); turn.n = regen.n; }
     adv.turns.push(turn);
-    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { if (e && e.code === 'cancelled') throw e; notes.push('summary fold failed: ' + (e && e.code)); } }
+    if (sample) { setStatus('folding memory…'); try { const f = await foldBeats(); if (f) { notes.push(f); turn.memAfter = { summary: adv.memory.summary, beats: clone(adv.memory.beats), facts: clone(adv.memory.facts || []) }; } } catch (e) { notes.push(e && e.code === 'cancelled' ? 'summary fold skipped: Stop was pressed; it runs again next turn' : 'summary fold failed: ' + (e && e.code)); } }
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     // Recovery reads a fold record only off the newest turn (an older one's successor carries the folded memory in its
     // memBefore), so once this turn has committed the one before it gives its record up. A stopped or stale turn never
@@ -1895,6 +1927,7 @@
     return turn;
   }
   async function takeTurn(input, opts) {
+    if (bootPending()) { setStatus('Your saved adventures are still loading; try again in a moment.', true); return false; }
     if (loadingAdv) { setStatus('An adventure is still loading; try again in a moment.', true); return false; }
     if (busy) { setStatus('A turn is already running.', true); return false; }
     if (!sample) { setStatus('Not connected to Claude in this view. Use Retry connection, or reload the page.', true); return false; }
@@ -1993,7 +2026,7 @@
       else if (code === 'refused') msg = 'Claude declined this turn. Change the action and try again.';
       else if (code === 'rate_limited') msg = 'Usage limit reached or too many calls. Wait a while and try again.';
       else if (code === 'invalid_json') msg = 'The reply was unusable after two attempts. Try the turn again, or see Debug.';
-      else if (code === 'truncated') msg = 'The reply was cut off after two attempts. Try again; if it keeps happening, choose a shorter length in Settings.';
+      else if (code === 'truncated') msg = 'The reply was cut off after two attempts. Try again; if it keeps happening, choose "Terse" under Narrative density in Settings.';
       else if (code === 'not_granted' || code === 'sampling_disabled' || code === 'not_declared' || /^capability_/.test(code)) { sample = null; setConn('bad', 'Claude unavailable'); msg = 'This page is not allowed to use Claude in this view.'; statusAction = { label: 'Retry connection', run: connectSample }; }
       else if (code === 'prompt_too_large') msg = 'The prompt is too large for the runtime even with everything optional shed. Shorten the action or the director note and try again (Debug shows the prompt).';
       else if (code === 'upstream_error') msg = 'The service failed mid-turn. Try again.';
@@ -2012,6 +2045,7 @@
   }
   // Override: run a pasted reply through the same pipeline with no model call.
   async function applyManualReply(action, replyText) {
+    if (bootPending()) return 'Your saved adventures are still loading; try again in a moment.';
     if (loadingAdv) { return 'An adventure is still loading; try again in a moment.'; }
     if (busy) { return 'A turn is already running.'; }
     const data = tolerantJson(replyText); if (!usableReply(data)) return 'That must be a JSON object with a non-empty narrative.';
@@ -2182,6 +2216,8 @@
   // and a newer save is reloaded instead of overwritten.
   // dirty: this page holds a change the store does not (a refused or failed save); loadingAdv: a Continue from Adventures is still loading
   let syncing = false, dirty = false, loadingAdv = false, deletingAdv = false;
+  // True while the boot is still loading saves and the page shows its placeholder (set up at boot).
+  let bootLoadPending = true, bootPendingFn = () => false; const bootPending = () => bootPendingFn();
   // Why the page is refusing an action while it is held.
   const busyMsg = () => deletingAdv ? 'An adventure is being removed.' : loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.';
   async function newerInStore() {
@@ -2200,12 +2236,19 @@
     syncing = true;
     try {
       const n = await newerInStore(); if (!n) return false;
-      if (n.deleted) { setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true); return true; }
+      if (n.deleted) { offerDeleted(); return true; }
       if (dirty) { offerConflict(n); return true; }
-      const was = adv.turns.length; const warning = await loadAdventure(adv.id);
+      // The reload gives way if the player opens or starts something else meanwhile: their choice stands.
+      const was = adv.turns.length, mine = adv; let warning;
+      try { warning = await loadAdventure(adv.id, () => adv === mine && !busy); } catch (e) { if (e && e.code === 'superseded') return false; throw e; }
       setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). ' + (warning || 'Carry on from here.'), !!warning);
       return true;
     } catch (e) { return false; } finally { syncing = false; }
+  }
+  // The open adventure is gone from the store (deleted on another device): it can be put back from this page, or left.
+  function offerDeleted() {
+    setStatus('This adventure was deleted from another device. It is still open here: restore it to keep playing, or open another from Adventures.', true,
+      { label: 'Restore it here', run: () => overwriteStore() });
   }
   function offerConflict(n) {
     setStatus('This adventure was saved from another device after this page last saved (' + n.turnCount + ' turns there, ' + adv.turns.length + ' here). Load that save, or overwrite it with this page\'s version?', true, [
@@ -2237,7 +2280,7 @@
       const newer = await newerInStore(); live();
       if (newer) {
         dirty = true;
-        if (newer.deleted) setStatus('This adventure was deleted from another device. It is still open here; use Overwrite in Adventures only if you want to restore it.', true);
+        if (newer.deleted) offerDeleted();
         else offerConflict(newer);
         return false;
       }
@@ -2291,9 +2334,11 @@
     return body;
   }
   const STORE_DOC_MAX_BYTES = 260000;
-  const tooBigCode = (e) => { const c = (e && e.code) || ''; return c === 'too_large' || c === 'invalid_argument' || c === 'quota_exceeded' || c === 'resource_exhausted' || /too.?large|quota/i.test((e && e.message) || ''); };
+  const tooBigCode = (e) => { const c = (e && e.code) || ''; return c === 'too_large' || c === 'invalid_argument' || c === 'quota_exceeded' || (c !== 'resource_exhausted' && /too.?large|quota/i.test((e && e.message) || '')); };
   function saveFailedText(e) {
     const code = (e && e.code) || (e && e.message) || 'unknown';
+    if (e && e.code === 'resource_exhausted') return 'Save refused for now (resource_exhausted): the store is busy. Your changes remain here; wait a moment, then retry.';
+    if (e && e.code === 'quota_exceeded') return 'Save refused (quota_exceeded): the store is full. Delete adventures you no longer need from Adventures, or export a copy now to keep your progress.';
     if (tooBigCode(e)) return 'Save refused (' + code + (e && e.code === 'too_large' ? ': ' + e.message : '') + '): the store will not take this much data. Retrying will not help; export a copy now to keep your progress.';
     return 'Save failed (' + code + '). Your changes remain here; retry by saving again.';
   }
@@ -2668,7 +2713,7 @@
     for (const o of arr) {
       if (!o || typeof o !== 'object') continue; const key = inventClean(o.key, 40); const slot = slots.find((sl) => sl.key === key); if (!slot || out[key]) continue;
       const g = {};
-      if (slot.fields.includes('first')) { const first = inventClean(o.first, INVENT_LIMITS.first), last = inventClean(o.last, INVENT_LIMITS.last); if (NAME_OK.test(first) && NAME_OK.test(last) && !seenFirst.has(first.toLowerCase()) && !seenLast.has(last.toLowerCase())) { g.first = first[0].toUpperCase() + first.slice(1); g.last = last[0].toUpperCase() + last.slice(1); seenFirst.add(first.toLowerCase()); seenLast.add(last.toLowerCase()); } }
+      if (slot.fields.includes('first')) { const first = inventClean(o.first, INVENT_LIMITS.first), last = inventClean(o.last, INVENT_LIMITS.last); if (NAME_OK.test(first) && NAME_OK.test(last) && !/\s/.test(first) && !seenFirst.has(first.toLowerCase()) && !seenLast.has(last.toLowerCase())) { g.first = first[0].toUpperCase() + first.slice(1); g.last = last[0].toUpperCase() + last.slice(1); seenFirst.add(first.toLowerCase()); seenLast.add(last.toLowerCase()); } }
       for (const f of ['course', 'temperament', 'quirk', 'want', 'private', 'detail', 'greeting', 'background', 'personality']) { if (!slot.fields.includes(f)) continue; const v = inventClean(o[f], INVENT_LIMITS[f]); if (v) g[f] = v.replace(/\.$/, (f === 'background' || f === 'personality') ? '.' : ''); }
       if (g.background && !/\{first\}/.test(g.background)) g.background = g.background.replace(/\byou\b/g, '{first}');
       out[key] = g;
@@ -2993,7 +3038,10 @@
     if (aimEdited) { const text = $('#cfAim').value.trim(); aims.default = text; Object.keys(aims).forEach((k) => { if (k !== 'default') aims[k] = text; }); }
     if (whereEdited) { const text = $('#cfWhere').value.trim(); where.default = text; Object.keys(where).forEach((k) => { if (k !== 'default') where[k] = text; }); }
     const parts = name === c.name ? { first: c.first || name.split(' ')[0], last: c.last || name.split(' ').slice(1).join(' ') } : (() => { const plain = name.replace(/^(?:dean|professor|prof\.|doctor|dr\.|madam|master|mr\.|mrs\.|ms\.|mx\.)\s+/i, '').trim().split(/\s+/); return { first: plain[0] || name, last: plain.slice(1).join(' ') }; })();
-    const o = { name, first: parts.first, last: parts.last, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
+    // A rename carries the aliases with it: the old given name and surname are swapped for the new ones.
+    const oldFirst = c.first || c.name.split(' ')[0], oldLast = c.last || c.name.split(' ').slice(1).join(' ');
+    const swapAlias = (a) => name === c.name ? a : a === oldFirst ? parts.first : (a === oldLast && parts.last ? parts.last : a);
+    const o = { name, first: parts.first, last: parts.last, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean).map(swapAlias).filter((a, i, arr) => a && arr.indexOf(a) === i), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
@@ -3024,12 +3072,14 @@
   // ---------- rendering ----------
   function setStatus(s, bad, action) {
     if (!s && saveError) { s = saveError; bad = true; action = db ? { label: 'Retry save', run: () => persist() } : { label: 'Retry storage', run: () => location.reload() }; }
+    else if (!s && connBad && !sample) { s = 'Not connected to Claude, so turns cannot run. Tap Retry connection; if it keeps failing, close and reopen this game.'; bad = true; action = { label: 'Retry connection', run: connectSample }; }
     const el = $('#status'); el.innerHTML = ''; el.classList.toggle('bad', !!bad); el.hidden = !s;
     if (!s) return;
     const span = document.createElement('span'); span.textContent = s; el.appendChild(span);
     for (const a of (Array.isArray(action) ? action : (action ? [action] : []))) { const b = document.createElement('button'); b.type = 'button'; b.textContent = a.label; b.onclick = a.run; el.appendChild(b); }
   }
-  function setConn(state, text) { const c = $('#conn'); c.classList.remove('ok', 'bad'); if (state) c.classList.add(state); $('#connText').textContent = text; }
+  let connBad = false;   // Claude is known to be unavailable: an otherwise empty status line says so rather than going blank
+  function setConn(state, text) { connBad = state === 'bad'; const c = $('#conn'); c.classList.remove('ok', 'bad'); if (state) c.classList.add(state); $('#connText').textContent = text; }
   // Every model call is recorded here (the last thirty): what was asked, on which tier, how big, when the first text came,
   // when it ended and how. The Debug dialog lists them, which is how a call that never answers gets seen.
   const callTrace = [];
@@ -3086,7 +3136,7 @@
   function renderClock() {
     const S = adv.state, s = slotInfo(S); const curName = fill(s.cur.name);
     const slotName = curName.length > 44 ? curName.slice(0, 42).replace(/\s+\S*$/, '') + '…' : curName;
-    $('#clock').innerHTML = '<b>Day ' + num(S.day) + '</b> · <span class="wd-long">' + esc(S.weekday) + '</span><span class="wd-short">' + esc(String(S.weekday).slice(0, 3)) + '</span> · <b>' + esc(S.time) + '</b> · <span title="' + esc(curName) + '">' + esc(slotName) + '</span>' + (s.next ? ' · next ' + esc(s.next.time) : '') + '<span class="loc"> · ' + esc(S.location) + '</span>';
+    $('#clock').innerHTML = '<b>Day ' + num(S.day) + '</b> · <span class="wd-long">' + esc(S.weekday) + '</span><span class="wd-short">' + esc(String(S.weekday).slice(0, 3)) + '</span> · <b>' + esc(S.time) + '</b><span class="slot"> · <span title="' + esc(curName) + '">' + esc(slotName) + '</span>' + (s.next ? ' · next ' + esc(s.next.time) : '') + '</span><span class="loc"> · ' + esc(S.location) + '</span>';
     $('#clock').title = 'Day ' + num(S.day) + ' · ' + S.weekday + ' · ' + S.time + ' · ' + curName + (s.next ? ' · next ' + s.next.time : '') + ' · ' + S.location;
   }
   let progScrollUntil = 0;   // the phone action bar ignores the page's own scrolls
@@ -3478,6 +3528,8 @@
   try { bootLast = localStorage.getItem('windlass.last'); } catch (e) { setSaveNote('local save pointer unavailable', true); }
   newAdventure({}, DEFAULT_WORLD);
   const bootAdv = adv;
+  // The placeholder shown while the saves load is a preview: a turn taken on it would be saved as an adventure nobody created.
+  bootPendingFn = () => bootLoadPending && adv === bootAdv;
   // Once the player has started or opened something of their own (a new adventure, the creation or adventures dialog),
   // the background boot load stands aside: it must not replace their adventure, reopen creation or put up its errors.
   // A creation restored from the draft does not stand the boot load aside: the newest save loads behind it, so Cancel lands there.
@@ -3556,6 +3608,7 @@
     } else setSaveNote('no saves yet');
     if (!$('#dlgCreate').open) { if (createClosed) showPreviewNote(); else openCreate(DEFAULT_WORLD); }
   })();
+  const bootDone = () => { bootLoadPending = false; }; bootLoad.then(bootDone, bootDone);
   if (bootDraft) Promise.race([Promise.allSettled([sampleReady, bootLoad]), new Promise((r) => setTimeout(r, 20000))]).then(() => {
     if (!restoreWait) return;   // the restored screen has given way to a fresh one, which needs no wait
     restoreWait = false; $('#cBegin').disabled = false; if ($('#cNote').textContent === RESTORE_WAIT) $('#cNote').textContent = '';

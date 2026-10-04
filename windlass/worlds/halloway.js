@@ -45,7 +45,7 @@ window.WINDLASS_WORLDS.halloway = {
     progressKey: 'attunement_progress',
     maxProgressPerTurn: 12,
     stages: [
-      { n: 0, name: 'unbound', text: 'No kin. Ordinary senses.' },
+      { n: 0, name: 'unbound', text: 'No kin yet, or newly matched and not yet bound. Ordinary senses.' },
       { n: 1, name: 'bound', text: 'Student and kin share senses in dreams; a tug behind the eyes when the kin is near.' },
       { n: 2, name: 'first marks', text: 'Eye colour shifts toward the kin; teeth or nails change slightly; hearing or smell sharpens. Passes unnoticed in a crowd.' },
       { n: 3, name: 'half-turned', text: 'Visible features: ears, a tail, fur patches or scales, altered gait. Passes in a coat and hat.' },
