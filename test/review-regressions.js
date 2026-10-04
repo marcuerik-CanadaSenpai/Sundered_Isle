@@ -92,8 +92,6 @@ async function checkInferenceAndCompaction() {
     assert(compacted && compacted._trimmed && compacted.memBefore === null, 'turn 9 should be compacted in its completed chunk');
     assert(!Object.hasOwn(compacted.stateBefore, 'items'), 'the compacted snapshot should not retain full state');
     const worlds = h.window.WINDLASS_WORLDS;
-    const udderTrait = worlds.mythaven.transformation.species.cow.ladder.find((step) => step.at === 85).trait;
-    assert(!/feminine body path/.test(udderTrait) && /udder develops/.test(udderTrait), 'the udder trait should apply unconditionally');
     const wolfBody = worlds.sundered.genPools.species.wolf.bodyByGender.female[0];
     assert.equal(wolfBody, 'Two rows of small nipples run down the abdomen, dark against the pelt');
     const diagnostics = h.diagnostics();
@@ -217,38 +215,6 @@ async function checkStaleImportRecovery() {
   }
 }
 
-async function checkGeneratedRoommateReplacement() {
-  const h = await startAdventure();
-  try {
-    h.mock.disable.sample = true;
-    h.click('#btnAdventures');
-    assert(await h.settle(80, 4000), 'adventure list did not settle');
-    h.$('#newWorld').value = 'mythaven';
-    h.click('#newAdv');
-    assert(await h.settle(80, 4000), 'Mythaven creation dialog did not open');
-    h.$('#cRmSpecies').value = 'cow';
-    h.$('#cRmSpecies').dispatchEvent(new h.window.Event('input', { bubbles: true }));
-    h.$('#cRmSpecies').dispatchEvent(new h.window.Event('change', { bubbles: true }));
-    h.$('#cRmGender').value = 'female';
-    h.$('#cRmName').value = 'Marisol Vega';
-    h.$('#cRmName').dispatchEvent(new h.window.Event('input', { bubbles: true }));
-    h.click('#cBegin');
-    assert(await h.idle(30000), 'creating the Mythaven adventure did not finish');
-
-    const [, entry] = [...h.mock.store.entries()].find(([path, value]) => /^adventures\/[^/]+$/.test(path) && value.data.worldId === 'mythaven');
-    assert(entry, 'the Mythaven adventure was not persisted');
-    assert.equal(entry.data.roommate.replaces, 'marisol', 'an explicitly chosen authored name should replace that same cast member');
-    h.click('#btnCast');
-    assert.equal(h.$('#castList [data-key="marisol"]'), null, 'the authored Marisol should not appear twice in the cast');
-
-    const diagnostics = h.diagnostics();
-    assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
-    assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));
-  } finally {
-    h.close();
-  }
-}
-
 async function checkChunkRecoveryRevision() {
   const h = await startAdventure();
   try {
@@ -315,7 +281,6 @@ async function checkCreationFallbackPreservesChoices() {
   await checkDuplicateChronology();
   await checkStaleChunkRecovery();
   await checkStaleImportRecovery();
-  await checkGeneratedRoommateReplacement();
   await checkChunkRecoveryRevision();
   await checkCreationFallbackPreservesChoices();
   console.log('review regressions passed');

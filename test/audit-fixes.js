@@ -1,13 +1,16 @@
 'use strict';
 // Regressions for the audit fixes: one scenario per fix. Each passes on the fixed page and fails on the page before the fixes
-// (2512da3). Run one scenario by name: node audit-fixes.js romanceDetection
+// (2512da3); sunderedOnly fails on the last three-world page (d985886). Run one scenario by name: node audit-fixes.js romanceDetection
 // Against another build: WL_HTML=<index.html> WL_WORLDS=<worlds dir> node audit-fixes.js
+// Halloway and Mythaven have left the game; hallowayAttunement reads the last Halloway world file from git (HALLOWAY_REV)
+// to exercise runProgression, the engine code only a world with a progression reaches.
 const assert = require('node:assert/strict');
-const fs = require('fs'), path = require('path'), vm = require('vm');
+const fs = require('fs'), path = require('path'), vm = require('vm'), { execFileSync } = require('child_process');
 const { boot } = require('./boot');
 
 const HTML = process.env.WL_HTML || path.join(__dirname, '..', 'windlass', 'index.html');
 const WORLDS = process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds');
+const HALLOWAY_REV = 'd985886';   // the last commit with windlass/worlds/halloway.js
 let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
 
 const advDocs = (store) => [...store.entries()].filter(([p]) => /^adventures\/[^/]+$/.test(p));
@@ -47,12 +50,16 @@ function patchTurns(h, patch) {
 
 const S = {
   // 1. Halloway Attunement: salt taken during a stage-crossing fever keeps that crossing's marks owed; no second crossing while
-  // they are pending; a matched kin draws +1 a night from Stage 0.
+  // they are pending; a matched kin draws +1 a night from Stage 0. Halloway is no longer in the game, so its world file comes
+  // from WL_WORLDS when a build there still has it, otherwise from git; runProgression comes from the page under test.
   async hallowayAttunement() {
     const src = fs.readFileSync(HTML, 'utf8');
     const a = src.indexOf('  function runProgression'), b = src.indexOf('  // ---------- per-species');
     assert(a > 0 && b > a, 'runProgression not found in the page');
-    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'halloway.js'), 'utf8'), ctx);
+    const local = path.join(WORLDS, 'halloway.js');
+    const hallowaySrc = fs.existsSync(local) ? fs.readFileSync(local, 'utf8')
+      : execFileSync('git', ['show', HALLOWAY_REV + ':windlass/worlds/halloway.js'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', maxBuffer: 1 << 26 });
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(hallowaySrc, ctx);
     const W = ctx.window.WINDLASS_WORLDS.halloway;
     const runProgression = new Function('W', 'firstName', src.slice(a, b) + '\nreturn runProgression;')(W, () => 'Wren');
     const fresh = () => ({ items: JSON.parse(JSON.stringify(W.initialState.items)), flags: {} });
@@ -197,7 +204,8 @@ const S = {
     }
   },
 
-  // 6. An invented detail or quirk naming anatomy the kind does not have is dropped; a harmless one is kept, capitalised.
+  // 6. An invented detail or quirk naming anatomy the kind does not have never reaches a description or quirk. Outcome checks
+  // only: they hold whether invented details are filtered or not taken at all.
   async inventedAnatomyDropped() {
     const h = await begin({
       name: 'Mira Holt', rmSpecies: 'cow',
@@ -224,8 +232,7 @@ const S = {
       assert.doesNotMatch(all, /forked tail/, 'a tail on a kind without tails must never reach a description or quirk');
       // Body words are matched as whole words: the cow's text saying "showing" does not give a cow wings.
       assert.doesNotMatch(JSON.stringify(data.roommate), /folded wings/, 'wings on a kind without wings must never reach a quirk');
-      const cream = data.cast.generated.characters.find((c) => c.key === 'creamery');
-      assert.match(JSON.stringify(cream), /\. A chipped front tooth/, 'a harmless invented detail is kept and capitalised: ' + (cream.looks || '').slice(-120));
+      assert(data.cast.generated.characters.find((c) => c.key === 'creamery'), 'the generated cast must include creamery');
       clean(h);
     } finally { h.close(); }
   },
@@ -263,7 +270,7 @@ const S = {
 
   // 8. Renaming the roommate in the Cast editor reaches every {rm_*} in the next turn prompt; the aliases follow the name.
   async roommateRename() {
-    const h = await begin({ world: 'mythaven', rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
     try {
       h.click('#btnCast'); await h.sleep(20);
       assert.equal(h.$('#cfName').value, 'Daisy Clover', 'the roommate is selected in the Cast editor');
@@ -285,19 +292,33 @@ const S = {
     } finally { h.close(); }
   },
 
-  // 9. A Halloway cast member listed present by first name only gets the full sheet and the Focus line.
-  async hallowayFirstName() {
-    const h = await begin({ world: 'halloway' });
+  // 9. A cast member listed present by first name only gets the full sheet and the Focus line, even when nothing else they
+  // answer to (aliases cleared in the Cast editor) carries that first name: the given name counts on its own.
+  async firstNamePresent() {
+    const h = await begin();
     try {
-      patchTurns(h, (r) => { r.state_updates = [{ key: 'present', op: 'set', value: ['Ines'] }]; r.narrative = 'Ines looks up from the table and nods at you. ' + r.narrative; });
+      const { data } = onlyAdv(h.mock.store);
+      const c = data.cast.generated.characters.find((x) => x.key === 'historian');
+      assert(c && c.first && /^Professor /.test(c.name), 'the historian must be a titled cast member with a first name: ' + (c && c.name));
+      h.click('#btnCast'); await h.sleep(20);
+      h.click(h.$('#castList [data-key="historian"]')); await h.sleep(20);
+      assert.equal(h.$('#cfName').value, c.name, 'the historian is selected in the Cast editor');
+      h.$('#cfAliases').value = '';
+      h.click('#cfSave'); assert(await h.idle(10000));
+      h.click('[data-close="dlgCast"]');
+      const ov = onlyAdv(h.mock.store).data.cast.overrides.historian;
+      assert(ov && Array.isArray(ov.aliases) && ov.aliases.length === 0, 'the cleared aliases are saved: ' + JSON.stringify(ov && ov.aliases));
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'present', op: 'set', value: [c.first] }]; r.narrative = c.first + ' looks up from the lectern and nods at you. ' + r.narrative; });
       assert(await h.turn('I look around.'));
-      assert(await h.turn('I ask Ines about the Quiet Table.'));
+      assert(await h.turn('I ask ' + c.first + ' about the Sundering.'));
       const p = promptOf(lastTurn(h));
       const chars = (/<characters[^>]*>([\s\S]*?)<\/characters>/.exec(p) || [])[1] || '';
-      const line = chars.split('\n').find((l) => l.includes('[key: ines]')) || '';
-      assert(line, 'Ines must be in <characters>');
-      assert.match(line, /Second-year, Stage 3 in fourteen months/, 'Ines in the scene and named must get her full sheet: ' + line.slice(0, 160));
-      assert.match(p, /Focus: the action names Ines\b/, 'the Focus line must name Ines');
+      const line = chars.split('\n').find((l) => l.includes('[key: historian]')) || '';
+      assert(line, 'the historian must be in <characters>');
+      const sheetOnly = /Teaches the Sundering \(history\)/;   // the sheet's sentence; the brief joins it with a semicolon
+      assert.match(c.sheet, sheetOnly, 'the generated sheet changed shape: ' + c.sheet.slice(0, 120));
+      assert.match(line, sheetOnly, 'the historian in the scene and named must get the full sheet: ' + line.slice(0, 200));
+      assert.match(p, new RegExp('Focus: the action names ' + c.first + '\\b'), 'the Focus line must name ' + c.first);
       clean(h);
     } finally { h.close(); }
   },
@@ -421,6 +442,61 @@ const S = {
       assert.match(statusText(h), /cut off after two attempts/, statusText(h));
       assert.match(statusText(h), /Narrative density/, 'the message must name the Narrative density setting');
     } finally { h.close(); }
+  },
+
+  // 16. Sundered Isle is the only world. The creation screen offers no world picker and creates in Sundered. A newer save from a
+  // world no longer in the game (Mythaven) is passed over quietly at boot, also when this device's pointer names it: the
+  // older Sundered save opens with a plain welcome, and Adventures lists the Mythaven save as no longer in this game, with
+  // Continue disabled.
+  async sunderedOnly() {
+    // (a) No picker; the new adventure is a Sundered one.
+    const a = await boot({});
+    let store;
+    try {
+      assert(await a.settle(150, 6000), 'boot did not settle');
+      assert(a.$('#dlgCreate').open, 'creation opens on an empty store');
+      assert(a.$('#newWorld').hidden, 'the world picker must be hidden when there is only one world');
+      assert.deepEqual([...a.$('#newWorld').options].map((o) => o.value), ['sundered'], 'Sundered Isle is the only world on offer');
+      a.click('#cBegin'); assert(await a.idle(30000), 'creating the adventure did not finish'); await a.settle(150, 6000);
+      assert.equal(onlyAdv(a.mock.store).data.worldId, 'sundered', 'the new adventure must be a Sundered one');
+      assert(await a.turn('I look around.'));
+      clean(a);
+      store = new Map([...a.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
+    } finally { a.close(); }
+    const sunId = onlyAdv(store).id;
+    // A newer save from Mythaven: the Sundered save's records under another id and world.
+    const oldId = 'advmythaven01';
+    for (const [k, v] of [...store]) {
+      if (!k.startsWith('adventures/' + sunId)) continue;
+      const c = JSON.parse(JSON.stringify(v)); const nk = k.replace('adventures/' + sunId, 'adventures/' + oldId);
+      if (nk === 'adventures/' + oldId) { c.data.id = oldId; c.data.worldId = 'mythaven'; c.data.title = 'The Mythaven game'; c.data.updatedAt = new Date(Date.parse(c.data.updatedAt) + 60000).toISOString(); }
+      store.set(nk, c);
+    }
+    assert(store.get('adventures/' + oldId).data.updatedAt > store.get('adventures/' + sunId).data.updatedAt, 'the Mythaven save must be the newer one');
+    const copyStore = () => new Map([...store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
+    // (b) by recency alone, (c) with this device's pointer naming the Mythaven save.
+    for (const pointer of [null, oldId]) {
+      const label = pointer ? '(pointer names the Mythaven save) ' : '';
+      const h = await boot({ setup(w, m) { m.store = copyStore(); if (pointer) w.localStorage.setItem('windlass.last', pointer); } });
+      try {
+        assert(await h.settle(150, 8000), label + 'boot did not settle'); await h.idle(10000); await h.settle(100, 4000);
+        assert(!h.$('#dlgCreate').open, label + 'the Sundered save must open, not the creation screen');
+        assert.equal(h.window.localStorage.getItem('windlass.last'), sunId, label + 'the Sundered save must be the one opened');
+        assert.match(statusText(h), /^Welcome back\./, label + 'a normal welcome: ' + statusText(h));
+        assert.doesNotMatch(statusText(h), /could not be opened|could not be loaded/, label + 'the retired save is not a failure: ' + statusText(h));
+        assert(!h.$('#status').classList.contains('bad'), label + 'no error status');
+        assert.doesNotMatch(h.$('#summaryNote').textContent, /could not/, label + 'the save note reports no failure: ' + h.$('#summaryNote').textContent);
+        h.click('#btnAdventures'); await h.settle(100, 4000);
+        const rows = [...h.document.querySelectorAll('#advlist .advrow')];
+        const row = rows.find((r) => /The Mythaven game/.test(r.textContent));
+        assert(row, label + 'the Mythaven save stays listed in Adventures: ' + rows.map((r) => r.textContent).join(' | '));
+        assert.match(row.textContent, /no longer in this game/, label + 'the Mythaven save is marked as from a world no longer in this game: ' + row.textContent);
+        assert(row.querySelector('[data-act="open"]').disabled, label + 'Continue is disabled for the Mythaven save');
+        const sunRow = rows.find((r) => r !== row);
+        assert(sunRow && !/no longer in this game/.test(sunRow.textContent), label + 'the Sundered save is listed normally');
+        clean(h);
+      } finally { h.close(); }
+    }
   },
 };
 

@@ -47,7 +47,6 @@ async function run() {
     assert(await h.settle(150, 6000), 'the page did not settle after boot');
     const worlds = h.window.WINDLASS_WORLDS;
     assert(worlds, 'WINDLASS_WORLDS must be exposed');
-    checkWorld(worlds, 'mythaven');
     checkWorld(worlds, 'sundered');
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));

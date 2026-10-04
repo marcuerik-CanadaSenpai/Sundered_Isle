@@ -105,6 +105,9 @@ async function main() {
     assert(minor, 'the test needs a generated minor figure not yet present');
     assert(await h.turn('Introduce myself to ' + minor.first), 'minor first-meeting turn did not finish');
     assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'meeting a generated minor figure is a first meeting: ' + minor.name);
+    // A line typed all in lower case still names them.
+    assert(await h.turn('introduce myself to ' + minor.first.toLowerCase()), 'lower-case first-meeting turn did not finish');
+    assert.equal(tierOf(h, 'turn').slice(-1)[0], 'complex', 'a name typed in lower case must still count: ' + minor.first.toLowerCase());
     // Once present, their kind is met even when the narrator does not report it, so meeting them again is not new.
     h.mock.sampleHandler = (input) => (/<output_format>/.test(String(input))
       ? { text: JSON.stringify(Object.assign(JSON.parse(turnReply()), { state_updates: [{ key: 'present', op: 'append', value: [minor.name] }] })) } : 'A short answer.');
@@ -135,23 +138,9 @@ async function main() {
     assert.equal(h2.$('#setNarrTier').value, 'auto', 'an old save that asked for a lesser tier must open as auto');
     h2.click('[data-close="dlgSettings"]');
 
-    // A first meeting in a world that does not track kinds: Halloway has no transformation, and Ines is not there at the start.
-    h2.mock.sampleHandler = (input) => (/<output_format>/.test(String(input)) ? turnReply() : 'A short answer.');
-    h2.$('#newWorld').value = 'halloway'; h2.click('#newAdv');
-    assert(await h2.settle(150, 6000), 'opening Halloway creation did not settle');
-    h2.click('#cBegin');
-    assert(await h2.idle(15000), 'creating the Halloway adventure did not finish');
-    await setWriter(h2, 'auto');
-    assert(await h2.turn('Walk along the cloister'), 'Halloway ordinary turn did not finish');
-    assert(await h2.turn('Introduce myself to Ines'), 'Halloway first-meeting turn did not finish');
-    assert.deepEqual(tierOf(h2, 'turn').slice(-2), ['default', 'complex'], 'auto must take the complex tier for a first meeting in a world without kinds');
-    assert(await h2.turn('introduce myself to ines'), 'lower-case first-meeting turn did not finish');
-    assert.equal(tierOf(h2, 'turn').slice(-1)[0], 'complex', 'a name typed in lower case must still count');
-    assert(await h2.turn('Introduce myself to Tobias'), 'Halloway already-present turn did not finish');
-    assert.equal(tierOf(h2, 'turn').slice(-1)[0], 'default', 'someone already present is not a first meeting');
     assert(!h2.errors.length && !h2.mock.violations.length, 'page errors or contract violations: ' + JSON.stringify(h2.errors.concat(h2.mock.violations)));
     h2.close();
-    console.log('writer toggle passed: most capable every turn; auto by scene, director first meetings and Halloway first meetings included; failures record the tier asked; the intro on the most capable tier; an old lesser tier opens as auto');
+    console.log('writer toggle passed: most capable every turn; auto by scene, director first meetings and lower-case first meetings included; failures record the tier asked; the intro on the most capable tier; an old lesser tier opens as auto');
   } catch (e) {
     console.error('WRITER TOGGLE FAILED\n' + ((e && e.stack) || e));
     process.exit(1);
