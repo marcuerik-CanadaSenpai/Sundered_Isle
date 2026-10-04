@@ -533,6 +533,36 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 9a. Fade deadlines are absolute: a long quiet turn that passes two of them eases one step now and the other next turn.
+  async fadeCatchesUp() {
+    const h0 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    const store = h0.mock.store; let id;
+    try { assert(await h0.turn('I sit at the desk.')); id = onlyAdv(store).id; } finally { h0.close(); }
+    const doc = store.get('adventures/' + id).data;
+    const nowMin = ((doc.state.day || 1) - 1) * 1440 + (() => { const [hh, mm] = doc.state.time.split(':').map(Number); return hh * 60 + mm; })();
+    doc.state.tf = Object.assign(doc.state.tf || {}, {
+      influence: Object.assign(doc.state.tf.influence || {}, { cow: 20 }), rungs: { cow: 1 },
+      traits: [{ species: 'cow', trait: 'ears lengthen and soften', day: 1, settled: false }], arcs: [], paths: {},
+      tracks: [{ species: 'cow', rung: 1, kind: 'body', trait: 'ears lengthen and soften', steps: ['a first ear sensation', 'a second ear sign', 'a third ear sign', 'a fourth ear sign', 'the ear change complete'], anatomy: '', habits: [], noticed: '', i: 2, nextAt: 1e9, beganAt: nowMin }],
+      last: { cow: nowMin }, drifted: {},
+    });
+    doc.pendingNotes = [];
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000));
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, track = () => tf().tracks.find((t) => t.species === 'cow' && t.kind === 'body');
+      let advance = 720;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = []; });
+      // Twelve quiet hours in one turn pass the six-hour and twelve-hour deadlines: one step eases now, the other is owed.
+      assert(await h.turn('I sleep the day away.'));
+      assert.equal(track().i, 1, 'one step eases per turn'); assert.equal(track().fadeAt, nowMin + 720, 'the next deadline is the twelve-hour one, not six hours from now');
+      advance = 30;
+      assert(await h.turn('I stretch.'));
+      assert(!track(), 'the owed step eases on the next turn, half an hour later, and the change is gone'); assert.equal(tf().rungs.cow, 0);
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
   // The Cast note is a live region so a screen reader hears the unsaved-edits question.
   async looksLeadFirst() {

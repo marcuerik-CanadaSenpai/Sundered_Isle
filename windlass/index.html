@@ -1275,12 +1275,14 @@
   function fadeTracks(state, notes) {
     const T = W.transformation; if (!T || !state.tf) return [];
     const tf = state.tf; const now = storyMin(state); const cfg = fadeCfg(); const sc = fadeScale(); const who = firstName(); const out = [];
-    const every = Math.round(cfg.everyHours * 60 * sc);
+    const every = Math.round(cfg.everyHours * 60 * sc), after = Math.round(cfg.afterHours * 60 * sc);
     for (const t of tf.tracks.slice()) {
       if (!fadeHeld(tf, t, now)) { if (t.fadeAt != null) delete t.fadeAt; continue; }
-      if (t.fadeAt == null) t.fadeAt = now;
+      // Deadlines are absolute, counted from the last exposure of the kind (or the change's start), so a long quiet turn that
+      // passes several of them loses none: one step eases per turn until the change has caught up.
+      if (t.fadeAt == null) t.fadeAt = (tf.last[t.species] != null ? tf.last[t.species] : t.beganAt || 0) + after;
       if (now < t.fadeAt) continue;
-      const sp = T.species[t.species]; t.fadeAt = now + every;
+      const sp = T.species[t.species]; t.fadeAt += every;
       if (t.i > 0) {
         t.i -= 1; t.nextAt = Math.max(t.nextAt, now + stepGapMin()); const step = pathFill(tf, t.species, t.steps[t.i]);
         notes.push(t.species + ' change fading: step ' + (t.i + 1) + ' of ' + t.steps.length + ' eased (' + completion(t) + ' of 100)');
@@ -1299,7 +1301,6 @@
         notes.push(t.species + ' change faded away: rung ' + t.rung + ' undone, influence ' + tf.influence[t.species]);
       }
     }
-    return out;
     return out;
   }
   // The band widens only while a change is at its finding (older arcs) or its completion (steps): the small steps get no extra room.
