@@ -610,13 +610,15 @@
   // closes her eyes"), and so does a comma right before the part ("a second glance, head tilted").
   const ANATOMY_STOP = '(?:a|an|the|her|his|their|its|my|your|our|one|of|to|at|in|on|with|for|from|by|and|or|but|as|over|under|into|onto|before|after|while|when|then|than|that|this|these|those)';
   const ANATOMY_MOD = '(?:(?:(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+,? ){0,2}(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+ )', ANATOMY_MODS = ANATOMY_MOD + '?';
-  // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
-  const ANATOMY_COUNT = new RegExp('\\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b', 'i');
-  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms"; "an extra pair of hands" or "of
-  // eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is her free one); "split second" is
-  // time, and "a second, smaller head" counts where "a second, mouth open" does not; "other" counts only after a possessive
-  // ("her other head", never "the other side of her face"); "another" is left out ("another mouth to feed").
-  const ANATOMY_NEVER = new RegExp('\\b(?:third|fourth|extra|additional|second (?:pair|set|row)(?: of)?|(?:third|extra|additional) (?:pair|set|row) of(?! (?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\bsecond(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
+  // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face, or more than one pair or
+  // set of arms, legs or heads ("three pairs of arms"; "two pairs of hands" is help, "two rows of faces" a crowd).
+  const ANATOMY_COUNT = new RegExp('\\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:pairs|sets) of ' + ANATOMY_MODS + '(?:arms|legs|heads)\\b', 'i');
+  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms", "her fourth pair of arms"; "an extra
+  // or a second pair of hands" or "of eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is
+  // her free one); "split second" is time, and "a second, smaller head" counts where "a second, mouth open" does not;
+  // "other" counts only after a possessive ("her other head", never "the other side of her face"); "another" is left out
+  // ("another mouth to feed").
+  const ANATOMY_NEVER = new RegExp('\\b(?:third|fourth|fifth|sixth|extra|additional|(?:second|third|fourth|fifth|sixth|extra|additional) ' + ANATOMY_MODS + '(?:pair|set|row) of(?! ' + ANATOMY_MODS + '(?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\bsecond(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
@@ -625,10 +627,11 @@
     const NUM = '(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many|\\d+)';
     const nounRe = '(' + ANATOMY_WORDS.source.slice(3, -3) + ')';
     const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
-    for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + nounRe + '\\b', 'gi'))) {
+    // "Two pairs of wings" must be pairs in the kind's text too.
+    for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + '((?:pairs?|sets?|rows?) of ' + ANATOMY_MODS + ')?' + nounRe + '\\b', 'gi'))) {
       const n = m[1].toLowerCase(), other = /^\d+$/.test(n) ? WORDS[+n] : (WORDS.includes(n) ? String(WORDS.indexOf(n)) : '');
-      const stem = m[2].toLowerCase().replace(/(?:ves|s)$/, '');
-      if (!new RegExp('\\b(?:' + n + (other ? '|' + other : '') + ') (?:[\\w\'-]+,? ){0,3}?' + escRe(stem)).test(kindLower)) return false;
+      const stem = m[3].toLowerCase().replace(/(?:ves|s)$/, ''), words = "(?:[\\w'-]+,? ){0,3}?";
+      if (!new RegExp('\\b(?:' + n + (other ? '|' + other : '') + ') ' + words + (m[2] ? '(?:pairs?|sets?|rows?) of ' + words : '') + escRe(stem)).test(kindLower)) return false;
     }
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
     const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };

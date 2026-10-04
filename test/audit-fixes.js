@@ -249,17 +249,23 @@ const S = {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const cow = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.cow;
     for (const t of ['flicks her two tails when amused', 'has eleven arms', 'scratches her second head when thinking', 'rubs three long muscular arms', 'a third arm folded away',
-      'a second smaller head', 'a second, smaller head that sleeps', 'grows a second pair of arms', 'grows an extra pair of arms', 'talks out of her other mouth', 'has two heads', 'keeps a spare tail']) assert.equal(fits(t, cow), false, 'refused: ' + t);
+      'a second smaller head', 'a second, smaller head that sleeps', 'grows a second pair of arms', 'grows an extra pair of arms', 'talks out of her other mouth', 'has two heads', 'keeps a spare tail',
+      'folds her three pairs of arms', 'scratches her fourth pair of arms', 'stretches two pairs of legs', 'grows a third pair of arms', 'flicks her two pairs of tails']) assert.equal(fits(t, cow), false, 'refused: ' + t);
     // Time, idiom and a pronoun or preposition between the number and the part are not anatomy.
     for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table',
       'takes a second to scratch her head before answering', 'gives another shake of her head', 'touches the other side of her face when thinking',
       'for the third time rubs her eyes', 'counts to three and closes her eyes', 'takes a second glance, head tilted', 'pauses a split second, head tilted',
       'waits a second, mouth open', 'holds her mug in her spare hand', 'never wants another mouth to feed', 'could use an extra pair of hands',
-      'spends two hours brushing her tail', 'counts to two while swishing her tail', 'hums three notes while her tail sways']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'spends two hours brushing her tail', 'counts to two while swishing her tail', 'hums three notes while her tail sways',
+      'could use a second pair of eyes', 'wishes for two pairs of hands', 'scans two rows of faces in the choir', 'buys three pairs of socks for her legs']) assert.equal(fits(t, cow), true, 'kept: ' + t);
     // A figure is the same count as the word: the fox's own two tails pass either way, and no kind has two heads.
     const fox = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.fox;
     for (const t of ['flicks her two tails when amused', 'flicks her 2 tails when amused']) { assert.equal(fits(t, fox), true, 'the fox kept: ' + t); assert.equal(fits(t, cow), false, 'the cow refused: ' + t); }
-    for (const t of ['has 2 heads', 'flicks her 3 tails', 'flicks her three tails']) assert.equal(fits(t, fox), false, 'the fox refused: ' + t);
+    for (const t of ['has 2 heads', 'flicks her 3 tails', 'flicks her three tails', 'flicks her two pairs of tails']) assert.equal(fits(t, fox), false, 'the fox refused: ' + t);
+    // A pair or row the kind's own text gives passes: a kind written with two rows of teats keeps a habit about them.
+    const rows = { body: ['two rows of small teats down the belly'] };
+    assert.equal(fits('counts her two rows of teats', rows), true, 'the kind\'s own rows kept');
+    assert.equal(fits('counts her three rows of teats', rows), false, 'three rows refused');
   },
 
   // 7. The generated cast never takes the player's first name, and an invented first name with a space is refused.
