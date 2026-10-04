@@ -605,16 +605,25 @@
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // Body structures an invented line may name only when the kind's own world text already has them.
   const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls|tongues?|tentacles?|antennae?|stingers?|quills?|mandibles?|pincers?|carapace|shells?|crests?|frills?|webbing|webbed|scaly|prehensile|forked|serpentine|reptilian|vestigial|barbed)\b/gi;
+  // The words between a count or ordinal and the body part must read as modifiers ("six thin legs", "a second smaller
+  // head"): an article, pronoun or preposition ends the phrase ("takes a second to scratch her head", "counts to three and
+  // closes her eyes"), and so does a comma right before the part ("a second glance, head tilted").
+  const ANATOMY_STOP = '(?:a|an|the|her|his|their|its|my|your|our|one|of|to|at|in|on|with|for|from|by|and|or|but|as|over|under|into|onto|before|after|while|when|then|than|that|this|these|those)';
+  const ANATOMY_MOD = '(?:(?:(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+,? ){0,2}(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+ )', ANATOMY_MODS = ANATOMY_MOD + '?';
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
-  const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:heads|mouths|faces)\b/i;
-  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:[\w'-]+,? ){0,3}(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b|\b(?:second|other|another|spare) (?:[\w'-]+,? ){0,3}(?:heads?|mouths?|faces?)\b/i;
+  const ANATOMY_COUNT = new RegExp('\\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b', 'i');
+  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms"; "an extra pair of hands" or "of
+  // eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is her free one); "split second" is
+  // time, and "a second, smaller head" counts where "a second, mouth open" does not; "other" counts only after a possessive
+  // ("her other head", never "the other side of her face"); "another" is left out ("another mouth to feed").
+  const ANATOMY_NEVER = new RegExp('\\b(?:third|fourth|extra|additional|second (?:pair|set|row)(?: of)?|(?:third|extra|additional) (?:pair|set|row) of(?! (?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\bsecond(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
     // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
     const NUM = '(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many|\\d+)';
     const nounRe = '(' + ANATOMY_WORDS.source.slice(3, -3) + ')';
     const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
-    for (const m of text.matchAll(new RegExp('\\b' + NUM + ' (?:[\\w\'-]+,? ){0,3}?' + nounRe + '\\b', 'gi'))) {
+    for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + nounRe + '\\b', 'gi'))) {
       const stem = m[2].toLowerCase().replace(/(?:ves|s)$/, '');
       if (!new RegExp('\\b' + m[1].toLowerCase() + ' (?:[\\w\'-]+,? ){0,3}?' + escRe(stem)).test(kindLower)) return false;
     }
@@ -3077,6 +3086,17 @@
     $('#cfReset').hidden = isAdded; $('#cfRemove').textContent = cs.hidden.includes(c.key) ? 'Restore to the story' : 'Remove from the story';
     $('#cfNote').textContent = isAdded ? 'Added in this adventure.' : (cs.overrides[c.key] ? 'Edited in this adventure.' : '');
   }
+  // A renamed (or reset) person stays present however the scene lists them: by full name, given name, surname or the
+  // surname's last word ("Lane" for Daisy Holt Lane), in any case, with a "(Race)" label kept. A name with no surname takes
+  // the surname entries too.
+  function renamePresent(from, to) {
+    if (!from || !to || from.name === to.name) return;
+    const forms = (c) => { const words = String(c.name || '').split(/\s+/).filter(Boolean); return { full: c.name, first: givenName(c), last: c.last || words.slice(1).join(' '), token: words.length > 1 ? words[words.length - 1] : '' }; };
+    const a = forms(from), b = forms(to), map = new Map();
+    const add = (k, v) => { k = String(k || '').trim().toLowerCase(); if (k && v && !map.has(k)) map.set(k, v); };
+    add(a.full, b.full); add(a.first, b.first || b.full); add(a.last, b.last || b.full); add(a.token, b.token || b.last || b.full);
+    adv.state.present = adv.state.present.map((pn) => { const m = /^\s*(.*?)(\s*\([^)]*\))?\s*$/.exec(String(pn)), next = m && map.get(m[1].toLowerCase()); return next ? next + (m[2] || '') : pn; });
+  }
   async function saveCast() {
     if (busy) return;
     const cs = castState(); const key = castSel; const c = activeCharacters().find((x) => x.key === key) || baseCharacter(key); if (!c) return;
@@ -3099,8 +3119,7 @@
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
-    // A renamed person stays present however they were listed: by full name, given name or surname.
-    if (c.name !== name) { const was = { [c.name]: name, [oldFirst]: parts.first }; if (oldLast && parts.last) was[oldLast] = parts.last; adv.state.present = adv.state.present.map((pn) => { const bare = String(pn).replace(/\s*\([^)]*\)\s*$/, '').trim(); return Object.prototype.hasOwnProperty.call(was, bare) && was[bare] ? String(pn).replace(bare, was[bare]) : pn; }); }
+    renamePresent(c, { name, first: parts.first, last: parts.last });
     if (att != null) adv.state.attitudes[key] = Math.max(0, Math.min(10, Math.round(att)));
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Saved.' : 'Changes are not saved yet.';
   }
@@ -3108,7 +3127,7 @@
     if (busy) return;
     const cs = castState(), edited = activeCharacters().find((x) => x.key === castSel), original = baseCharacter(castSel);
     delete cs.overrides[castSel];
-    if (edited && original && edited.name !== original.name) adv.state.present = adv.state.present.map((pn) => pn === edited.name ? original.name : pn);
+    renamePresent(edited, original);
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Back to the world\'s version.' : 'Reset here, but the change is not saved yet.';
   }
   async function toggleRemoveCast() {

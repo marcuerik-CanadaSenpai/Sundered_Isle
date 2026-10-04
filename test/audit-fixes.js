@@ -248,8 +248,14 @@ const S = {
     const fits = new Function('escRe', src.slice(a, b) + '\nreturn anatomyFits;')(escRe);
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const cow = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.cow;
-    for (const t of ['flicks her two tails when amused', 'has eleven arms', 'scratches her second head when thinking', 'rubs three long muscular arms', 'a third arm folded away']) assert.equal(fits(t, cow), false, 'refused: ' + t);
-    for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+    for (const t of ['flicks her two tails when amused', 'has eleven arms', 'scratches her second head when thinking', 'rubs three long muscular arms', 'a third arm folded away',
+      'a second smaller head', 'a second, smaller head that sleeps', 'grows a second pair of arms', 'grows an extra pair of arms', 'talks out of her other mouth', 'has two heads', 'keeps a spare tail']) assert.equal(fits(t, cow), false, 'refused: ' + t);
+    // Time, idiom and a pronoun or preposition between the number and the part are not anatomy.
+    for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table',
+      'takes a second to scratch her head before answering', 'gives another shake of her head', 'touches the other side of her face when thinking',
+      'for the third time rubs her eyes', 'counts to three and closes her eyes', 'takes a second glance, head tilted', 'pauses a split second, head tilted',
+      'waits a second, mouth open', 'holds her mug in her spare hand', 'never wants another mouth to feed', 'could use an extra pair of hands',
+      'spends two hours brushing her tail']) assert.equal(fits(t, cow), true, 'kept: ' + t);
   },
 
   // 7. The generated cast never takes the player's first name, and an invented first name with a space is refused.
@@ -316,6 +322,32 @@ const S = {
       assert(ov, 'the rename is saved as an override');
       assert(!data.state.present.some((x) => /Daisy/.test(x)) && data.state.present.includes('Bess'), 'a given-name presence entry follows the rename: ' + JSON.stringify(data.state.present));
       assert.deepEqual(Array.from(ov.aliases), ['Bess', 'Morrow', 'Dee'], 'the old given name and surname are swapped for the new ones; other aliases stay');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 8b. Presence entries in any case, by the surname's last word, or with a "(Race)" label follow a rename, and "Reset to the
+  // world's version" carries them back, so the roommate stays present through both.
+  async renameResetPresence() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holt Lane' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k));
+    const rm = seeded.get(advKey).data.roommate;
+    assert.equal(rm.name, 'Daisy Holt Lane', 'the roommate keeps the three-word name: ' + rm.name);
+    seeded.get(advKey).data.state.present = ['daisy (Cow)', 'Lane', 'Someone Else'];
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      const present = () => Array.from(onlyAdv(h.mock.store).data.state.present);
+      assert.deepEqual(present(), ['daisy (Cow)', 'Lane', 'Someone Else']);
+      h.click('#btnCast'); await h.sleep(20);
+      assert.equal(h.$('#cfName').value, 'Daisy Holt Lane', 'the roommate is selected in the Cast editor');
+      h.$('#cfName').value = 'Bess Morrow';
+      h.click('#cfSave'); assert(await h.idle(10000));
+      assert.deepEqual(present(), ['Bess (Cow)', 'Morrow', 'Someone Else'], 'a lower-case given name keeps its label and the final surname word follows the rename');
+      h.click('#cfReset'); assert(await h.idle(10000)); await h.sleep(20);
+      assert.equal(h.$('#cfName').value, 'Daisy Holt Lane', 'the reset restores the world\'s name');
+      assert.deepEqual(present(), ['Daisy (Cow)', 'Holt Lane', 'Someone Else'], 'the reset carries the given name and surname entries back');
       clean(h);
     } finally { h.close(); }
   },
