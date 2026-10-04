@@ -605,11 +605,28 @@
   const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // Body structures an invented line may name only when the kind's own world text already has them.
   const ANATOMY_WORDS = /\b(tails?|wings?|horns?|hoo(?:f|fs|ves)|udders?|teats?|nipples?|breasts?|gills?|fins?|claws?|talons?|antlers?|scales?|fur|furred|feathers?|feathered|manes?|muzzles?|snouts?|beaks?|tusks?|fangs?|paws?|ears?|penis|cocks?|vagina|vulva|genitals?|genitalia|testicles|balls|tongues?|tentacles?|antennae?|stingers?|quills?|mandibles?|pincers?|carapace|shells?|crests?|frills?|webbing|webbed|scaly|prehensile|forked|serpentine|reptilian|vestigial|barbed)\b/gi;
+  // The words between a count or ordinal and the body part must read as modifiers ("six thin legs", "a second smaller
+  // head"): an article, pronoun or preposition ends the phrase ("takes a second to scratch her head", "counts to three and
+  // closes her eyes"), and so does a comma right before the part ("a second glance, head tilted").
+  const ANATOMY_STOP = '(?:a|an|the|her|his|their|its|my|your|our|one|of|to|at|in|on|with|for|from|by|and|or|but|as|over|under|into|onto|before|after|while|when|then|than|that|this|these|those)';
+  const ANATOMY_MOD = '(?:(?:(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+,? ){0,2}(?!' + ANATOMY_STOP + '\\b)[\\w\'-]+ )', ANATOMY_MODS = ANATOMY_MOD + '?';
   // A count no body has: more than two arms, legs, hands or eyes, more than one head, mouth or face.
-  const ANATOMY_COUNT = /\b(?:three|four|five|six|seven|eight|nine|ten|dozen|several|multiple|many|[3-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:arms|legs|hands|eyes)\b|\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\d{2,}) (?:[\w'-]+,? ){0,3}(?:heads|mouths|faces)\b/i;
-  const ANATOMY_NEVER = /\b(?:third|fourth|extra|additional|second (?:pair|set|row)|spare) (?:[\w'-]+,? ){0,3}(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\b/i;
+  const ANATOMY_COUNT = new RegExp('\\b(?:three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\w+teen|twenty|thirty|forty|fifty|hundred|dozens?|several|multiple|many|countless|[3-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:arms|legs|hands|eyes)\\b|\\b(?:two|three|four|five|six|several|multiple|many|[2-9]|\\d{2,}) ' + ANATOMY_MODS + '(?:heads|mouths|faces)\\b', 'i');
+  // Ordinals and "extra" name a part beyond the body's own ("an extra pair of arms"; "an extra pair of hands" or "of
+  // eyes" is help, not anatomy). "Spare" leaves out hands and arms ("her spare hand" is her free one); "split second" is
+  // time, and "a second, smaller head" counts where "a second, mouth open" does not; "other" counts only after a possessive
+  // ("her other head", never "the other side of her face"); "another" is left out ("another mouth to feed").
+  const ANATOMY_NEVER = new RegExp('\\b(?:third|fourth|extra|additional|second (?:pair|set|row)(?: of)?|(?:third|extra|additional) (?:pair|set|row) of(?! (?:hands|eyes)\\b)) ' + ANATOMY_MODS + '(?:arms?|legs?|eyes?|heads?|hands?|tails?|wings?|breasts?|nipples?|teats?|mouths?)\\b|\\bspare ' + ANATOMY_MODS + '(?:legs?|eyes?|heads?|tails?|wings?|breasts?|nipples?|teats?|mouths?|faces?)\\b|(?<!split[ -])\\bsecond(?: ' + ANATOMY_MODS + '|, ' + ANATOMY_MOD + ')(?:heads?|mouths?|faces?)\\b|\\b(?:her|his|their|its|my|your) other ' + ANATOMY_MODS + '(?:heads?|mouths?|faces?)\\b', 'i');
   function anatomyFits(text, sp) {
     text = String(text || ''); if (ANATOMY_NEVER.test(text) || ANATOMY_COUNT.test(text)) return false;
+    // A count on a structure the kind has must be the kind's own: "two tails" passes only where the kind's text gives two tails.
+    const NUM = '(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many|\\d+)';
+    const nounRe = '(' + ANATOMY_WORDS.source.slice(3, -3) + ')';
+    const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
+    for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + nounRe + '\\b', 'gi'))) {
+      const stem = m[2].toLowerCase().replace(/(?:ves|s)$/, '');
+      if (!new RegExp('\\b' + m[1].toLowerCase() + ' (?:[\\w\'-]+,? ){0,3}?' + escRe(stem)).test(kindLower)) return false;
+    }
     // Whole words only, plurals and -ed forms folded together ("wings" matches "wing", never "showing"; "fur" never "furniture").
     const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
     const kindWords = new Set(sp ? (JSON.stringify(sp).match(/[a-z]+/gi) || []).map(norm) : []);
@@ -1341,11 +1358,15 @@
   function wordBand() { return (W.wordBands || {})[adv.settings.density] || [240, 460]; }
   function isRomanceScene(input) {
     const text = [input.action, input.director, input.rewrite].filter(Boolean).join('\n');
-    // Undressing someone else (a pronoun or a capitalised name), not undressing for a shower or in one's room.
-    if (/\b[Uu]ndress(?:es|ing)?\s+(?:him|her|them|each other|one another|[A-Z][\w'-]+)\b/.test(text)) return true;
-    // Taking someone to bed: a pronoun or a name (one or more capitalised words), not "a book" or "medicine".
-    if (/\b[Tt]ak(?:e|es|ing)\s+(?:him|her|them|[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)*)\s+to bed\b/.test(text)) return true;
-    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
+    // Bed and undressing count only with a person as the object: a pronoun, anyone in the cast by any name they answer to
+    // (in any case: "rin" is Rin), or a capitalised name. "I undress in my room", "I take tea to bed" and "I go to bed with a
+    // book" are not romance.
+    const handles = activeCharacters().concat((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).flatMap(nameHandles).filter((h) => h && h.length >= 2);
+    const person = (rest) => { rest = String(rest || '').trim(); return /^(?:him|her|them|each other|one another|my (?:roommate|partner|girlfriend|boyfriend|lover|date))\b/i.test(rest) || /^[A-Z][\w'-]+/.test(rest) || handles.some((h) => new RegExp('^' + escRe(h) + '(?![A-Za-z])', 'i').test(rest)); };
+    for (const m of text.matchAll(/\bundress(?:es|ing)?\s+(.{0,40})/gi)) if (person(m[1])) return true;
+    for (const m of text.matchAll(/\btak(?:e|es|ing)\s+(.{1,40}?)\s+to bed\b/gi)) if (person(m[1])) return true;
+    for (const m of text.matchAll(/\b(?:go(?:es|ing)?|get(?:s|ting)?|climb(?:s|ing)?)\s+(?:in)?to bed with\s+(.{0,40})/gi)) if (person(m[1])) return true;
+    return /\b(?:on a date|dat(?:e|es|ed|ing)\s+(?:with|someone)|romanc\w*|flirt\w*|confess\w*\s+(?:(?:my|your|her|his|their)\s+)?(?:love|feelings|attraction|crush)|kiss\w*|cuddl\w*|embrac\w*|hug(?:s|ged|ging)?|hold(?:ing)? hands|intimat\w*|tender(?:ly|ness)|court(?:ship|s|ed|ing)?|fall(?:ing)? in love|i love you|sleep(?:ing)?\s+(?:with|together|beside|next to)|spend(?:ing)?\s+(?:(?:the|a)\s+)?night|share(?:d|ing)?\s+(?:a\s+)?bed|make(?:s|ing)? (?:out|love)|caress\w*|copulat\w*|intercourse|sex(?:ual(?:ly)?|y)?|affection|slow dance|ask .{0,30} out)\b/i.test(text);
   }
   // A change is on the page this turn: an arc in its opening phases, or a change note due now. A change merely pending
   // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
@@ -2404,6 +2425,17 @@
   // Saves from before worlds were recorded on the save belong to Halloway, the only world at the time.
   const LEGACY_WORLD = 'halloway';
   // A listed save whose world is no longer in this game: it stays listed in Adventures but is never opened on its own.
+  // Saves newest first, for opening one. When the newest fifty all belong to removed worlds, this game's own worlds are
+  // asked for directly, so an older playable save is still found.
+  async function savesNewestFirst() {
+    const page = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
+    const docs = (page.docs || []).slice();
+    if (docs.length < 50 || docs.some((d) => !retiredSave(d))) return docs;
+    const seen = new Set(docs.map((d) => d.id));
+    for (const w of WORLD_IDS) { const q = await db.collection('adventures').where('worldId', '==', w).orderBy('updatedAt', 'desc').limit(50).get(); for (const d of (q.docs || [])) if (!seen.has(d.id)) { seen.add(d.id); docs.push(d); } }
+    const at = (d) => { try { return String((d.data() || {}).updatedAt || ''); } catch (e) { return ''; } };
+    return docs.sort((a, b) => (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0));
+  }
   const retiredSave = (d) => { try { const w = (d.data() || {}).worldId || LEGACY_WORLD; return !Object.prototype.hasOwnProperty.call(WORLDS, w); } catch (e) { return false; } };
   // A previous version becomes the live turn and state on "Previous version", so only well-formed ones are kept from a save.
   // Every list field a previous version brings back into play (the feed, the suggestions, memory, the engine notes) must be
@@ -2599,7 +2631,7 @@
             setStatus('');
             if (isCur) {
               // The newest remaining save this game can open; saves from removed worlds are passed over.
-              let next = null; try { const left = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get(); next = (left.docs || []).find((d) => !retiredSave(d)) || null; } catch (e) { next = null; }
+              let next = null; try { next = (await savesNewestFirst()).find((d) => !retiredSave(d)) || null; } catch (e) { next = null; }
               if (next) await loadAdventure(next.id);
               else { newAdventure({}, W.id); renderAll(); closeDlg('dlgAdventures'); openCreate(W.id); return; }
             }
@@ -3054,6 +3086,17 @@
     $('#cfReset').hidden = isAdded; $('#cfRemove').textContent = cs.hidden.includes(c.key) ? 'Restore to the story' : 'Remove from the story';
     $('#cfNote').textContent = isAdded ? 'Added in this adventure.' : (cs.overrides[c.key] ? 'Edited in this adventure.' : '');
   }
+  // A renamed (or reset) person stays present however the scene lists them: by full name, given name, surname or the
+  // surname's last word ("Lane" for Daisy Holt Lane), in any case, with a "(Race)" label kept. A name with no surname takes
+  // the surname entries too.
+  function renamePresent(from, to) {
+    if (!from || !to || from.name === to.name) return;
+    const forms = (c) => { const words = String(c.name || '').split(/\s+/).filter(Boolean); return { full: c.name, first: givenName(c), last: c.last || words.slice(1).join(' '), token: words.length > 1 ? words[words.length - 1] : '' }; };
+    const a = forms(from), b = forms(to), map = new Map();
+    const add = (k, v) => { k = String(k || '').trim().toLowerCase(); if (k && v && !map.has(k)) map.set(k, v); };
+    add(a.full, b.full); add(a.first, b.first || b.full); add(a.last, b.last || b.full); add(a.token, b.token || b.last || b.full);
+    adv.state.present = adv.state.present.map((pn) => { const m = /^\s*(.*?)(\s*\([^)]*\))?\s*$/.exec(String(pn)), next = m && map.get(m[1].toLowerCase()); return next ? next + (m[2] || '') : pn; });
+  }
   async function saveCast() {
     if (busy) return;
     const cs = castState(); const key = castSel; const c = activeCharacters().find((x) => x.key === key) || baseCharacter(key); if (!c) return;
@@ -3076,7 +3119,7 @@
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
     else cs.overrides[key] = o;
-    if (c.name !== name) adv.state.present = adv.state.present.map((pn) => pn === c.name ? name : pn);
+    renamePresent(c, { name, first: parts.first, last: parts.last });
     if (att != null) adv.state.attitudes[key] = Math.max(0, Math.min(10, Math.round(att)));
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Saved.' : 'Changes are not saved yet.';
   }
@@ -3084,7 +3127,7 @@
     if (busy) return;
     const cs = castState(), edited = activeCharacters().find((x) => x.key === castSel), original = baseCharacter(castSel);
     delete cs.overrides[castSel];
-    if (edited && original && edited.name !== original.name) adv.state.present = adv.state.present.map((pn) => pn === edited.name ? original.name : pn);
+    renamePresent(edited, original);
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Back to the world\'s version.' : 'Reset here, but the change is not saved yet.';
   }
   async function toggleRemoveCast() {
@@ -3595,7 +3638,7 @@
     let snap = null, listError = null;
     try {
       // Open the adventure saved most recently on any device, so a phone session carries on from the desktop and back.
-      snap = await db.collection('adventures').orderBy('updatedAt', 'desc').limit(50).get();
+      const docs = await savesNewestFirst(); snap = { docs, empty: !docs.length };
     } catch (e) { listError = e; }
     // Saves from a world no longer in this game cannot open here; boot passes over them quietly (they stay listed in Adventures).
     const retired = retiredSave;
