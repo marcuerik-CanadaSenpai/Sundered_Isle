@@ -247,12 +247,18 @@ const S = {
     const escRe = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const fits = new Function('escRe', src.slice(a, b) + '\nreturn anatomyFits;')(escRe);
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
-    const cow = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.cow;
+    const species = ctx.window.WINDLASS_WORLDS.sundered.genPools.species, cow = species.cow;
     for (const t of ['flicks her two tails when amused', 'has eleven arms', 'scratches her second head when thinking', 'rubs three long muscular arms', 'a third arm folded away',
       'a second smaller head', 'a second, smaller head that sleeps', 'grows a second pair of arms', 'grows an extra pair of arms', 'talks out of her other mouth', 'has two heads', 'keeps a spare tail',
       'folds her three pairs of arms', 'scratches her fourth pair of arms', 'stretches two pairs of legs', 'grows a third pair of arms', 'flicks her two pairs of tails',
       'folds her seven pairs of arms', 'stretches twelve sets of legs', 'scratches her seventh pair of arms', 'shakes her seven heads', 'has twenty heads', 'flicks her 13th tail',
-      'scratches her third pair of eyes', 'grows a fourth pair of hands', 'opens a 3rd set of eyes']) assert.equal(fits(t, cow), false, 'refused: ' + t);
+      'scratches her third pair of eyes', 'grows a fourth pair of hands', 'opens a 3rd set of eyes',
+      // Ordinals on the kind's own parts are counts: the cow has one tail, two ears, two horns and four teats. A pair past the first
+      // is a body's after "her", in a row, or of any part at all when "extra".
+      'scratches her third pair of ears', 'polishes her fourth set of horns', 'flicks her second tail', 'twitches her third ear', 'tugs her fifth teat', 'grows an extra pair of ears',
+      'scratches her second pair of eyes', 'scratches her 2nd pair of eyes', 'rubs her extra pair of hands', 'blinks her second row of eyes', 'blinks a second row of eyes',
+      'blinks her third and fourth pairs of eyes', 'blinks her third, smaller pair of eyes', 'blinks her twenty-first pair of eyes', 'blinks her twenty-second pair of eyes', 'has twenty-one arms',
+      'tugs her fifth, swollen teat', 'flicks her second, smaller tail', 'scratches her third, torn ear', 'taps her third hoof', 'has three hooves']) assert.equal(fits(t, cow), false, 'refused: ' + t);
     // Time, idiom and a pronoun or preposition between the number and the part are not anatomy.
     for (const t of ['swishes her tail when amused', 'hums while counting change', 'taps two fingers on the table',
       'takes a second to scratch her head before answering', 'gives another shake of her head', 'touches the other side of her face when thinking',
@@ -260,7 +266,17 @@ const S = {
       'waits a second, mouth open', 'holds her mug in her spare hand', 'never wants another mouth to feed', 'could use an extra pair of hands',
       'spends two hours brushing her tail', 'counts to two while swishing her tail', 'hums three notes while her tail sways',
       'could use a second pair of eyes', 'wishes for two pairs of hands', 'scans two rows of faces in the choir', 'buys three pairs of socks for her legs',
-      'counts to seventeen while her tail sways', 'for the seventh time rubs her eyes']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+      'counts to seventeen while her tail sways', 'for the seventh time rubs her eyes',
+      // A pair of things, then her own hands or eyes; a teat she has; "a second" as time before a comma.
+      'darns her third pair of stockings, both hands busy', 'sits in the third row of benches, both hands in her lap', 'hauls the third set of nets, bare hands raw', 'reads the third set of minutes, tired eyes narrowed',
+      'tugs her fourth teat', 'tugs her fourth, swollen teat', 'scratches her second ear', 'polishes her second horn', 'taps her second hoof', 'pauses a second, long tail swishing', 'waits a second then flicks her tail', 'a second later her tail flicks']) assert.equal(fits(t, cow), true, 'kept: ' + t);
+    // The kind's own counts set the bar: the fox's two tails, the cat's four pairs of nipples, the wolf's two more pairs.
+    assert.equal(fits('flicks her second tail', species.fox), true, 'the fox has a second tail');
+    for (const t of ['flicks her third tail', 'flicks her second pair of tails']) assert.equal(fits(t, species.fox), false, 'refused for the fox: ' + t);
+    assert.equal(fits('the fur over her third pair of nipples is paler', species.cat), true, 'the cat has four pairs');
+    assert.equal(fits('the fur over her fifth pair of nipples is paler', species.cat), false, 'the cat has no fifth pair');
+    assert.equal(fits('the fur over her second pair of nipples is paler', species.wolf), true, 'the wolf has two more pairs');
+    assert.equal(fits('the fur over her second pair of nipples is paler', cow), false, 'the cow has no pairs');
     // A figure is the same count as the word: the fox's own two tails pass either way, and no kind has two heads.
     const fox = ctx.window.WINDLASS_WORLDS.sundered.genPools.species.fox;
     for (const t of ['flicks her two tails when amused', 'flicks her 2 tails when amused']) { assert.equal(fits(t, fox), true, 'the fox kept: ' + t); assert.equal(fits(t, cow), false, 'the cow refused: ' + t); }
@@ -426,7 +442,8 @@ const S = {
       const rich = W.wordBands.rich;
       for (const a of ['I make love with Rin.', 'I take Rin to bed.', 'I go to bed with Rin.', 'I take Rin Kitsuragi to bed.', 'i take rin to bed', 'I undress rin slowly.', 'I take her gently up to bed.', 'I go to bed with Rin tonight.',
         'I undress Rin very slowly.', 'I undress her very slowly.', 'I undress Rin languidly.', 'I undress her piece by piece.', 'I take her all the way up to bed.',
-        'I take Rin by the hand to bed.', 'I take her home and to bed.', 'I take Rin and Ana up to bed.', 'I take Rin, slowly, to bed.']) {
+        'I take Rin by the hand to bed.', 'I take her home and to bed.', 'I take Rin and Ana up to bed.', 'I take Rin, slowly, to bed.',
+        'I take Rin by the hand, gently, to bed.', 'I take her back to my room and to bed.', 'I take her - slowly - to bed.', 'I take her, then Ana, to bed.', 'I take her upstairs with me to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.equal(c.opts.modelTier, 'complex', a + ' is romance: the complex tier on auto');
@@ -439,7 +456,8 @@ const S = {
       }
       for (const a of ['I confess to the porter that I lost my key.', 'I check the date on the timetable.', 'I look at the sextant.', 'I take a book to bed.', 'I take tea to bed.', 'I go to bed with a book.', 'I undress in my room.',
         'I take her book to bed.', "I take Rin's notebook to bed.", 'I go to bed with her book.', "I go to bed with Rin's letters.", 'I take her dolly to bed.', 'I take her butterfly to bed.', 'I take her jelly to bed.',
-        'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.']) {
+        'I take her downstairs and go to bed.', 'I take Rin home, then go to bed.', 'I take Rin downstairs and I go to bed.', 'I take her up; I go to bed.',
+        'I take her home and then I go to bed.', 'I take her to the door and go to bed.', 'I take Rin home so I can go to bed.', 'I take her home, and go to bed.']) {
         assert(await h.turn(a), a + ' did not finish');
         const c = lastTurn(h), p = promptOf(c);
         assert.doesNotMatch(p, /Body detail \(binding\)/, a + ' is not romance');
