@@ -728,13 +728,18 @@ const S = {
 
       const choir = W.castRoles.find((role) => role.key === 'choir');
       choir.species = 'harpy'; choir.gender = 'female'; choir.looks = 'An authored look in a blue coat.';
+      const theatre = W.castRoles.find((role) => role.key === 'theatre');
+      theatre.species = 'cow'; theatre.gender = 'female'; theatre.looks = '';
+      G.species.cow.body = ['{colour} hair tied back in a dark braid'];
       h.$('#cGender').value = 'male'; h.type('#cRmSpecies', 'harpy'); h.type('#cRmName', 'Wren Skye');
       h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish');
-      const data = onlyAdv(h.mock.store).data, authored = data.cast.generated.characters.find((c) => c.key === 'choir');
+      const data = onlyAdv(h.mock.store).data, authored = data.cast.generated.characters.find((c) => c.key === 'choir'), templated = data.cast.generated.characters.find((c) => c.key === 'theatre');
       assert.match(data.roommate.looks, /Hair: /, 'generated looks carry a hair-pool pick');
       assert.match(data.roommate.looks, /(?:A-cup|small, close-set) breasts/i, 'generated female looks carry a harpy breast-pool pick');
       assert.match(authored.looks, /Hair: /, 'an authored look receives hair when it lacks a hair slot');
       assert.match(authored.looks, /(?:A-cup|small, close-set) breasts/i, 'an authored female look receives breasts when it lacks a breast description');
+      assert.match(templated.looks, /hair tied back in a dark braid/i, 'generated template hair remains in the look');
+      assert.doesNotMatch(templated.looks, /Hair: /, 'a second pool pick does not contradict hair already in the look');
       clean(h);
     } finally { h.close(); }
   },
@@ -852,6 +857,40 @@ const S = {
       const reversed = store.get('adventures/' + id).data;
       assert.equal(reversed.state.tf.paths.cow.sex, 'male', 'a female player can take the reverse sex-change path');
       assert((reversed.pendingNotes || []).some((note) => /Tanner stage V/.test(note)), 'the reverse path begins at the grown-chest Tanner stage');
+
+      const female = store.get('adventures/' + id).data, femaleTf = female.state.tf;
+      female.player.gender = 'female'; female.settings.pace = 'unbounded'; delete femaleTf.sex;
+      femaleTf.rungs = { cow: 4 }; femaleTf.influence.cow = ladder[4].at; femaleTf.traits = []; femaleTf.arcs = []; femaleTf.tracks = []; femaleTf.paths = {};
+      const [fh, fm] = female.state.time.split(':').map(Number), femaleNow = (female.state.day - 1) * 1440 + fh * 60 + fm;
+      femaleTf.last = { cow: femaleNow }; femaleTf.drifted = {};
+      await reload();
+      h.window.WINDLASS_WORLDS.sundered.transformation.sexChange.cow.chance = 0;
+      await turnAndCollect();
+      let femaleState = store.get('adventures/' + id).data;
+      assert.equal(femaleState.state.tf.paths.cow.sex, null, 'the female path can keep its current sex');
+      const womenBeforeBodyCompletes = womenNotes.length;
+      assert(!(femaleState.pendingNotes || []).some((note) => /woman's form/i.test(note)), 'women-form details do not race the first body step');
+      while (femaleState.state.tf.tracks.some((track) => track.kind === 'body')) {
+        await turnAndCollect();
+        femaleState = store.get('adventures/' + id).data;
+        assert.equal(womenNotes.length, womenBeforeBodyCompletes, 'women-form details wait for the body track too');
+      }
+      await turnAndCollect();
+      assert(womenNotes.length > womenBeforeBodyCompletes, 'women-form details begin on a later turn after the body track completes');
+
+      const fading = store.get('adventures/' + id).data, fadingTf = fading.state.tf;
+      fading.settings.pace = 'standard';
+      const [fah, fam] = fading.state.time.split(':').map(Number), fadeNow = (fading.state.day - 1) * 1440 + fah * 60 + fam;
+      fadingTf.rungs = { cow: 5 }; fadingTf.influence.cow = ladder[4].at; fadingTf.traits = [{ species: 'cow', trait: 'a bovine body change', day: fading.state.day, settled: false }]; fadingTf.arcs = [];
+      fadingTf.tracks = [{ species: 'cow', rung: 5, kind: 'body', trait: 'a bovine body change', steps: ['first', 'second', 'third', 'fourth', 'fifth'], anatomy: '', habits: [], noticed: '', i: 1, nextAt: 1e9, beganAt: fadeNow - 360 }];
+      fadingTf.paths.cow = { sex: 'female', sexTold: [stages[3], stages[4]], sexToldByRung: { 4: [stages[3]], 5: [stages[4]] }, day: fading.state.day, order: [0, 1, 2, 3, 4, 5], eye: 'dark eyes' };
+      fadingTf.last = { cow: fadeNow - 360 }; fadingTf.drifted = {}; fadingTf.sex = { to: 'female', species: 'cow', rung: 5, day: fading.state.day };
+      await reload();
+      await turnAndCollect();
+      const faded = store.get('adventures/' + id).data.state.tf;
+      assert(!faded.sex, 'fading the rung that completed a sex change also reverses its final sex state');
+      assert.deepEqual(Array.from(faded.paths.cow.sexTold), [stages[3]], 'fading a rung removes only that rung’s Tanner history');
+      assert(!Object.prototype.hasOwnProperty.call(faded.paths.cow.sexToldByRung, 5), 'faded rung history is removed from its per-rung record');
       clean(h);
     } finally { h.close(); }
   },

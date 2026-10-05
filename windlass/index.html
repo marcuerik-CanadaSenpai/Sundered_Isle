@@ -699,9 +699,9 @@
     const breasts = gender === 'female' ? pick((sp && sp.breasts) || G.breasts || []) : '';
     const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
     const lookText = opts.looks || (bodyText ? (lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText) : '');
-    const hasHairSlot = /\{hair\}/i.test(lookText), hasBreastSlot = /\{breasts\}/i.test(lookText);
+    const hasHairSlot = /\{hair\}/i.test(lookText), hasHairDescription = /\b(?:hair|mane|braids?|plaits?|curls?|waves?|fringe|ponytails?|locks?)\b/i.test(lookText), hasBreastSlot = /\{breasts\}/i.test(lookText);
     p.looks = personFill(kindText(Wc, speciesKey, lookText, p.eyes).replace(/\{hair\}/gi, hair).replace(/\{breasts\}/gi, breasts), p);
-    if (!hasHairSlot && hair) p.looks += (p.looks ? ' ' : '') + 'Hair: ' + hair + '.';
+    if (!hasHairSlot && !hasHairDescription && hair) p.looks += (p.looks ? ' ' : '') + 'Hair: ' + hair + '.';
     if (gender === 'female' && !hasBreastSlot && !/\b(?:breasts?|nipples?|bust|mammary)\b/i.test(lookText) && breasts) p.looks += (p.looks ? ' ' : '') + breasts + '.';
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
@@ -1286,12 +1286,16 @@
     const T = W.transformation; if (!T || !state.tf) return [];
     const tf = state.tf; tf.tracks = tf.tracks || []; const now = storyMin(state); const gap = stepGapMin(); const out = [];
     const held = (t) => { const b = bodyTrackOf(tf, t); return !!b && fadeHeld(tf, b, now); };
-    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t) && !(t.kind === 'women' && tf.tracks.some((x) => x.species === t.species && x.rung === t.rung && x.kind === 'sex'))).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
+    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t) && !(t.kind === 'women' && tf.tracks.some((x) => x.species === t.species && x.rung === t.rung && (x.kind === 'sex' || x.kind === 'body')))).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
     for (const t of due) {
       out.push(stepNote(t, tf, t.steps[t.i]));
       if (t.kind === 'sex') {
         const path = tf.paths[t.species];
-        if (path) { path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]); }
+        if (path) {
+          path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]);
+          path.sexToldByRung = path.sexToldByRung || {}; path.sexToldByRung[t.rung] = path.sexToldByRung[t.rung] || [];
+          path.sexToldByRung[t.rung].push(t.steps[t.i]);
+        }
       }
       if (t.kind === 'women') {
         const path = tf.paths[t.species];
@@ -1329,8 +1333,13 @@
         // Gone: the trait, the rung, the sex steps of the same rung, and influence to just under the line, so the body remembers.
         tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && x.rung === t.rung && (x.kind === 'sex' || x.kind === 'women')));
         const path = (tf.paths || {})[t.species], rung = sp.ladder[t.rung - 1];
-        if (path && Array.isArray(path.sexTold) && rung && rung.sex) path.sexTold = path.sexTold.filter((x) => !rung.sex.includes(x));
+        if (path && Array.isArray(path.sexTold) && rung) {
+          const told = path.sexToldByRung && path.sexToldByRung[t.rung];
+          for (const step of (Array.isArray(told) ? told : (rung.sex || []))) { const index = path.sexTold.indexOf(step); if (index >= 0) path.sexTold.splice(index, 1); }
+          if (path.sexToldByRung) delete path.sexToldByRung[t.rung];
+        }
         if (path && Array.isArray(path.womenTold) && rung && rung.women) path.womenTold = path.womenTold.filter((x) => !rung.women.includes(x));
+        if (tf.sex && tf.sex.species === t.species && tf.sex.rung === t.rung) { delete tf.sex; notes.push(t.species + ' sex change faded: rung ' + t.rung + ' undone'); }
         const i = tf.traits.findIndex((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (i >= 0) tf.traits.splice(i, 1);
         tf.rungs[t.species] = Math.max(0, (tf.rungs[t.species] || 0) - 1);
         if (!tf.rungs[t.species] && !tf.traits.some((x) => x.species === t.species) && tf.paths) delete tf.paths[t.species];
