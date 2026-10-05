@@ -699,6 +699,9 @@
     const breasts = gender === 'female' ? pick((sp && sp.breasts) || G.breasts || []) : '';
     const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
     const lookText = opts.looks || (bodyText ? (lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText) : '');
+    // A kind's body text carries an explicit {hair} slot (and {breasts} for women) wherever it names them, so the pool always
+    // supplies the colour and style the look needs; a template or authored look that already gives a full hair or breast
+    // description of its own keeps it, and only a look that names neither slot nor description gains a pool line.
     const hasHairSlot = /\{hair\}/i.test(lookText), hasHairDescription = /\b(?:hair|mane|braids?|plaits?|curls?|waves?|fringe|ponytails?|locks?)\b/i.test(lookText), hasBreastSlot = /\{breasts\}/i.test(lookText);
     p.looks = personFill(kindText(Wc, speciesKey, lookText, p.eyes).replace(/\{hair\}/gi, hair).replace(/\{breasts\}/gi, breasts), p);
     if (!hasHairSlot && !hasHairDescription && hair) p.looks += (p.looks ? ' ' : '') + 'Hair: ' + hair + '.';
@@ -1133,15 +1136,20 @@
   function stepGapMin() { const T = W.transformation || {}; const h = T.stepGapHours != null ? T.stepGapHours : 1.5; const sc = PACE_STEP_SCALE[adv.settings.pace]; return Math.round(h * 60 * (sc == null ? 1 : sc)); }
   const hasSteps = (rung) => !!(rung && Array.isArray(rung.steps) && rung.steps.length);
   const lastSexRung = (sp) => sp.ladder.reduce((m, r, i) => (r.sex && r.sex.length ? i + 1 : m), 0);
+  // The configured sex stages run once each, in order, across the whole path: the rungs that carry a sex change share them out,
+  // each rung taking a contiguous block, so no developmental stage is ever repeated and the final (genital) stage lands on the
+  // last sex rung. A kind with more legacy sex slots than stages still tells each stage only once; a world without sexStages for
+  // the target falls back to the rung's own hand-written sex lines.
   function sexStageSteps(sp, position, target, fallback) {
     const stages = W.transformation.sexStages && W.transformation.sexStages[target];
     if (!Array.isArray(stages) || !stages.length) return fallback.slice();
-    const total = sp.ladder.reduce((n, rung) => n + ((rung.sex && rung.sex.length) || 0), 0);
-    const before = sp.ladder.slice(0, position).reduce((n, rung) => n + ((rung.sex && rung.sex.length) || 0), 0);
-    return fallback.map((_, i) => {
-      const index = before + i;
-      return stages[Math.floor(index * (stages.length - 1) / Math.max(1, total - 1))];
-    });
+    const sexPositions = sp.ladder.reduce((acc, rung, i) => { if (rung.sex && rung.sex.length) acc.push(i); return acc; }, []);
+    const rank = sexPositions.indexOf(position); if (rank < 0) return fallback.slice();
+    const R = sexPositions.length, n = stages.length;
+    // Even contiguous partition of the n stages across the R sex rungs, in order; earlier rungs take the extra stage when n does
+    // not divide evenly, so the last rung always ends on the final stage.
+    const start = Math.floor(rank * n / R), end = Math.floor((rank + 1) * n / R);
+    return stages.slice(start, end);
   }
   // Fading. A change has a completion: the steps told over the steps in all, 0 (as it was) to 100 (the paw). One not yet at the
   // line (half done) with no exposure to its kind for afterHours of story time stops growing and loses a step, then another every
@@ -1225,7 +1233,10 @@
           if (tf.last[k] == null || tf.last[k] < now) tf.last[k] = now;
           tf.tracks.push({ species: k, rung: r + 1, kind: 'body', trait: content.trait, steps: drawSteps(content.steps), anatomy: content.anatomy || '', habits: shuffled(sp.habits || []).slice(0, 2), noticed: pick(sp.noticed || []) || '', i: 0, nextAt: now, day: state.day, beganAt: now });
           if (tf.paths[k].sex && rung.sex && rung.sex.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'sex', to: tf.paths[k].sex, trait: content.trait, steps: sexStageSteps(sp, r, tf.paths[k].sex, rung.sex), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day });
-          const femaleBody = tf.paths[k].sex ? tf.paths[k].sex === 'female' : p.gender === 'female';
+          // The woman's details follow the body's current sex, not the player's original gender: this path's own target when it
+          // has one, otherwise a sex change already completed on an earlier path (tf.sex), and only then the starting gender.
+          const currentBodySex = tf.paths[k].sex || (tf.sex && tf.sex.to) || p.gender;
+          const femaleBody = currentBodySex === 'female';
           if (femaleBody && content.women && content.women.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'women', to: 'female', trait: content.trait, steps: content.women.slice(), i: 0, nextAt: now, day: state.day });
           diff.push({ path: 'tf.traits', from: '', to: sp.short + ': ' + content.trait + ' (beginning)' });
         } else {
@@ -1573,7 +1584,7 @@
       if (sc && sc.to) {
         const them = sc.to === 'female' ? 'women' : 'men', other = sc.to === 'female' ? 'man' : 'woman', toward = sc.to === 'female' ? 'a woman\'s' : 'a man\'s';
         t += (sc.chance == null ? 0.5 : sc.chance) >= 1 ? ' ' + cap(sp.name) + ' are all ' + them + '; a human ' + other + ' who goes far down this path becomes one along the way, and the ' + sp.name + ' think nothing of it.' : ' Some who go this way find the body going toward ' + toward + ' as well.';
-        if (sc.reverseTo) t += ' In reverse, a woman or man may find the body going toward a ' + (sc.reverseTo === 'female' ? 'woman' : 'man') + '\'s form.';
+        if (sc.reverseTo) { const already = sc.to === 'female' ? 'woman' : 'man'; t += ' In reverse, a ' + already + ' who goes this way may instead find the body going toward a ' + (sc.reverseTo === 'female' ? 'woman' : 'man') + '\'s form.'; }
       }
     }
     return t;

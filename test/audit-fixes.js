@@ -843,8 +843,7 @@ const S = {
         }
       }
       const labels = sexNotes.flatMap(({ note }) => Array.from(note.matchAll(/Tanner stage (III|IV|II|V)/g), (match) => ['II', 'III', 'IV', 'V'].indexOf(match[1])));
-      assert(labels.includes(0) && labels.includes(1) && labels.includes(2) && labels.includes(3), 'all breast Tanner stages are narrated');
-      assert(labels.every((label, i) => !i || label >= labels[i - 1]), 'Tanner stages are narrated in order');
+      assert.deepEqual(labels, [0, 1, 2, 3], 'each breast Tanner stage is narrated exactly once, in order, with none repeated');
       assert.match(sexNotes.at(-1).note, /The body has finished going over.*external genital anatomy/i, 'the final clinical sex step completes the path: ' + sexNotes.at(-1).note);
       const reverse = store.get('adventures/' + id).data, reverseTf = reverse.state.tf;
       reverse.player.gender = 'female'; delete reverseTf.sex;
