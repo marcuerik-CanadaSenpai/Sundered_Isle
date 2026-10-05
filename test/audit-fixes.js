@@ -1070,6 +1070,43 @@ const S = {
       clean(m);
     } finally { m.close(); }
   },
+  // Copilot's second review of the track work: seasons that leave the wanting to the player, a minor's kind in the scene, one
+  // relationship cause moving a bond once, track stages drawn through the path, and a pending path shown beside told tracks.
+  async secondTrackReview() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const T = ctx.window.WINDLASS_WORLDS.sundered.transformation, TR = T.tracks; assert(TR && TR.species && TR.bond, 'the world carries the track and bond models');
+    for (const [k, list] of Object.entries(TR.species)) for (const t of list.filter((x) => x.sex === 'men'))
+      assert.doesNotMatch(JSON.stringify(t), /drawn (?:hard|to any)|measure of him|grace or without|hard to stand anywhere else|too attentive|feels it pull|for the pleasure of it/, k + ' ' + t.key + ' leaves the wanting to the player');
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
+    const castKinds = new Set((doc.cast.generated.characters || []).map((c) => c.species).concat(['cow', 'human', 'wolf']));
+    const minor = (doc.cast.generated.minors || []).find((m) => T.species[m.species] && !castKinds.has(m.species)); assert(minor, 'a minor of a kind no cast member has');
+    // A wolf path with the eyes told and a woman's body still to come; the minor present.
+    const eyes = TR.species.wolf.find((t) => t.key === 'eyes');
+    const tracks = Object.fromEntries(TR.species.wolf.map((t) => [t.key, t.key === 'eyes' ? { s: 10, e: 40, p: 100, told: eyes.stages.length, nextAt: 0 } : { s: 95, e: 100, p: 0, told: 0, nextAt: 0 }]));
+    doc.state.tf = { influence: { wolf: 30 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { wolf: { sex: 'female', sexTold: [], formTold: [], day: 1, order: [], eye: 'amber' } }, prog: { wolf: { lean: 0, face: 15, tracks } }, last: {}, drifted: {} };
+    doc.state.present = [minor.name];
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      if (h.$('#tfPanel').hidden) h.click('#toggleHidden');
+      const panel = h.$('#traits').textContent;
+      assert.doesNotMatch(panel, /\{eye\}/, 'a told stage is drawn through the path, not left as a token: ' + panel.slice(0, 200));
+      assert.match(panel, /amber/, 'the path\'s eye colour is shown');
+      assert.match(panel, /also going toward a woman's body/, 'a pending path is listed beside the told tracks');
+      const st = () => onlyAdv(h.mock.store).data.state, block = () => { const p = promptOf(lastTurn(h)); return p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>')); };
+      const before = JSON.parse(JSON.stringify(st().bonds && st().bonds.roommate ? st().bonds.roommate : {}));
+      patchTurns(h, (r) => { r.time_advance_minutes = 10; r.exposures = []; r.state_updates = (r.state_updates || []).filter((u) => !/^present$/.test(u.key)).concat([{ key: 'attitudes.roommate', op: 'inc', value: 1 }]); r.bond_shifts = [{ who: 'roommate', facet: 'liking', dir: 'up', why: 'a shared joke' }]; });
+      assert(await h.turn('I sit quietly and listen.'));
+      assert.match(block(), new RegExp('- ' + minor.species + ' \\('), 'a minor present brings their kind\'s contacts (' + minor.species + ')');
+      assert.doesNotMatch(promptOf(lastTurn(h)), /attitude changes only with a cause/, 'with bonds on, attitudes move only through bond_shifts');
+      const liking = TR.bond.find((t) => t.key === 'liking'), notch = Math.round(100 / (2 * liking.stages.length));
+      const b0 = (before.liking && before.liking.p) || 0, b1 = st().bonds.roommate.liking.p;
+      assert.equal(b1 - b0, Math.min(notch, 100 - b0), 'one cause moves liking one notch, not two: ' + b0 + ' -> ' + b1);
+      clean(h);
+    } finally { h.close(); }
+  },
   // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
   // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names
   // nobody; a harpy's hair line says her hair is feathers; and a bovine roommate's sheet still carries her udder, teats and milk, shown.

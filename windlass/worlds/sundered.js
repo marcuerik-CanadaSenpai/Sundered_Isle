@@ -581,12 +581,12 @@ window.WINDLASS_WORLDS.sundered = {
               'A full season: days of running hot and restless, the skin answering every touch, sleep broken, temper on a hair. What is wanted of it stays the player\'s to say. Wolves nearby know by scent.',
               'It comes about twice a year for a week and is planned around. At its height wanting is most of thought; then it passes and leaves her clear-headed and hungry. What she does with it is hers to decide.'
             ] },
-          { key: 'answering', name: 'Answering', weight: 5, sex: 'men', endsAs: 'a pull toward a woman\'s season, and the measure of him',
+          { key: 'answering', name: 'Answering', weight: 5, sex: 'men', endsAs: 'a body that answers a woman\'s season by scent',
             stages: [
-              'Some days one person smells warm and good, and it is hard to stand anywhere else.',
-              'Knows a season by scent before a word is said; restless and too attentive near it.',
-              'Protective and competitive, quick to posture. Sleep and appetite both go while it lasts.',
-              'Reads it across a room and feels it pull like a tide. He can carry it well or badly, and which he does is the measure of him. It passes when hers does.'
+              'Some days one person smells sharper and warmer than anyone else in the room.',
+              'Knows a season by scent before a word is said; runs warm and restless near it.',
+              'The temper runs short and the skin runs hot. Sleep and appetite both go while it lasts.',
+              'Reads it across a room by scent, and the body answers with heat and restlessness. What is done with it stays the player\'s to say. It passes when hers does.'
             ] }
         ],
         cow: [
@@ -837,8 +837,8 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Restless on winter nights; walks further than he meant to.',
               'His musk strengthens with the cold, and he barks at night without quite choosing to.',
-              'Roams, calls, and squares up to other fox men over nothing. Appetite drops.',
-              'Every midwinter he is loud, restless and drawn to any woman of his kind in season. He can carry it with grace or without, and it passes with the season.'
+              'Restless enough to walk half the night; the temper runs short. Appetite drops.',
+              'Every midwinter he is loud and restless, his musk strong, and he knows any woman of his kind in season by scent. What is done with it stays the player\'s to say, and it passes with the season.'
             ] },
           { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with small claws', standard: 'Slim fingers, pads and small dark claws', most: 'Short quick fingers with full pads and furred backs; still hands' }, endsAs: 'Slim fingers, pads and small dark claws',
             stages: [
@@ -1003,8 +1003,8 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Wakeful on spring nights.',
               'Walks at night, further each time, and leaves his scent where he goes.',
-              'Answers a woman\'s calling from far off; bristles and yowls at other toms, and comes home scratched.',
-              'Through spring and summer he roams, marks, and fights for standing, drawn hard by any season nearby. He can carry it with grace or without.'
+              'Hears a woman\'s calling from far off; bristles at other toms, and the voice yowls without leave.',
+              'Through spring and summer he is wakeful and restless, his scent strong, and he knows any season nearby by scent. What is done with it stays the player\'s to say.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
@@ -1370,7 +1370,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Hands and feet run cool.',
               'Cool to the touch all over; slow on cold mornings.',
-              'Cool-skinned, slowed by cold air and quickened by warm water, drawn to warm bodies.'
+              'Cool-skinned, slowed by cold air and quickened by warm water, always seeking warmth.'
             ] },
           { key: 'appetite', name: 'Appetite', weight: 3, endsAs: 'salt and raw fish',
             stages: [
@@ -1409,8 +1409,8 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Livelier near the highest tides.',
               'His colours flare at the spring tides, and he swims harder and sings louder.',
-              'Shows his colours to any woman of his kind in season, and outswims other men for the pleasure of it.',
-              'At the spring tides he is all colour and song. He can carry it with grace or without, and it passes with the tide.'
+              'His colours flare brightest near any woman of his kind in season, and the water will not let him keep still.',
+              'At the spring tides he is all colour and song. What is done with it stays the player\'s to say, and it passes with the tide.'
             ] }
         ],
         dryad: [
@@ -1546,8 +1546,8 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Tassels bud among the leaves in spring.',
               'Catkins hang in the hair and shed pollen when shaken.',
-              'In catkin he is restless and bright, drawn to any dryad in flower, dusting everything near him gold.',
-              'Catkins every spring, and clouds of pollen with them. He can carry the season with grace or without, and it passes with the blossom.'
+              'In catkin he is restless and bright, his catkins opening near any dryad in flower, dusting everything near him gold.',
+              'Catkins every spring, and clouds of pollen with them. What is done with the season stays the player\'s to say, and it passes with the blossom.'
             ] }
         ],
         goblin: [
