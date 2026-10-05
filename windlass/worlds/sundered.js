@@ -372,7 +372,7 @@ window.WINDLASS_WORLDS.sundered = {
     maxPerTurn: 12,
     maxPerDay: 10,  // the slow burn: at most this much influence per kind per story day (the Settings pace overrides it)
     stepGapHours: 1.5,  // story hours between one small step of a change and the next on the same path (the Settings pace scales it)
-    fade: { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 },  // a change under half done fades a step after six quiet story hours and another every six; at half it has set; influence drifts two a day after a quiet day, never below the last change's line
+    fade: { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2, trackAfterHours: 24, trackEveryHours: 24 },  // a change under half done fades a step after six quiet story hours and another every six; at half it has set; influence drifts two a day after a quiet day, never below the last change's line; on tracks, a part at half or less eases back a waypoint after a quiet story day and another each quiet day after
     elements: { air: 'air', water: 'water', wood: 'wood', fire: 'fire', light: 'light', shadow: 'shadow', moon: 'moon', metal: 'metal', earth: 'earth' },  // each kind's element (species.element); a settled change gives the player that element: +1 on the die inside it, -1 through any other
     intimacy: 'intensity 4 is the most intimate contact (sex with someone of the kind) and may pass the usual per-turn and per-day limits (both doubled that day)',
     // Charms: worn against the skin, each counts as one contact a story day with its kind, applied by the engine while it is in items.wearing (matched by keys).

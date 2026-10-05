@@ -1151,7 +1151,7 @@
   // to nothing is gone (the trait, the rung, and influence to five under the rung's line, so the body remembers). Influence itself
   // drifts down after a quiet day, influencePerDay a day, never below the line of the last change begun. The pace setting scales
   // the hours as it does the step gap, and the unbounded pace turns fading off. The world's transformation.fade overrides these.
-  const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 };
+  const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2, trackAfterHours: 24, trackEveryHours: 24 };
   const fadeCfg = () => Object.assign({}, FADE_DEFAULTS, (W.transformation && W.transformation.fade) || {});
   // The elements the player carries: one per kind with at least one settled change (a change under way gives nothing yet).
   function carriedElements(tf) {
@@ -1346,7 +1346,7 @@
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
-    return out.concat(fadeTracks(state, notes), tellTracks(state, notes));
+    return out.concat(fadeTracks(state, notes), easeTracks(state, notes), tellTracks(state, notes));
   }
   // The fading itself: one step back per held change per turn, on its own clock (the first when the quiet reaches afterHours, then
   // every everyHours), told to the narrator as the step easing. At nothing told the change is gone, with its sex steps.
@@ -1577,7 +1577,7 @@
       : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
     if (begun) lines.push(T.tracks
-      ? 'Each part changes on its own track of waypoints at even intervals: a waypoint\'s line is the fact, found by ' + who + ' in a way of your own each time; between waypoints the part keeps changing by degrees, and a finished part is rendered only at its last waypoint. The body morphs one way and never takes an animal\'s shape. Progress numbers are internal only and never appear in the narration.'
+      ? 'Each part changes on its own track of waypoints at even intervals: a waypoint\'s line is the fact, found by ' + who + ' in a way of your own each time; between waypoints the part keeps changing by degrees, and a finished part is rendered only at its last waypoint. A part at half or less can ease back after a long while with nothing of its kind; past half it stays. The body never takes an animal\'s shape. Progress numbers are internal only and never appear in the narration.'
       : 'Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
     const methodKinds = kinds.filter((k) => inScene.has(k)), restKinds = kinds.filter((k) => !inScene.has(k));
     lines.push('What raises influence' + (methodKinds.length ? ':\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n') : ': no kind is in the scene yet.')
@@ -1614,7 +1614,7 @@
   // per part of the body, the senses or the mind, each 0 to 100 with a weight; the kind's total is the weighted sum and the weights of
   // a body sum to 100. Influence toward the kind drives the tracks: each track has a window of influence drawn once per path (so the
   // tracks interleave in an order and at a pace of their own), and its progress is where the influence sits in that window, never
-  // falling (the body morphs one way; the Spa undoes it). A track's stages are waypoints at even intervals; the narrator is told the
+  // falling while contact goes on (a part at half or less eases back slowly in a long quiet, see easeTracks; the Spa undoes any). A track's stages are waypoints at even intervals; the narrator is told the
   // newest waypoint when a track reaches it, at most two a turn and story hours apart on one track, and the current line of every
   // track under way. A track with needs waits for the named track's stage; a by-sex track opens only for the matching body. Two extent
   // draws per path (the body's lean and the face) say how far each feature goes, in the words of the track's range.
@@ -1696,9 +1696,48 @@
     for (const k of Object.keys(T.species)) {
       const M = trackModel(k), D = tf.influence[k] || 0; if (!M || !(D > 0)) continue;
       const pr = ensureProg(tf, k);
-      const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) { const SM = sexModel(sx.to); for (const t of SM) { const r = sx.tracks[t.key]; const cap = needCap(tf, k, SM, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); } }
-      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
+      const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) { const SM = sexModel(sx.to); for (const t of SM) { const r = sx.tracks[t.key]; if (heldBack(tf, k, r)) continue; const cap = needCap(tf, k, SM, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); } }
+      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
     }
+  }
+  // A part the body has fought back stays where it eased to until something of its kind touches the player again.
+  function heldBack(tf, k, r) {
+    if (r.eased == null) return false;
+    if (tf.last[k] != null && tf.last[k] > r.eased) { delete r.eased; return false; }
+    return true;
+  }
+  // The body fighting off a small change: when nothing of a kind has touched the player for trackAfterHours, one part of that kind
+  // at half or less (its told waypoint at or under the line) eases back a waypoint, and another every trackEveryHours while the
+  // quiet lasts, the latest told first. A part past half has set and only goes on; a finished part stays. The way over to the
+  // other body eases the same way, with its kind. The pace setting scales the hours, and the unbounded pace turns it off.
+  function easeTracks(state, notes) {
+    const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return [];
+    const sc = fadeScale(); if (!sc) return [];
+    const cfg = fadeCfg(), now = storyMin(state), who = firstName(), out = [];
+    const after = Math.round(cfg.trackAfterHours * 60 * sc), every = Math.round(cfg.trackEveryHours * 60 * sc);
+    tf.ease = tf.ease || {};
+    for (const k of Object.keys(tf.prog || {})) {
+      const M = trackModel(k), pr = tf.prog[k]; if (!M || !pr) continue;
+      const last = tf.last[k]; if (last == null || now - last < after) { delete tf.ease[k]; continue; }
+      const cand = [];
+      for (const t of M) { const r = pr.tracks[t.key]; if (r) cand.push({ t, r, sex: false }); }
+      const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) for (const t of sexModel(sx.to) || []) { const r = sx.tracks[t.key]; if (r) cand.push({ t, r, sex: true }); }
+      const can = cand.filter(({ t, r }) => { const n = t.stages.length; return r.told > 0 && r.told < n && stageAt(r.told, n) <= cfg.line && stageOf(r.p, n) <= r.told; });
+      if (!can.length) { delete tf.ease[k]; continue; }
+      // The deadlines run from the last contact, so a long quiet turn eases one part and the rest follow a turn at a time.
+      if (tf.ease[k] == null || tf.ease[k] < last + after) tf.ease[k] = last + after;
+      if (now < tf.ease[k]) continue;
+      tf.ease[k] += every;
+      const { t, r, sex } = can.sort((a, b) => (b.r.nextAt || 0) - (a.r.nextAt || 0))[0];
+      const n = t.stages.length, was = pathFill(tf, k, t.stages[r.told - 1]).replace(/\.$/, '');
+      r.told -= 1; r.p = r.told ? stageAt(r.told, n) : 0; r.eased = now; r.nextAt = Math.max(r.nextAt || 0, now + stepGapMin());
+      const sp = T.species[k], what = sex ? 'the way toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body' : sp.name;
+      notes.push(k + (sex ? ' path: ' : ' change easing: ') + t.name + ' back to waypoint ' + r.told + ' of ' + n + ' (nothing of its kind for ' + Math.round((now - last) / 60) + ' h)');
+      out.push(r.told
+        ? 'The body is fighting off a change (' + what + '): ' + t.name + '. Nothing of its kind has touched ' + who + ' for a while, and this part is easing back a little toward how it was: ' + was + ' no longer, only ' + pathFill(tf, k, t.stages[r.told - 1]).replace(/\.$/, '') + '. One small thing this turn, in your own words, found in passing, the way an ache goes or a shoe fits again; then the scene goes on. Nobody remarks on it and nobody names it; whether ' + who + ' is relieved, sorry or unsure is the player\'s.'
+        : 'The body has fought off a change (' + what + '): ' + t.name + '. The last of it is gone (' + was + ' no longer), and this part is as it was before it began. Say so once, in passing, as ' + who + ' would notice an absence in a mirror, a shoe or a touch, without explanation; then the scene goes on. Nobody comments. How ' + who + ' takes it is the player\'s.');
+    }
+    return out;
   }
   // The note for a waypoint reached: the kind's first ever is a sensation small enough to forget; a track's last renders the part
   // finished, with how far it goes on this body; the rest are one small thing each, found in passing.
@@ -2009,7 +2048,7 @@
   // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
   function transformationSceneActive() {
     return arcActive() ||
-      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over|body (?:is fighting|has fought) off a change/i.test(n));
   }
   function isTransition(input) {
     const a = String(input.action || '').trim();

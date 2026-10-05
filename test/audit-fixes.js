@@ -986,33 +986,51 @@ const S = {
     } finally { h3.close(); }
   },
 
-  // 8p. The body morphs one way: on tracks nothing fades in quiet hours, no change is called fading, and influence drifts down after a
-  // quiet day only to where the latest part told began (its window's start). Fails on bef6c76 (no tracks; a change under half fades).
-  async noFading() {
+  // 8p. The body fights off a small change: after a quiet story day with nothing of its kind, a part at half or less eases back a
+  // waypoint, then another each quiet day, the latest told first, until it is gone; a part past half never falls; contact again lets
+  // an eased part go on. Influence drifts down after a quiet day only to where the latest part still told began. Fails on 4b2530d
+  // (on tracks nothing eased).
+  async partsEaseBack() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const TR = ctx.window.WINDLASS_WORLDS.sundered.transformation.tracks; assert(TR && TR.species && TR.species.cow, 'the world carries the track model');
     const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
     const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
     let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
     const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data, id = advKey.split('/')[1];
-    const open = TR.species.cow.filter((t) => !t.sex && !t.needs).slice(0, 3).map((t) => t.key);
-    const tracks = Object.fromEntries(TR.species.cow.map((t) => [t.key, open.includes(t.key) ? { s: 30, e: 80, p: stageAt(1, t.stages.length), told: 1, nextAt: 0 } : { s: 70, e: 95, p: 0, told: 0, nextAt: 0 }]));
+    const plain = TR.species.cow.filter((t) => !t.sex && !t.needs && t.stages.length >= 3);
+    const small = plain.slice(0, 3).map((t) => t.key), set = plain[3];
+    assert(set, 'a fourth plain track to hold past half');
+    const setTold = set.stages.length - 1;
+    const tracks = Object.fromEntries(TR.species.cow.map((t) => [t.key, small.includes(t.key) ? { s: 30, e: 80, p: stageAt(1, t.stages.length), told: 1, nextAt: 0 }
+      : t.key === set.key ? { s: 20, e: 95, p: stageAt(setTold, t.stages.length), told: setTold, nextAt: 0 } : { s: 70, e: 95, p: 0, told: 0, nextAt: 0 }]));
     doc.state.tf = { influence: { cow: 34 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { cow: { sex: null, sexTold: [], formTold: [], day: 1, order: [], eye: 'eyes dark with a blue cast like a calf\'s' } }, prog: { cow: { lean: 0, face: 15, tracks } }, last: {}, drifted: {} };
     const h = await boot({ setup(w, m) { m.store = seeded; } });
     try {
       assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
       patchTurns(h, (r) => { r.time_advance_minutes = 720; r.exposures = []; });
-      const tf = () => onlyAdv(h.mock.store).data.state.tf;
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, told = (k) => tf().prog.cow.tracks[k].told;
+      let eased = 0, sawPrompt = false;
       for (let i = 0; i < 12; i++) {
+        const before = small.map(told);
         assert(await h.turn('I keep to myself and study.'), 'turn ' + (i + 1));
-        const pr = tf().prog.cow;
-        for (const k of open) assert(pr.tracks[k].told >= 1 && pr.tracks[k].p >= stageAt(1, TR.species.cow.find((t) => t.key === k).stages.length), k + ' never falls back: ' + JSON.stringify(pr.tracks[k]));
-        assert(tf().influence.cow >= 30, 'influence never drifts below where the latest part told began: ' + tf().influence.cow);
+        const after = small.map(told), down = before.reduce((a, b, x) => a + b - after[x], 0);
+        assert(down >= 0 && down <= 1, 'at most one part eases a turn: ' + before + ' -> ' + after);
+        eased += down;
+        assert.equal(told(set.key), setTold, 'the part past half never falls');
         const p = promptOf(lastTurn(h)), block = p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>'));
-        assert.doesNotMatch(block, /fading/i, 'no change is called fading');
+        if (/Note from the engine: The body (?:has fought|is fighting) off a change/.test(p)) sawPrompt = true;
+        if (i === 0) assert.equal(down, 0, 'nothing eases before a quiet day has passed');
+        assert(tf().influence.cow >= 20, 'influence never drifts below where the latest part still told began: ' + tf().influence.cow);
       }
-      assert.equal(tf().influence.cow, 30, 'six quiet days bring influence down to that line and no further');
+      assert.equal(eased, 3, 'the three small parts each ease back to nothing, a quiet day apart');
+      assert(small.every((k) => told(k) === 0), 'the small parts are gone: ' + small.map(told));
+      assert(sawPrompt, 'the narrator is told the body fights the change off');
+      assert(storedTurns(h.mock.store, id).some((t) => t.notes.some((n) => /^cow change easing: /.test(n))), 'the easing is noted');
       assert(storedTurns(h.mock.store, id).some((t) => t.notes.some((n) => /^cow influence -\d/.test(n))), 'influence does drift on quiet days');
+      assert(small.every((k) => tf().prog.cow.tracks[k].eased != null), 'an eased part is held where it eased to');
+      patchTurns(h, (r) => { r.time_advance_minutes = 30; r.exposures = [{ species: 'cow', method: 'a hug', intensity: 1 }]; });
+      assert(await h.turn('I hug Daisy.'));
+      assert(small.every((k) => tf().prog.cow.tracks[k].eased == null), 'contact again lets an eased part go on');
       clean(h);
     } finally { h.close(); }
   },
