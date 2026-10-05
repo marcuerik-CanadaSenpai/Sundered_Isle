@@ -1184,11 +1184,12 @@
   // The eye colour a path gives, drawn once from the kind's pool when the path begins (a save from before v29 draws it when first asked).
   const pathEye = (k) => { const sp = speciesPool(W, k); return sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : ''; };
   // A step, an anatomy or a sex line of the player's path, with the kind's facts filled: the path's eye colour, the kind's teats phrase.
+  const isSexStage = (key) => { const st = W.transformation && W.transformation.sexStages; return !!st && Object.prototype.hasOwnProperty.call(st, key) && st[key] != null; };
   function pathFill(tf, k, text) {
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
     if (path && !path.breasts) path.breasts = pickBreasts(W, k);
-    const st = (W.transformation && W.transformation.sexStages) || {};
-    const staged = String(text || '').replace(/\{(tanner\d|genitals)\}/g, (m, key) => (st[key] != null ? st[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
+    // Any brace token that names one of the world's sexStages is filled from it, whatever the key's spelling; other tokens go on to fill().
+    const staged = String(text || '').replace(/\{([^{}\s]+)\}/g, (m, key) => (isSexStage(key) ? W.transformation.sexStages[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
     return fill(kindText(W, k, staged, path && path.eye, path && path.breasts));
   }
   // A chest draw's shape alone, the part before its first semicolon: what the breasts do (a bovine woman's milk) is told by the kind's form steps.
@@ -1495,6 +1496,16 @@
       }
       // The chest a path grew stays told once the body has gone over: the path's own draw, its shape alone (what it does is a form step).
       if (path && path.sex === 'female' && tf.sex && tf.sex.species === k && tf.sex.to === 'female') parts.push('The breasts grown on this path: ' + chestShape(pathFill(tf, k, '{breasts}')) + '.');
+      // So does the rest of what lasts from the way over: the shared stages (skin, rhythm, gait, scent) and the kind's complete shape from its last sex rung.
+      // The breast stages are in the grown chest above, and the genitals were stated once and are not repeated.
+      if (path && path.sex && tf.sex && tf.sex.species === k) {
+        const told = Array.isArray(path.sexTold) ? path.sexTold : [], lastRung = sp.ladder[lastSexRung(sp) - 1], shape = (lastRung && lastRung.sex) || [];
+        // A save completed on an earlier build carries the complete shape in that build's words: when none of its lines is in the rung's
+        // current text, the last line told is the shape.
+        const isTok = (x) => /^\{[^{}\s]+\}$/.test(x), inShape = told.some((x) => !isTok(x) && shape.includes(x)), lastLine = told.filter((x) => !isTok(x)).pop();
+        const kept = told.filter((x) => { const m = /^\{([^{}\s]+)\}$/.exec(x); return m ? (isSexStage(m[1]) && !/^(?:tanner\d+|genitals)$/.test(m[1])) : (shape.includes(x) || (!inShape && x === lastLine)); });
+        if (kept.length) parts.push('Settled on the way over: ' + (compact ? kept.slice(-2) : kept).map(pf).join('; ') + '.');
+      }
       // The kind's form on a woman's body, every step told.
       if (path) {
         const form = formToldOf(tf, k);
@@ -1516,7 +1527,8 @@
     // Every change stays listed in the short form too: the body summary names only each kind's latest settled shape, so a trait
     // dropped here (cow horns once the hooves have come) would leave the prompt altogether.
     const visibleTraits = tf.traits;
-    const influenceNow = compact ? kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ') + (kinds.some((k) => !(tf.influence[k] || 0)) ? ' (unlisted kinds 0)' : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
+    const listed = kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ');
+    const influenceNow = compact ? (listed || 'none yet') + (kinds.some((k) => !(tf.influence[k] || 0)) ? (listed ? ' (unlisted kinds 0)' : ' (every kind 0)') : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
     lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
     const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
@@ -1964,7 +1976,7 @@
       actionLines.push('Dice this turn: d6 rolled ' + d6 + '. If the outcome of this action is uncertain or contested, choose the one stat from <player> (or skill) that the attempt relies on and read its total, the die plus the value, from this table: ' + totals + skillTotals + '. Difficulty ladder: ' + Object.keys(D).map((k) => k + ' ' + D[k]).join(', ') + '. Outcome: a total at or above the difficulty is success; one or two below is partial; further below is failure. Take the total from the table as it stands, do not recompute it, and apply that rule to it and the difficulty you chose; the engine checks both against these numbers, and the narrative must show that outcome, no worse and no better. If nothing about the action is uncertain, set stat to "none" and narrate the natural consequence.');
       if (W.transformation) { const carried = carriedElements(S.tf || {}); if (carried.length) actionLines.push('Elements on the die: ' + p.first + ' carries ' + carried.map((c) => c.element).join(' and ') + '. For a magical working, name the element it is done through in "element": through a carried element the total is 1 higher than the table, through any other element 1 lower, and judge the outcome on that adjusted total; "none" (plain craft, or no magic) leaves the table total as it is. The engine applies the same 1.'); }
     }
-    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + (turnInput.bandFloor ? 'at least ' + band[0] + ', as the director note requires' : band[0] + ' to ' + band[1] + ' when the scene earns it') + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead.' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
+    actionLines.push('Narrative length: at most ' + band[1] + ' words; ' + (turnInput.bandFloor ? 'at least ' + band[0] + ', as the director note requires' : band[0] + ' to ' + band[1] + ' when the scene earns it') + (turnInput.director ? ' and long enough to carry out all compatible requested actions' : ', and shorter whenever ' + p.first + ' reaches a choice sooner') + (arcActive() ? ' (a change is under way; give it room)' : '') + (turnInput.sceneDensity === 'rich' ? ' If romance or a bodily change is central, use the space for sensory and emotional nuance rather than summarizing or skipping ahead' : '') + '. ' + (turnInput.director ? 'Carry out the binding director note and reach its requested ending before stopping; if it gives no ending, stop at the first choice after carrying out its requested actions.' : 'Stop at the first moment ' + p.first + ' would speak or choose.'));
     for (const n of (adv.pendingNotes || [])) actionLines.push('Note from the engine: ' + (L.notesChars ? clip(String(n), L.notesChars) : n));
     parts.push(x('action', actionLines.join('\n')));
     parts.push(x('output_format', [
@@ -2103,7 +2115,12 @@
     const text = String(action || '');
     if (!W.transformation || !text) return [];
     const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
-    const dairy = /^[\s]*[Ii]\s+(?:drank|sipped|tasted|ate|consumed|had)\s+(?:(?:a|some|the|a glass of|a cup of)\s+)?(?:(?:sip|taste|cup|glass|serving)\s+of\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text);
+    // "I have" counts only with a measure of it ("I have a cup of cocoa"): a bare "I have the milk" or "I have a milk allergy" is not drinking.
+    // "I had" is the meal told after: "I had some milk" and "I had cheese" count; "I had the milk in my bag", "I had cheese in my bag for later"
+    // and "I have a cup of cocoa with me" do not, the dairy being carried, not taken (KEPT).
+    const KEPT = '(?!\\s+(?:in|inside|within)\\s+(?:my|the|a|an|his|her|their|our|[A-Za-z]+\u2019s|[A-Za-z]+\'s)\\s+(?:[a-z]+\\s+)?(?:bag|pack|backpack|pocket|satchel|basket|bottle|flask|canteen|jar|tin|box|hands?|locker|cupboard|fridge|pantry|coat|jacket|room)s?\\b)(?!\\s+(?:with|on)\\s+me\\b)(?!\\s+for\\s+later\\b)';
+    const DAIRY = '(?:cocoa|milk|cream|cheese|butter|dairy)\\b' + KEPT, MEASURE = '(?:(?:a|some|the|another|my)\\s+)?(?:sip|taste|cup|mug|glass|bowl|serving|plate)s?\\s+of\\s+';
+    const dairy = new RegExp('^[\\s]*[Ii]\\s+(?:(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed)\\s+(?:(?:a|some|the|another|my)\\s+)?(?:' + MEASURE + ')?|have\\s+' + MEASURE + '|had\\s+(?:' + MEASURE + '|(?:some\\s+)?))' + DAIRY, 'i').test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });
