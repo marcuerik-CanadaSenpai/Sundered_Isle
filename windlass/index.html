@@ -2104,7 +2104,9 @@
     const text = String(action || '');
     if (!W.transformation || !text) return [];
     const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
-    const dairy = /^[\s]*[Ii]\s+(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed|have|had)\s+(?:(?:a|some|the|a glass of|a cup of)\s+)?(?:(?:sip|taste|cup|glass|serving)\s+of\s+)?(?:cocoa|milk|cream|cheese|butter|dairy)\b/i.test(text);
+    // "I have" counts only with a measure of it ("I have a cup of cocoa"): a bare "I have the milk" or "I have a milk allergy" is not drinking.
+    const DAIRY = '(?:cocoa|milk|cream|cheese|butter|dairy)\\b', MEASURE = '(?:(?:a|some|the|another|my)\\s+)?(?:sip|taste|cup|mug|glass|bowl|serving|plate)s?\\s+of\\s+';
+    const dairy = new RegExp('^[\\s]*[Ii]\\s+(?:(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed)\\s+(?:(?:a|some|the|another|my)\\s+)?(?:' + MEASURE + ')?|(?:have|had)\\s+' + MEASURE + ')' + DAIRY, 'i').test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });

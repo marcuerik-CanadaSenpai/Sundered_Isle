@@ -735,7 +735,7 @@ const S = {
     const g = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
     try {
       const rm = onlyAdv(g.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
-      assert.match(looks, /plumage|feathers for hair|worn as hair is|head feathers/, 'the harpy wears feathers for hair: ' + looks);
+      assert.match(looks, /plumage|feathers for hair|worn as hair is|head feathers/i, 'the harpy wears feathers for hair: ' + looks);
       assert.match(looks, /\b(A|B) cup\b/, 'and has her own light chest: ' + looks);
       assert.doesNotMatch(looks, /\{/, 'no placeholder: ' + looks);
       clean(g);
@@ -1058,6 +1058,18 @@ const S = {
       let t = storedTurns(h.mock.store, id).at(-1);
       assert(t.notes.some((n) => /transformation contact confirmed from the explicit player action \(cow, intensity 1\)/.test(n)), 'drinking Creamery cocoa in the present tense is a bovine contact: ' + JSON.stringify(t.notes));
       assert.equal(t.stateAfter.tf.influence.cow, 4, 'and it counts');
+      // "I have" is drinking only with a measure of it; owning or being allergic to milk is not a contact.
+      assert(await h.turn('I have a milk allergy, I tell Daisy at the Creamery.'));
+      t = storedTurns(h.mock.store, id).at(-1);
+      assert(!t.notes.some((n) => /transformation contact confirmed from the explicit player action/.test(n)), 'a milk allergy is not drinking: ' + JSON.stringify(t.notes));
+      assert.equal(t.stateAfter.tf.influence.cow, 4, 'and nothing was counted');
+      assert(await h.turn('I have the milk in my bag for later.'));
+      t = storedTurns(h.mock.store, id).at(-1);
+      assert.equal(t.stateAfter.tf.influence.cow, 4, 'carrying milk is not drinking: ' + JSON.stringify(t.notes));
+      assert(await h.turn('I have a cup of cocoa with Daisy at the Creamery.'));
+      t = storedTurns(h.mock.store, id).at(-1);
+      assert(t.notes.some((n) => /transformation contact confirmed from the explicit player action \(cow, intensity 1\)/.test(n)), 'having a cup of Creamery cocoa is drinking: ' + JSON.stringify(t.notes));
+      assert.equal(t.stateAfter.tf.influence.cow, 8, 'and it counts once');
       const p1 = promptOf(lastTurn(h));
       assert.doesNotMatch(p1, /[^\n ]  +\S/, 'no doubled space in the prompt: ' + (p1.match(/.{0,60}[^\n ]  +\S.{0,20}/) || [''])[0]);
       assert(await h.turn('I kiss Daisy.'));
@@ -1067,6 +1079,20 @@ const S = {
       assert.doesNotMatch(p2, /[^\n ]  +\S/, 'no doubled space in a romance prompt');
       clean(h);
     } finally { h.close(); }
+    // The short form of the transformation block with no influence anywhere says so in words, not with an empty list.
+    const h2 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
+    try {
+      patchTurns(h2, (r) => { r.exposures = []; });
+      // A few thousand characters of action are enough to push a prompt already near the cap into the short form, well short of the cap itself.
+      assert(await h2.turn('I walk the long way round. ' + 'The path winds past the Creamery and on along the old wall by the river, and I take it slowly. '.repeat(60)));
+      const t = storedTurns(h2.mock.store, onlyAdv(h2.mock.store).id).at(-1);
+      assert(t, 'the long turn was stored: ' + h2.$('#status').textContent);
+      assert(t.notes.some((n) => /transformation block in its short form/.test(n)), 'the prompt was compacted: ' + JSON.stringify(t.notes.filter((n) => /size cap/.test(n))));
+      assert.deepEqual(Object.values(t.stateAfter.tf.influence).filter(Boolean), [], 'no kind has influence');
+      const line = (promptOf(lastTurn(h2)).match(/^Influence now [^\n]*/m) || [''])[0];
+      assert.match(line, /\): none yet \(every kind 0\)\.$/, 'the short form says none yet (every kind 0): ' + line);
+      clean(h2);
+    } finally { h2.close(); }
   },
 
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
