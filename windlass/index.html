@@ -1188,7 +1188,7 @@
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
     if (path && !path.breasts) path.breasts = pickBreasts(W, k);
     const st = (W.transformation && W.transformation.sexStages) || {};
-    const staged = String(text || '').replace(/\{(tanner\d|genitals)\}/g, (m, key) => (st[key] != null ? st[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
+    const staged = String(text || '').replace(/\{([a-z]+\d?)\}/g, (m, key) => (st[key] != null ? st[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
     return fill(kindText(W, k, staged, path && path.eye, path && path.breasts));
   }
   // A chest draw's shape alone, the part before its first semicolon: what the breasts do (a bovine woman's milk) is told by the kind's form steps.

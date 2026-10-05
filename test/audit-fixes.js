@@ -724,7 +724,7 @@ const S = {
         if (!c.looks || c.looks.indexOf('{') >= 0) assert(!c.looks || c.looks.indexOf('{') < 0, c.name + ' leaks a placeholder: ' + c.looks);
         if (c.gen === false || !c.species) continue;
         assert.match(c.looks, /\bhair\b|plumage|feathers|crest|plait|crop|braid|mane/i, c.name + ' (' + c.species + ') has hair in the look: ' + c.looks);
-        if (c.gender === 'female') assert.match(c.looks, /\bcup\b|\bbreasts?\b/, c.name + ' (' + c.species + ') has her chest in the look: ' + c.looks);
+        if (c.gender === 'female') assert.match(c.looks, /\bcup\b|\bbreasts?\b/i, c.name + ' (' + c.species + ') has her chest in the look: ' + c.looks);
       }
       assert(await h.turn('I look around the room.'));
       const p = promptOf(lastTurn(h));
@@ -806,7 +806,7 @@ const S = {
         return { prompts: prompts.join('\n'), notes, perTurn, tf };
       } finally { h.close(); }
     };
-    const a = await run(1, 30, 5);
+    const a = await run(1, 30, 6);  // four sex steps on rung 30 now (the shared skin stage), two steps a turn, and the form step rolls after them: told in the sixth prompt
     assert.match(a.prompts, /the body is going toward a woman's \(bovine mythkin path\)/, 'the sex steps are told');
     assert.match(a.prompts, /the first breast buds: a small firm mound under each nipple, tender to a strap, the areola widening/, 'Tanner stage two reaches the narrator: told ' + JSON.stringify(a.tf.paths.cow.sexTold) + ' tracks ' + JSON.stringify(a.tf.tracks.map((t) => t.kind + ':' + t.i + '/' + t.steps.length + '@' + t.nextAt)) + ' notes ' + JSON.stringify(a.notes.filter((n) => !/^length/.test(n))).slice(0, 600));
     const iT = a.prompts.indexOf('the first breast buds'), iF = a.prompts.indexOf('the breasts fuller and heavier by the week');
@@ -818,7 +818,8 @@ const S = {
     assert(iF >= 0 || (form && form.after === 'sex'), 'the form step has been told after the sex steps, or still waits on them: ' + JSON.stringify(a.tf.tracks.map((t) => t.kind + (t.after ? '>' + t.after : '') + ':' + t.i + '/' + t.steps.length)));
     const b = await run(4, 85, 8);
     assert.match(b.prompts, /the penis has drawn in and shortened to a clitoris under its hood/, 'the genital change is stated once, clinically');
-    assert.match(b.prompts, /the breasts at their grown shape, the areola settled back into the breast's contour and the nipple standing from it: (full, heavy breasts|big soft breasts|heavy breasts)/, 'the grown shape is the bovine pool\'s');
+    const grownShape = String((b.tf.paths.cow || {}).breasts || '').split(';')[0].trim();
+    assert(grownShape && b.prompts.includes('the breasts at their grown shape, the areola settled back into the breast\'s contour and the nipple standing from it: ' + grownShape), 'the grown shape is the path\'s own draw from the bovine pool: ' + grownShape);
     assert.match(b.prompts, /The body has finished going over \(bovine mythkin path\)/, 'and the body goes over at the end');
     assert(b.notes.some((n) => /^the body is a woman's now \(cow path\)/.test(n)), 'the engine records the body as a woman\'s: ' + JSON.stringify(b.notes.filter((n) => /woman|sex|form/.test(n))));
     assert(b.tf.sex && b.tf.sex.to === 'female' && typeof b.tf.paths.cow.breasts === 'string' && /vein/.test(b.tf.paths.cow.breasts), 'the path keeps its own draw of the chest');
@@ -1023,6 +1024,53 @@ const S = {
   // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
   // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names
   // nobody; a harpy's hair line says her hair is feathers; and a bovine roommate's sheet still carries her udder, teats and milk, shown.
+  // 8m. The rest of a body going over is shared: every kind's sex steps at rungs 30, 50 and 70 carry the skin, rhythm, gait and
+  // scent stages from transformation.sexStages, and the engine fills any stage key, not only the Tanner ones, so no placeholder
+  // reaches the narrator. The werewolf and bovine ladders carry the change-tracks document's lines, and closeness is a rule.
+  async sharedSexStages() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const Wd = ctx.window.WINDLASS_WORLDS.sundered, T = Wd.transformation;
+    for (const key of ['skin1', 'skin2', 'rhythms1', 'gait1', 'scent1']) assert(typeof T.sexStages[key] === 'string' && T.sexStages[key].length > 40, 'a shared stage: ' + key);
+    for (const [k, sp] of Object.entries(T.species)) {
+      if (!sp.ladder.some((r) => r.sex)) continue;
+      const at = (n) => sp.ladder.find((r) => r.at === n);
+      assert(at(30).sex.includes('{skin1}'), k + ': the skin goes finer at 30');
+      assert(at(50).sex.includes('{skin2}') && at(50).sex.includes('{rhythms1}'), k + ': skin and rhythm at 50');
+      assert(at(50).sex.indexOf('{skin2}') < at(50).sex.indexOf('{rhythms1}'), k + ': the skin before the rhythm');
+      assert(at(70).sex.includes('{gait1}') && at(70).sex.includes('{scent1}'), k + ': gait and scent at 70');
+    }
+    const wolf = T.species.wolf, cow = T.species.cow;
+    assert(wolf.ladder.find((r) => r.at === 85).steps.some((s) => /ruff along the spine/.test(s)), 'the werewolf ruff');
+    assert(wolf.habits.length >= 10 && wolf.habits.some((s) => /whole-body shake/.test(s)), 'the werewolf habits');
+    assert(cow.ladder.find((r) => r.at === 70).steps.some((s) => /chewed again/.test(s)), 'the bovine cud');
+    const cowWomen = cow.ladder.find((r) => r.at === 85).women;
+    assert.match(cowWomen[0], /fullness and tightness in the udder/, 'the udder fills first'); assert.match(cowWomen[1], /^milk:/, 'and then the milk');
+    assert(Wd.rules.some((r) => /^Closeness grows in facets/.test(r)), 'closeness is a rule');
+    // The shared stage reaches the narrator filled, like the Tanner stages.
+    const first = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi', gender: 'male' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)); const doc = seeded.get(advKey).data;
+    doc.state.tf = {
+      influence: { cow: 35 }, rungs: { cow: 2 }, traits: [{ species: 'cow', trait: cow.ladder[1].trait, day: 1, settled: true }], arcs: [],
+      paths: { cow: { sex: 'female', sexTold: [], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'brown' } },
+      tracks: [{ species: 'cow', rung: 2, kind: 'sex', to: 'female', trait: cow.ladder[1].trait, steps: ['{skin1}', '{tanner2}'], i: 0, nextAt: 0, day: 1 }],
+      last: {}, drifted: {},
+    };
+    doc.settings.pace = 'unbounded';
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      patchTurns(h, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
+      assert(await h.turn('I get on with the day.'));
+      assert(await h.turn('I get on with the day.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /thinning and lightening, and the skin of the cheeks smoother under the razor/, 'the shared skin stage is told');
+      assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}/, 'and no stage placeholder reaches the narrator');
+      assert.match(p, /Closeness grows in facets/, 'the closeness rule reaches the narrator');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   async looksShowNotTell() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const Wd = ctx.window.WINDLASS_WORLDS.sundered;
@@ -1033,7 +1081,7 @@ const S = {
       for (const [name, arr] of Object.entries(pools)) for (const t of arr) { if (LECTURE.test(t)) bad.push(k + '.' + name + ': ' + t.slice(0, 90)); if (name !== 'senses' && /\.$/.test(t)) bad.push(k + '.' + name + ' ends with a full stop: ' + t.slice(0, 60)); }
       if (k === 'harpy') for (const t of sp.hair) assert.match(t, /plumage|feathers for hair|worn as hair is|head feathers/, 'a harpy\'s hair is feathers: ' + t);
     }
-    for (const t of Wd.genPools.breasts) if (LECTURE.test(t)) bad.push('breasts: ' + t.slice(0, 90));
+    for (const t of Wd.genPools.breasts) { if (LECTURE.test(t)) bad.push('breasts: ' + t.slice(0, 90)); if (/\.$/.test(t)) bad.push('breasts ends with a full stop: ' + t.slice(0, 60)); }
     for (const [k, sp] of Object.entries(Wd.transformation.species)) for (const r of sp.ladder) for (const t of [r.trait, r.anatomy].concat(r.steps || [], r.sex || [], r.women || [])) if (t && LECTURE.test(t)) bad.push(k + ' rung ' + r.at + ': ' + t.slice(0, 90));
     assert.deepEqual(bad, [], 'a look or a step explains instead of showing: ' + bad.join(' | '));
     const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
