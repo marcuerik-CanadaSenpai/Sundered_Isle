@@ -1446,6 +1446,35 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 8n. The State panel's Transformation row lists a change from its first told waypoint. The track model keeps no trait for a
+  // part under way, so a body with fourteen parts changing read "No engine-confirmed body changes yet" next to a Condition line
+  // full of them.
+  async stateShowsChangesUnderWay() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const T = ctx.window.WINDLASS_WORLDS.sundered.transformation, TR = T.tracks.species;
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const doc = seeded.get([...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k))).data;
+    const row = (h) => { const dt = [...h.document.querySelectorAll('#items dt')].find((d) => d.textContent === 'Transformation'); return dt ? dt.nextElementSibling.textContent : ''; };
+    const tracks = (told) => Object.fromEntries(TR.cow.map((t) => [t.key, { s: 50, e: 100, p: told[t.key] ? 30 : 0, told: told[t.key] || 0, nextAt: 0 }]));
+    const hands = TR.cow.find((t) => t.key === 'hands'), ears = TR.cow.find((t) => t.key === 'ears');
+    doc.state.tf = Object.assign(doc.state.tf || {}, { influence: { cow: 30 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { cow: { sex: null, sexTold: [], formTold: [], day: 1, order: [] } }, prog: { cow: { lean: 0, face: 15, tracks: tracks({ hands: 1, ears: 1 }) } }, last: {}, drifted: {} });
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      assert.match(row(h), new RegExp('^' + T.species.cow.short + ': ' + hands.name.toLowerCase() + ', ' + ears.name.toLowerCase() + ' \\(in progress\\)$|^' + T.species.cow.short + ': ' + ears.name.toLowerCase() + ', ' + hands.name.toLowerCase() + ' \\(in progress\\)$'), 'parts told once show as in progress: ' + row(h));
+      assert.doesNotMatch(row(h), /No engine-confirmed/, 'and the row no longer says none');
+      clean(h);
+    } finally { h.close(); }
+    for (const k of Object.keys(doc.state.tf.prog.cow.tracks)) doc.state.tf.prog.cow.tracks[k].told = 0;
+    const h2 = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h2.settle(150, 8000)); await h2.idle(10000); await h2.settle(100, 4000);
+      assert.equal(row(h2), 'No engine-confirmed body changes yet', 'a body with nothing told still reads none: ' + row(h2));
+      clean(h2);
+    } finally { h2.close(); }
+  },
+
   // 9c. Playtest findings: a present-tense dairy action ("I drink the cocoa") is a bovine contact like the past-tense one; the
   // length line of a rich scene ends one sentence before starting the next (no ".."); the short transformation block says
   // "none yet" instead of an empty list when no kind has influence, and no prompt line carries a doubled space.

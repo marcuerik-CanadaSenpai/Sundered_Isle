@@ -4461,7 +4461,15 @@
     const rows = [['Location', S.location, false], ['Present', S.present.map(presentLabel).join(', '), false]];
     if (T) rows.push(['Kinds met', ensureMet(S).map(kindLabel).join(', ') || 'none yet', false]);
     if (T) {
+      // Finished changes sit in tf.traits; a part the body has started on shows from its first told waypoint (the track model
+      // keeps no trait for a part under way), and a body going toward the other sex shows once its first step is told.
       const changes = (S.tf.traits || []).map((t) => T.species[t.species].short + ': ' + t.trait + (t.settled === false ? ' (in progress)' : ''));
+      for (const k of Object.keys(S.tf.prog || {})) {
+        const under = (trackModel(k) || []).filter((t) => { const told = ((S.tf.prog[k].tracks || {})[t.key] || {}).told || 0; return told > 0 && told < t.stages.length; });
+        if (under.length) changes.push(T.species[k].short + ': ' + under.map((t) => t.name.toLowerCase()).join(', ') + ' (in progress)');
+      }
+      const sx = S.tf.sexprog;
+      if (sx && !S.tf.sex && (sexModel(sx.to) || []).some((t) => ((sx.tracks || {})[t.key] || {}).told > 0)) changes.push(T.species[sx.species].short + ': the body going toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' (in progress)');
       rows.push(['Transformation', changes.length ? changes.join('; ') : 'No engine-confirmed body changes yet', false]);
     }
     for (const d of W.trackedItems) {
