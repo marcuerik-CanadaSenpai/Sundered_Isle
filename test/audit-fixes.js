@@ -390,6 +390,24 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 8c. A tight lore budget sheds what the recent story only brushed past before what the player's own action names: the
+  // dorm entry the action asks for stays in, ahead of a higher-priority kind the last turn happened to mention.
+  async loreFromAction() {
+    const first = await begin({ rmSpecies: 'cow' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)); seeded.get(advKey).data.settings.loreBudget = 1000;
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      patchTurns(h, (r) => { r.narrative = 'A harpy feather drifts down past the window and settles on the sill. ' + r.narrative; });
+      assert(await h.turn('I look out of the window.'));
+      assert(await h.turn('I go back up to room 4B and sit on my bed.'));
+      const entries = (promptOf(lastTurn(h)).match(/<entry name="[^"]*"/g) || []).map((x) => x.slice(13, -1));
+      assert(entries.includes('Kettle Hall and room 4B'), 'the entry the action names must survive the budget: ' + JSON.stringify(entries));
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 9. A cast member listed present by first name only gets the full sheet and the Focus line, even when nothing else they
   // answer to (aliases cleared in the Cast editor) carries that first name: the given name counts on its own.
   async firstNamePresent() {
