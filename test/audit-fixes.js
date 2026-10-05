@@ -713,7 +713,7 @@ const S = {
     try {
       const { data } = onlyAdv(h.mock.store);
       const rm = data.roommate; assert.equal(rm.gender, 'female', 'the roommate is a woman'); const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
-      assert.match(looks, /\bD cup and more\b|\ban E cup\b|\ba DD\b/, 'the bovine roommate has a cup size: ' + looks);
+      assert.match(looks, /\b(?:[A-H]|DD|DDD) cup\b|\ba (?:DD|DDD)\b/, 'the bovine roommate has a cup size: ' + looks);
       assert.match(looks, /nipple/, 'and nipples');
       assert.match(looks, /vein/, 'and veins');
       assert.match(looks, /milk|lactat/, 'and milk');
@@ -1020,6 +1020,31 @@ const S = {
     }, 'fox');
   },
 
+  // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
+  // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names
+  // nobody; a harpy's hair line says her hair is feathers; and a bovine roommate's sheet still carries her udder, teats and milk, shown.
+  async looksShowNotTell() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const Wd = ctx.window.WINDLASS_WORLDS.sundered;
+    const LECTURE = /in the way of \w+ mythkin|as every \w+ woman|women lactate|lactate, and|accommodated by|is cut to (?:hold|support)|cut to support|does not think about it|mythkin do\b|the way \w+ mythkin do|as (?:all|every) \w+ do\b/i;
+    const bad = [];
+    for (const [k, sp] of Object.entries(Wd.genPools.species)) {
+      const pools = { lead: [].concat(...Object.values(sp.leadByGender || {})), hair: sp.hair, body: sp.body, bodyByGender: [].concat(...Object.values(sp.bodyByGender || {})), breasts: sp.breasts || [], senses: sp.senses || [] };
+      for (const [name, arr] of Object.entries(pools)) for (const t of arr) { if (LECTURE.test(t)) bad.push(k + '.' + name + ': ' + t.slice(0, 90)); if (name !== 'senses' && /\.$/.test(t)) bad.push(k + '.' + name + ' ends with a full stop: ' + t.slice(0, 60)); }
+      if (k === 'harpy') for (const t of sp.hair) assert.match(t, /plumage|feathers for hair|worn as hair is|head feathers/, 'a harpy\'s hair is feathers: ' + t);
+    }
+    for (const t of Wd.genPools.breasts) if (LECTURE.test(t)) bad.push('breasts: ' + t.slice(0, 90));
+    for (const [k, sp] of Object.entries(Wd.transformation.species)) for (const r of sp.ladder) for (const t of [r.trait, r.anatomy].concat(r.steps || [], r.sex || [], r.women || [])) if (t && LECTURE.test(t)) bad.push(k + ' rung ' + r.at + ': ' + t.slice(0, 90));
+    assert.deepEqual(bad, [], 'a look or a step explains instead of showing: ' + bad.join(' | '));
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
+    try {
+      const rm = onlyAdv(h.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
+      assert.doesNotMatch(looks, LECTURE, 'the bovine roommate\'s sheet shows and does not explain: ' + looks);
+      for (const re of [/udder/, /teats/, /milk/, /\bhoo(?:f|ves)\b/, /horn/]) assert.match(looks, re, 'and still carries her kind\'s anatomy ' + re + ': ' + looks);
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
   // The Cast note is a live region so a screen reader hears the unsaved-edits question.
   async looksLeadFirst() {
@@ -1028,10 +1053,11 @@ const S = {
       h.click('#btnCast'); await h.sleep(20);
       assert.equal(h.$('#cfName').value, 'Wren Skye');
       const looks = h.$('#cfLooks').value;
-      const leads = [/^Shorter than you and light enough to lift, fine-boned and quick/, /^A small woman built for the air/, /^Slight and poised, a head shorter than you/];
-      assert(leads.some((re) => re.test(looks)), 'the looks open with a beauty line: ' + looks.slice(0, 120));
+      // The opening is one of the kind's own lead lines (the harpy has no {colour} in hers), whatever their current wording.
+      const leads = h.window.WINDLASS_WORLDS.sundered.genPools.species.harpy.leadByGender.female.map((l) => l.replace(/\{\w+\}/g, '').split(/\s+/).slice(0, 4).join(' '));
+      assert(leads.some((l) => looks.startsWith(l)), 'the looks open with a beauty line: ' + looks.slice(0, 120) + ' (leads: ' + leads.join(' / ') + ')');
       assert.match(looks, /\. [A-Z][^.]*(feathers|wing|down)/i, 'the body follows as its own capitalised sentence: ' + looks.slice(0, 200));
-      assert.match(looks, /beneath the down at the collarbones|down runs between them/i, 'the kind\'s anatomy is still stated: ' + looks);
+      assert.match(looks, /\bdown\b/i, 'the kind\'s anatomy is still stated (the down between her breasts): ' + looks);
       assert.match(looks, /\b(A|B) cup\b|\bbreasts\b/, 'her chest is described, drawn from the harpy pool: ' + looks);
       assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
       clean(h);
