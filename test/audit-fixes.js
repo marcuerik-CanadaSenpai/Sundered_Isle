@@ -713,7 +713,7 @@ const S = {
     try {
       const { data } = onlyAdv(h.mock.store);
       const rm = data.roommate; assert.equal(rm.gender, 'female', 'the roommate is a woman'); const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
-      assert.match(looks, /\b(?:[A-H]|DD|DDD) cup\b|\ba (?:DD|DDD)\b/, 'the bovine roommate has a cup size: ' + looks);
+      assert.match(looks, /\b(?:[D-H]|DD|DDD) cup\b|\ba (?:DD|DDD)\b/, 'the bovine roommate has a cup size, a D or more: ' + looks);
       assert.match(looks, /nipple/, 'and nipples');
       assert.match(looks, /vein/, 'and veins');
       assert.match(looks, /milk|lactat/, 'and milk');
@@ -1041,6 +1041,8 @@ const S = {
       const rm = onlyAdv(h.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
       assert.doesNotMatch(looks, LECTURE, 'the bovine roommate\'s sheet shows and does not explain: ' + looks);
       for (const re of [/udder/, /teats/, /milk/, /\bhoo(?:f|ves)\b/, /horn/]) assert.match(looks, re, 'and still carries her kind\'s anatomy ' + re + ': ' + looks);
+      assert(await h.turn('I look at Daisy.'));
+      assert.match(promptOf(lastTurn(h)), /shown in passing, as part of the person, never recited from the sheet as a list or explained as biology or custom/, 'the appearance rule reaches the narrator');
       clean(h);
     } finally { h.close(); }
   },
