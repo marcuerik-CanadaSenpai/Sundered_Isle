@@ -592,11 +592,14 @@
   }
   const speciesPool = (Wc, key) => (Wc.genPools && key && Wc.genPools.species[key]) || null;
   // ---------- looks, composed from the world's own lines ----------
-  // A person's looks are never prose of their own: Height and Build first, in absolute terms and part by part, then Bust, Hair
-  // and Eyes from the pools, the kind's colour, and every finished feature of the kind for that sex in the words of its track's
-  // range at this person's extent (the lean, a step either side for a feature, the face from its own draw), each once and under
-  // its own label, in the order genPools.looks gives. What that sex of the kind never has is told beside the looks (absentText),
-  // never stored in them. opts.extent (-1, 0 or 1) sets every feature to one column of the range, for the checks.
+  // A person's looks are never prose of their own: Height first, then the Build (one figure word, then the waist, hips and thighs
+  // or shoulders, chest and waist written to agree with it), the Bust, Hair and Eyes from the pools, the kind's colour, and every
+  // finished feature of the kind for that sex in the words of its track's range at this person's one column (the lean, drawn
+  // once for the whole body; the face from its own draw), each once and under a plain label (Arms, Legs, Feet, Spine), in the
+  // order genPools.looks gives; and last what this sex of the kind never has, as plain negatives ("No horns, no crest."). What
+  // no body here has is told beside the looks (absentText). opts.extent (-1, 0 or 1) sets every feature to one column, for the checks.
+  // looksV marks a look composed this way, so a save's older looks are composed again once (migrateAdv).
+  const LOOKS_V = 2;
   const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
   const heightWords = (inches) => 'about ' + NUMBER_WORDS[Math.floor(inches / 12)] + ' foot' + (inches % 12 ? ' ' + NUMBER_WORDS[inches % 12] : '');
   const looksSpec = (Wc) => (Wc && Wc.genPools && Wc.genPools.looks) || null;
@@ -604,22 +607,49 @@
   const sexKey = (gender) => (gender === 'female' || gender === 'male' ? gender : 'nonbinary');
   const genderOf = (c) => c && (c.gender || (c.pronouns && c.pronouns.they === 'she' ? 'female' : c.pronouns && c.pronouns.they === 'he' ? 'male' : 'nonbinary'));
   const lowerFirst = (t) => String(t || '').replace(/^[A-Z](?![A-Z])/, (ch) => ch.toLowerCase());
-  // The face's own draw, 0 to 30: two in three on the standard (10 to 20), a sixth under it and a sixth over.
-  const drawFace = () => { const r = Math.random(); return r < 1 / 6 ? Math.floor(Math.random() * 10) : r < 5 / 6 ? 10 + Math.floor(Math.random() * 11) : 21 + Math.floor(Math.random() * 10); };
+  const listOf = (xs) => (xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs[0] || '');
+  // The body's one column: two in three at the standard, a sixth under it and a sixth over (a born person's and the player's path alike).
+  const drawLean = () => { const r = Math.random(); return r < 1 / 6 ? -1 : r < 5 / 6 ? 0 : 1; };
+  // The face's own draw, 0 to 30: about 65 in 100 on the standard (10 to 20), 25 under it and 10 over, so the muzzle is rare.
+  const drawFace = () => { const r = Math.random(); return r < 0.25 ? Math.floor(Math.random() * 10) : r < 0.9 ? 10 + Math.floor(Math.random() * 11) : 21 + Math.floor(Math.random() * 10); };
+  // The cup a drawn chest names ("a D cup and more", "a neat A cup", "a DD,", "full C carried low"), for the figure to agree with.
+  const CUP_RE = /\b(?:an?|neat|small|full|soft|generous|big) (AA|A|B|C|D|DD|E|F|G)\b|\b(AA|A|B|C|D|DD|E|F|G) cup\b/;
+  const cupOf = (breasts) => { const m = CUP_RE.exec(String(breasts || '').split(';')[0]); return m ? (m[1] || m[2]) : ''; };
+  // A young animal's word has no place in an adult's looks ("like a calf's"); "to the calf" is the leg.
+  const YOUNG_RE = /\b(?:kitten|pup|cub|foal|kid|chick|fawn|calf|calve)s?'s?(?=[\s.,;:]|$)|(?<!\b(?:to|at|below|above|mid-)\s?)\b(?:an?|the|like|like an?|like the|as|as an?|as the) (?:kitten|pup|cub|foal|kid|chick|fawn|calf)s?\b/i;
+  // The figure first, one word (a woman's slight, slim, athletic, soft, full or heavy; a man's slight, lean, athletic, solid or
+  // heavy), then the parts written to agree with it: each part's pool (the kind's over the world's, genPools.looks.build) kept to
+  // the phrases the figure allows for that part (genPools.looks.figures), and a woman's figure kept to the ones her drawn chest
+  // allows (no E cup on a slight figure). A kind whose pools fit no figure is told part by part, as before.
+  const figureFits = (f, part) => (Array.isArray(f.fits) ? f.fits : (f.fits || {})[part] || (f.fits || {}).all || []);
+  const fitsPhrase = (f, part, phrase) => figureFits(f, part).some((w) => new RegExp('\\b' + escRe(w) + '\\b', 'i').test(phrase));
+  function drawBuild(Wc, k, sx, breasts) {
+    const L = looksSpec(Wc) || {}, K = looksKind(Wc, k) || {};
+    const base = (L.build || {})[sx] || {}, B = Object.assign({}, base, (K.build || {})[sx] || {}), names = Object.keys(base);
+    const pools = (f) => names.map((part) => (B[part] || []).filter((ph) => fitsPhrase(f, part, ph)));
+    const figs = ((L.figures || {})[sx] || []).filter((f) => pools(f).every((pool) => pool.length));
+    const cup = sx === 'female' ? cupOf(breasts) : '', byCup = cup ? figs.filter((f) => !f.cups || f.cups.includes(cup)) : figs;
+    const f = byCup.length ? pick(byCup) : figs.length ? pick(figs) : null;
+    const parts = f ? pools(f).map(pick) : names.map((part) => (B[part] && B[part].length ? pick(B[part]) : '')).filter(Boolean);
+    return { word: f ? f.word : '', parts, figure: f, text: parts.length ? (f ? f.word + ', with ' : '') + listOf(parts) : '' };
+  }
   function composeLooks(Wc, k, p, opts) {
     opts = opts || {};
     const L = looksSpec(Wc) || {}, K = looksKind(Wc, k) || {}, sp = speciesPool(Wc, k);
-    const sx = sexKey(p.gender), forced = [-1, 0, 1].includes(opts.extent);
-    const roll = (a, b) => { const r = Math.random(); return r < a ? -1 : r < b ? 0 : 1; };
-    const lean = forced ? opts.extent : roll(1 / 6, 5 / 6), face = forced ? 15 + 10 * opts.extent : drawFace();
+    const sx = sexKey(p.gender), forced = [-1, 0, 1].includes(opts.extent), want = sx === 'female' ? 'women' : sx === 'male' ? 'men' : '';
     const T = Wc.transformation && Wc.transformation.tracks && Wc.transformation.tracks.species;
     const M = (T && T[k]) || [], track = (key) => M.find((t) => t.key === key);
-    const cols = {}, column = (t) => {
+    const feats = (K.parts || []).map(track).filter((t) => t && (!t.sex || t.sex === want));
+    // One column for the whole person, drawn once; off the standard, up to two features may still sit at it. The face has its own
+    // draw, and a feature told relative to another (the rabbit's belly fur to its leg coat) follows that one's column.
+    const lean = forced ? opts.extent : drawLean(), face = forced ? 15 + 10 * opts.extent : drawFace();
+    const atStd = new Set(lean && !forced ? shuffled(feats.filter((t) => t.range && !t.face && !t.extentWith).map((t) => t.key)).slice(0, Math.floor(Math.random() * 3)) : []);
+    const cols = {}, colOf = (t) => (t.extentWith && cols[t.extentWith] != null ? cols[t.extentWith] : t.face ? (face < 10 ? -1 : face > 20 ? 1 : 0) : atStd.has(t.key) ? 0 : lean);
+    const column = (t) => {
       let s = '';
       if (t.range) {
-        const l = t.extentWith && cols[t.extentWith] != null ? cols[t.extentWith] : t.face ? (face < 10 ? -1 : face > 20 ? 1 : 0) : Math.max(-1, Math.min(1, lean + (forced ? 0 : roll(0.15, 0.85))));
         // A column told relative to the body before (a goblin's least, "a head shorter than before") has a born person's own words.
-        const col = l < 0 ? 'least' : l > 0 ? 'most' : 'standard'; cols[t.key] = l; s = ((K.born || {})[t.key] || {})[col] || t.range[col] || ''; if (/^none$/i.test(s)) return '';
+        const l = colOf(t), col = l < 0 ? 'least' : l > 0 ? 'most' : 'standard'; cols[t.key] = l; s = ((K.born || {})[t.key] || {})[col] || t.range[col] || ''; if (/^none$/i.test(s)) return '';
       }
       return s || t.endsAs || '';
     };
@@ -629,45 +659,74 @@
       const to = (K.to && K.to[key]) || (L.to && L.to[key]);
       return lowerFirst(to && /^To /.test(s) ? to + ' ' + lowerFirst(s) : s);
     };
-    const lines = [], add = (label, text) => { text = String(text || '').replace(/[.;,\s]+$/, '').trim(); if (text) lines.push(label + ': ' + text + '.'); };
+    // Each field is a draw that can be made again when the check below faults it; a fixed line draws the same. Several tracks
+    // of one part (the toes and the stance of the feet) go under one label, joined by "; ".
+    const fields = [], put = (label, text, redraw) => { const f = fields.find((x) => x.label === label); if (f) f.texts.push(text); else fields.push({ label, texts: [text], redraw: redraw || null }); };
+    const fixed = (s) => () => s;
     const ht = K.heightTrack && track(K.heightTrack), hr = K.height && (K.height[sx] || K.height.female || K.height.male);
-    if (ht) add('Height', tidy(column(ht), ht.key) + ', adult in proportion');
-    else if (hr) add('Height', heightWords(hr[0] + Math.floor(Math.random() * (hr[1] - hr[0] + 1))));
-    const base = (L.build || {})[sx] || {}, B = Object.assign({}, base, (K.build || {})[sx] || {});
-    const build = Object.keys(base).map((part) => (B[part] && B[part].length ? pick(B[part]) : '')).filter(Boolean);
-    if (build.length) add('Build', build.length > 1 ? build.slice(0, -1).join(', ') + ' and ' + build[build.length - 1] : build[0]);
+    if (ht) put('Height', fixed(tidy(column(ht), ht.key) + ', adult in proportion'));
+    else if (hr) { let h = ''; const draw = () => { h = heightWords(hr[0] + Math.floor(Math.random() * (hr[1] - hr[0] + 1))); }; draw(); put('Height', () => h, draw); }
+    let build = drawBuild(Wc, k, sx, p.breasts); if (build.text) put('Build', () => build.text, () => { build = drawBuild(Wc, k, sx, p.breasts); });
     // The kind's finished features for this sex, read first so a part that takes the place of hair leaves the hair out.
     const parts = []; let told = '';
-    for (const key of K.parts || []) {
-      const t = track(key); if (!t) continue;
-      if (t.sex && t.sex !== (sx === 'female' ? 'women' : sx === 'male' ? 'men' : '')) continue;
-      if (K.unless && K.unless[key] && told.toLowerCase().includes(String(K.unless[key]).toLowerCase())) continue;
-      let text = tidy(column(t), key); if (!text) continue;
-      for (const [from, to] of ((K.swap || {})[sx] || {})[key] || []) text = text.replace(new RegExp('\\b' + from + '\\b', 'g'), to);
-      if (key === 'water_tail' && !/on land|legs stay legs/i.test(text)) text += '; legs on land';
-      const label = (K.labels && K.labels[key]) || (L.labels && L.labels[key]) || (t.face ? 'Face' : t.name);
+    for (const t of feats) {
+      if (K.unless && K.unless[t.key] && told.toLowerCase().includes(String(K.unless[t.key]).toLowerCase())) continue;
+      let text = tidy(column(t), t.key); if (!text) continue;
+      for (const [from, to] of ((K.swap || {})[sx] || {})[t.key] || []) text = text.replace(new RegExp('\\b' + from + '\\b', 'g'), to);
+      if (t.key === 'water_tail' && !/on land|legs stay legs/i.test(text)) text += '; legs on land';
+      const label = (K.labels && K.labels[t.key]) || (L.labels && L.labels[t.key]) || (t.face ? 'Face' : t.name);
       if (text.toLowerCase().startsWith(label.toLowerCase() + ', ')) text = text.slice(label.length + 2);
       parts.push([label, text]); told += ' ' + text;
     }
-    if (p.breasts) add('Bust', (K.bustShape || []).includes(sx) ? String(p.breasts).split(';')[0].trim() : p.breasts);
+    if (p.breasts) put('Bust', () => ((K.bustShape || []).includes(sx) ? String(p.breasts).split(';')[0].trim() : p.breasts), () => { p.breasts = pickBreasts(Wc, k); build = drawBuild(Wc, k, sx, p.breasts); });
     if (parts.some(([, x]) => /in place of hair/i.test(x))) p.hair = '';
-    if (p.hair) add('Hair', p.hair);
-    const te = track('eyes'); add('Eyes', [p.eyes, te ? tidy(te.endsAs, 'eyes') : ''].filter(Boolean).join('; '));
+    const hairs = (sp && sp.hair ? sp.hair : []).map((h) => h.replace(/\{colour\}/g, opts.colour || ''));
+    if (p.hair) put('Hair', () => p.hair, hairs.length > 1 ? () => { p.hair = pick(hairs); } : null);
+    // The eyes are the drawn phrase alone; the kind's eye line is the path's, not a second phrase here.
+    const te = track('eyes'); if (p.eyes || te) put('Eyes', () => p.eyes || tidy(te.endsAs, 'eyes'), sp && sp.eyes && sp.eyes.length > 1 ? () => { p.eyes = pick(sp.eyes); } : null);
     const colourLabel = K.colour && typeof K.colour === 'object' ? K.colour[sx] : K.colour;
-    const drawn = (K.draws || []).filter((d) => d.pool && d.pool.length).map((d) => d.label + ' ' + pick(d.pool));
-    if (colourLabel && opts.colour) add(colourLabel, [opts.colour].concat(drawn, K.colourTrack && track(K.colourTrack) ? [tidy(column(track(K.colourTrack)), K.colourTrack)] : []).join('; '));
-    for (const [label, text] of parts) add(label, text);
+    let drawn = []; const drawDraws = () => { drawn = (K.draws || []).filter((d) => d.pool && d.pool.length).map((d) => d.label + ' ' + pick(d.pool)); }; drawDraws();
+    if (colourLabel && opts.colour) put(colourLabel, () => [opts.colour].concat(drawn, K.colourTrack && track(K.colourTrack) ? [tidy(column(track(K.colourTrack)), K.colourTrack)] : []).join('; '), drawDraws);
+    for (const [label, text] of parts) put(label, fixed(text));
     // The kinds without tracks keep a line of their own body; an authored look (a role's) stands in for it.
-    const body = opts.body || (!(K.parts || []).length && sp && sp.body && sp.body.length ? pick(sp.body) : '');
-    if (body) add('Body', String(body).replace(/\{colour\}/g, opts.colour || ''));
+    const bodies = !(K.parts || []).length && sp && sp.body && sp.body.length ? sp.body : [];
+    let body = opts.body || (bodies.length ? pick(bodies) : '');
+    if (body) put('Body', () => String(body).replace(/\{colour\}/g, opts.colour || ''), !opts.body && bodies.length > 1 ? () => { body = pick(bodies); } : null);
+    // What this sex of the kind never has, as plain negatives at the end, and what the fields must not say.
+    const A = K.absent || {}, nots = [].concat(A[sx] || [], A.all || []).map((x) => String(x).replace(/^(?:an?|the) /i, ''));
+    const notRe = [].concat(...nots.map((x) => x.split(/ or /))).map((x) => x.replace(/^(?:an?|the) /i, '').replace(/ (?:apart from|more than) .*$/, '').trim()).filter(Boolean)
+      .map((x) => new RegExp('\\b' + escRe(x.replace(/s$/, '')) + 's?\\b', 'i'));
+    // The checks every composed look must pass, field by field: no "you", no lone shape word for the build, no young animal's
+    // word, none of the must-nots above ("never a beak" is not a beak), and no run of three words twice. A field at fault is
+    // drawn again, up to six times; a fault in a fixed line is the world's to mend, and the regression suite reads for it.
+    const faults = (rows) => {
+      const bad = [], seen = {};
+      rows.forEach(([label, text], i) => {
+        const said = text.replace(/;?\s*never an? [^;]*/gi, '');
+        if (/\byou(?:r|rs|rself)?\b/i.test(text) || (label === 'Build' && /\b(?:round|low|squat|stocky)\b/i.test(text)) || YOUNG_RE.test(text) || notRe.some((re) => re.test(said))) bad.push(i);
+        const w = (opts.colour ? text.replace(new RegExp(escRe(opts.colour), 'gi'), ' ') : text).toLowerCase().match(/[a-z'-]+/g) || [];
+        for (let j = 0; j + 2 < w.length; j++) { const run = w.slice(j, j + 3).join(' '); if (seen[run] != null) { if (!bad.includes(i)) bad.push(i); if (seen[run] !== i && !bad.includes(seen[run])) bad.push(seen[run]); } else seen[run] = i; }
+      });
+      return bad;
+    };
+    let rows = [];
+    for (let round = 0; round < 6; round++) {
+      rows = fields.map((f) => [f.label, f.texts.map((t) => String(t() || '').replace(/[.;,\s]+$/, '').trim()).filter(Boolean).join('; ')]).filter(([, text]) => text);
+      const bad = faults(rows).filter((i) => fields.find((f) => f.label === rows[i][0]).redraw); if (!bad.length) break;
+      fields.find((f) => f.label === rows[bad[0]][0]).redraw();
+    }
+    const lines = rows.map(([label, text]) => label + ': ' + text + '.');
+    if (nots.length) lines.push(cap(nots.map((x) => 'no ' + x).join(', ')) + '.');
     return personFill(kindText(Wc, k, lines.join(' '), p.eyes, p.breasts), p);
   }
-  // What this person's body does not have, said beside the looks: the kind's other sex's features, what no body of the kind has,
-  // what no body here has, and a muzzle wherever the face line gives none.
+  // What this person's body does not have, said beside the looks: what no body here has, a muzzle wherever the face line gives
+  // none, and the kind's must-nots for this sex only where the looks do not already end with them (a look written by hand).
   function absentText(Wc, k, c) {
     const L = looksSpec(Wc), K = looksKind(Wc, k); if (!L || !K || !(K.parts || []).length) return '';
-    const A = K.absent || {}, list = [].concat(A[sexKey(genderOf(c))] || [], A.all || [], L.absent || []);
-    if (c && c.looks && !/\bmuzzle\b/i.test(c.looks)) list.push('a muzzle');
+    const A = K.absent || {}, looks = String((c && c.looks) || ''), list = [];
+    if (!/(?:^|\. )No [a-z][^.]*\.?\s*$/.test(looks)) list.push(...(A[sexKey(genderOf(c))] || []), ...(A.all || []));
+    list.push(...(L.absent || []));
+    if (looks && !/\bmuzzle\b/i.test(looks)) list.push('a muzzle');
     return list.join(', ');
   }
   // The kind's ways for this person's sex: the finished lines of its senses, appetites and instincts (genPools.looks.kinds[k].ways),
@@ -679,11 +738,11 @@
     return K.ways.map((key) => T.find((t) => t.key === key)).filter((t) => t && t.endsAs && (!t.sex || t.sex === want)).map((t) => lowerFirst(String(t.endsAs).replace(/\.$/, ''))).join('; ');
   }
   // A labelled look read back by its labels ("Height", "Hair" ...); an unlabelled one (written in the Cast editor) is itself.
-  const looksField = (looks, label) => { const m = new RegExp('(?:^|\\s)' + label + ': ([^]*?)\\.(?=\\s+[A-Z][A-Za-z\' ]{1,30}: |\\s*$)').exec(String(looks || '')); return m ? m[1] : ''; };
+  const looksField = (looks, label) => { const m = new RegExp('(?:^|\\s)' + label + ': ([^]*?)\\.(?=\\s+[A-Z][A-Za-z\' ]{1,30}: |\\s+No [a-z]|\\s*$)').exec(String(looks || '')); return m ? m[1] : ''; };
   const looksLabelled = (looks) => /^Height: /.test(String(looks || ''));
   function looksBrief(looks) {
     if (!looksLabelled(looks)) return String(looks || '');
-    const build = looksField(looks, 'Build'); return [looksField(looks, 'Height') + (build ? ', with ' + build : ''), looksField(looks, 'Hair'), looksField(looks, 'Eyes')].filter(Boolean).join('; ');
+    const build = looksField(looks, 'Build'); return [looksField(looks, 'Height') + (build ? (/, with /.test(build) ? ', ' : ', with ') + build : ''), looksField(looks, 'Hair'), looksField(looks, 'Eyes')].filter(Boolean).join('; ');
   }
   // A look as a phrase inside another line ({npc_<key>_looks}): the body line where there is one, else the brief.
   const looksPhrase = (looks) => (looksLabelled(looks) ? looksField(looks, 'Body') || looksBrief(looks) : String(looks || ''));
@@ -825,7 +884,7 @@
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
     p.hair = sp && sp.hair && sp.hair.length ? pick(sp.hair).replace(/\{colour\}/g, colour) : '';
     p.breasts = gender === 'female' ? pickBreasts(Wc, speciesKey) : '';
-    p.looks = sp ? composeLooks(Wc, speciesKey, p, { colour, body: opts.looks, extent: opts.extent }) : (opts.looks || '');
+    p.looks = sp ? composeLooks(Wc, speciesKey, p, { colour, body: opts.looks, extent: opts.extent }) : (opts.looks || ''); p.looksV = LOOKS_V;
     // Clothes are the narrator's, from a role, a taste and the scene's occasion (dressLine); the cast deals the tastes round.
     p.dress = { role: opts.dressRole || 'student', taste: opts.taste || pick(dressTastes(Wc)) };
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
@@ -884,7 +943,7 @@
     const normName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const namedCharacter = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((name) => normName(name) === normName(p.name)));
     const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : (namedCharacter ? namedCharacter.key : null);
-    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, dress: p.dress, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
+    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, looksV: p.looksV, senses: p.senses, dress: p.dress, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
     r.intro = composeIntro(r);
     return r;
   }
@@ -927,13 +986,13 @@
       const aliases = [p.first, p.last].concat(t ? [t + ' ' + p.last] : []).filter(Boolean);
       const course = role.course || (/staff/.test(String(role.year || '')) ? '' : p.course); const yearBit = role.year + (course ? ', ' + course : '');
       const roleText = vfill(role.role, v), hope = vfill(role.hope, v);
-      return { key: role.key, name: title + p.name, first: p.first, last: p.last, gender: p.gender, pronouns: p.pronouns, race: p.race, species: p.species, aliases, looks: p.looks, senses: p.senses, dress: p.dress,
+      return { key: role.key, name: title + p.name, first: p.first, last: p.last, gender: p.gender, pronouns: p.pronouns, race: p.race, species: p.species, aliases, looks: p.looks, looksV: p.looksV, senses: p.senses, dress: p.dress,
         brief: p.race + ', ' + yearBit + '; ' + roleText + '. ' + cap(p.temperament) + '.',
         sheet: p.race + ', ' + yearBit + '. ' + cap(roleText) + '. ' + cap(p.temperament) + '; ' + p.quirk + '. Wants ' + p.want + '. Does not say: ' + p.privateMatter + '.' + (role.knows && role.knows.length ? ' Knows ' + role.knows.map((k) => '{npc_' + k + '}').join(', ') + '; nobody else outside class, club or dorm.' : ''),
         where: role.where || { default: 'around campus' }, aims: Object.assign({ default: 'go about ' + p.pronouns.their + ' own day' + (hope ? '; hopes, in time, for ' + hope + ', and does not push' : '') }, role.aims || {}), attitude: att,
         gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, invented: p.invented } };
     });
-    const minors = (W.minorRoles || []).map((m, i) => { const pl = plan.minors[i] || {}; const v = pl.variant || null; const p = draw({ species: pl.species || m.species, gender: pl.gender || m.gender, given: given[m.key], looks: m.looks ? vfill(m.looks, v) : undefined, dressRole: m.dress || 'student', taste: deal() }); const t = titleFor(m, p.gender); return { key: m.key, name: (t ? t + ' ' : '') + p.name, first: p.first, last: p.last, race: p.race, species: p.species, gender: p.gender, pronouns: p.pronouns, text: vfill(m.text, v), looks: p.looks, senses: p.senses, dress: p.dress, invented: p.invented }; });
+    const minors = (W.minorRoles || []).map((m, i) => { const pl = plan.minors[i] || {}; const v = pl.variant || null; const p = draw({ species: pl.species || m.species, gender: pl.gender || m.gender, given: given[m.key], looks: m.looks ? vfill(m.looks, v) : undefined, dressRole: m.dress || 'student', taste: deal() }); const t = titleFor(m, p.gender); return { key: m.key, name: (t ? t + ' ' : '') + p.name, first: p.first, last: p.last, race: p.race, species: p.species, gender: p.gender, pronouns: p.pronouns, text: vfill(m.text, v), looks: p.looks, looksV: p.looksV, senses: p.senses, dress: p.dress, invented: p.invented }; });
     return { characters, minors, invented: characters.filter((c) => c.gen.invented).length + minors.filter((m) => m.invented).length };
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
@@ -1020,11 +1079,13 @@
     // Saves from before v24 kept the roommate's looks only inside the sheet; the Cast editor and the prompt read a field of its own now.
     if (adv.roommate && adv.roommate.gen && !adv.roommate.looks && adv.roommate.gen.looks) { adv.roommate.looks = adv.roommate.gen.looks; adv.roommate.senses = adv.roommate.gen.senses || ''; adv.roommate.sheet = String(adv.roommate.sheet || '').replace(/ Looks: [^]*$/, ''); }
     // Saves from before v83 kept generated looks written as prose, which drifted from the kind (horns on a bovine woman, a height
-    // measured against the player): each is composed again from the kind's lines, and a Cast edit that only carried the old look along follows it.
+    // measured against the player); saves from before v84 drew each feature's column on its own, named tracks for labels (Forearm
+    // coat, Feet and stance), said the eyes twice and left the kind's must-nots out. Each is composed again from the kind's lines,
+    // once (looksV), keeping its colour, hair, eyes and chest, and a Cast edit that only carried the old look along follows it.
     const relook = (c) => {
-      if (!c || !c.looks || looksLabelled(c.looks) || !speciesPool(W, c.species)) return;
+      if (!c || !c.looks || c.looksV === LOOKS_V || !speciesPool(W, c.species)) return;
       const old = c.looks, fresh = recomposeLooks(W, c); if (!fresh) return;
-      c.looks = fresh; if (c.gen && c.gen.looks === old) c.gen.looks = fresh;
+      c.looks = fresh; c.looksV = LOOKS_V; if (c.gen && c.gen.looks === old) c.gen.looks = fresh;
       const o = adv.cast && adv.cast.overrides && adv.cast.overrides[c.key]; if (o && (o.looks === old || o.looks === fill(old))) o.looks = fresh;
     };
     relook(adv.roommate);
@@ -1358,10 +1419,9 @@
     const L = looksSpec(W) || {}, K = looksKind(W, k) || {}, side = to === 'female' ? 'woman' : 'man';
     // The kind's own pools stand over the shared ones, part by part, as composeLooks reads them for a person born to it.
     const D = Object.assign({}, ((W.transformation || {}).sexDraws || {})[side] || {}, (K.sexDraws || {})[side] || {});
-    const base = (L.build || {})[to] || {}, parts = Object.assign({}, base, (K.build || {})[to] || {});
-    const words = Object.keys(base).map((part) => (parts[part] && parts[part].length ? pick(parts[part]) : '')).filter(Boolean);
-    if (to === 'female' && D.rear && D.rear.length) words.push(pick(D.rear));
-    const joined = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words[0] || '';
+    const b = drawBuild(W, k, to, ''), words = b.parts.slice();
+    if (to === 'female' && D.rear && D.rear.length) { const fit = b.figure ? D.rear.filter((r) => fitsPhrase(b.figure, 'rear', r)) : []; words.push(pick(fit.length ? fit : D.rear)); }
+    const joined = words.length ? (b.word ? b.word + ', with ' : '') + listOf(words) : '';
     const hr = !K.heightTrack && K.height && K.height[to], out = {}, one = (pool) => (pool && pool.length ? pick(pool) : '');
     if (to === 'female') { const face = one(D.face); if (face) out.face = 'face type ' + face; if (joined) out.figure = 'figure ' + joined; }
     else { const look = one(D.look), beard = one(D.beard), hair = one(D.bodyHair); if (look) out.look = 'looks ' + look; if (joined) out.build = 'build ' + joined; if (beard) out.beard = beard; if (hair) out.bodyHair = hair; }
@@ -1821,8 +1881,6 @@
   const bondModel = () => { const T = W.transformation; return (T && T.tracks && T.tracks.bond) || null; };
   const TRACK_WINDOW = { from: 12, spread: 38, lenMin: 35, lenMax: 65 }, SEX_WINDOW = { from: 12, spread: 33, lenMin: 30, lenMax: 60, end: 92 };
   const drawWindow = (cfg) => { const s = cfg.from + Math.random() * cfg.spread; const e = Math.min(cfg.end || 100, s + cfg.lenMin + Math.random() * (cfg.lenMax - cfg.lenMin)); return { s: Math.round(s), e: Math.max(Math.round(s) + 10, Math.round(e)) }; };
-  // The body's lean: about two in three on the standard, the far ends rarer; a single feature may sit one step either side of it.
-  const drawLean = () => { const r = Math.random(); return r < 1 / 6 ? -1 : r < 5 / 6 ? 0 : 1; };
   const drawExt = () => { const r = Math.random(); return r < 0.15 ? -1 : r < 0.85 ? 0 : 1; };
   const stageOf = (p, n) => Math.max(0, Math.min(n, Math.floor((Number(p) || 0) * n / 100 + 1e-9)));
   // The least whole progress at stage j: rounded up, so stageOf of it is j again (round would give 33 for 1 of 3, which is stage 0).

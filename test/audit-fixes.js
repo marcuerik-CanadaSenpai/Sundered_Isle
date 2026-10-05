@@ -704,7 +704,7 @@ const S = {
       const rm = onlyAdv(g.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
       assert.match(looks, /Plumage: /, 'the harpy has her plumage: ' + looks);
       assert.match(looks, /Hair: [^.]*hair|Feathers in place of hair/i, 'and her hair, or feathers where her crest has taken it: ' + looks);
-      assert.match(looks, /Crest and ears: /, 'and her crest: ' + looks);
+      assert.match(looks, /Crest: /, 'and her crest: ' + looks);
       assert.match(looks, /\b(A|B) cup\b/, 'and has her own light chest: ' + looks);
       assert.doesNotMatch(looks, /\{/, 'no placeholder: ' + looks);
       clean(g);
@@ -738,8 +738,8 @@ const S = {
     const h = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
     try {
       const rm = onlyAdv(h.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
-      assert.match(looks, /Talons: /, 'the roommate\'s look has talons: ' + looks);
-      assert.match(looks, /Arms as wings: /, 'and her arms are wings: ' + looks);
+      assert.match(looks, /Feet: [^.]*(?:scaled|talons?|three toes forward)/, 'the roommate\'s look has talons for feet: ' + looks);
+      assert.match(looks, /Wings: arms as wings/, 'and her arms are wings: ' + looks);
       assert.match(looks, /Hands: [^.]*clawed finger/, 'with a gripping hand at the end of each: ' + looks);
       assert.doesNotMatch(looks, old, 'with no bare wrist or forearm-only wing: ' + looks);
       clean(h);
@@ -1309,7 +1309,8 @@ const S = {
           const c = sx.tracks.chest, w = sx.tracks.waist_and_hips, C = c.e - c.s;
           assert(Math.abs(w.s - (c.s + 0.3 * C)) <= 1 && w.e === Math.max(w.s + 10, Math.round(c.s + 0.8 * C)), 'waist and hips run with Chest 2 to 4: ' + JSON.stringify({ c, w }));
           assert(sx.draws && sx.draws.face && sx.draws.figure, 'the way over\'s draws are made when it is rolled: ' + JSON.stringify(sx.draws));
-          const words = sx.draws.figure.replace(/^figure /, '').split(/, | and /);
+          // The figure word comes first ("figure slight, with a slim waist, ..."); the parts after it are the pools' phrases.
+          const words = sx.draws.figure.replace(/^figure \w+, with /, '').split(/, | and /);
           assert(words.every((x) => pool('female', 'woman').includes(x)), 'a fairy figure is drawn from the fairy\'s pools: ' + sx.draws.figure);
         } else assert(sx.draws && sx.draws.beard === 'no beard' && /^smooth/.test(sx.draws.bodyHair) && /slight|slim|narrow/.test(sx.draws.build), 'a fairy man is beardless, smooth and slight: ' + JSON.stringify(sx.draws));
         clean(g);
@@ -1415,7 +1416,7 @@ const S = {
   // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
   // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names
   // nobody; a harpy's hair line is hair (her crest goes through it); and a bovine roommate's sheet still carries her udder, teats and
-  // hooves, shown, with no horns (a bull's) and no word on milk.
+  // hooves, shown, with the horns (a bull's) named only as absent in the closing line, and no word on milk.
   async looksShowNotTell() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const Wd = ctx.window.WINDLASS_WORLDS.sundered;
@@ -1436,7 +1437,9 @@ const S = {
       const rm = onlyAdv(h.mock.store).data.roommate; const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
       assert.doesNotMatch(looks, LECTURE, 'the bovine roommate\'s sheet shows and does not explain: ' + looks);
       for (const re of [/udder/, /nipple|teat/, /\bhoo(?:f|ves)\b/]) assert.match(looks, re, 'and still carries her kind\'s anatomy ' + re + ': ' + looks);
-      for (const re of [/horn/, /milk|lactat/]) assert.doesNotMatch(looks, re, 'and nothing a bovine woman\'s look does not hold ' + re + ': ' + looks);
+      const body = looks.replace(/\. No [a-z][^.]*\.$/, '.');
+      for (const re of [/horn/, /milk|lactat/]) assert.doesNotMatch(body, re, 'and nothing a bovine woman\'s look does not hold ' + re + ': ' + looks);
+      assert.match(looks, /\. No horns\b[^.]*\.$/, 'and the closing line names the horns as absent: ' + looks);
       assert(await h.turn('I look at Daisy.'));
       assert.match(promptOf(lastTurn(h)), /shown in passing, as part of the person, never recited from the sheet as a list or explained as biology or custom/, 'the appearance rule reaches the narrator');
       clean(h);
@@ -1517,7 +1520,8 @@ const S = {
       const looks = h.$('#cfLooks').value;
       assert.match(looks, /^Height: about (?:four|five|six) foot[^.]*\. Build: [^.]*waist[^.]*hips[^.]*thighs\./, 'the looks open with an absolute height and a build told part by part: ' + looks.slice(0, 160));
       assert.doesNotMatch(looks, /\byou(?:r)?\b/i, 'and are never measured against the player: ' + looks);
-      assert.match(looks, /\. Arms as wings: [^.]+\. /, 'the body follows as its own labelled sentences: ' + looks.slice(0, 400));
+      assert.match(looks, /\. Wings: [^.]+\. /, 'the body follows as its own labelled sentences: ' + looks.slice(0, 400));
+      assert.match(looks, /\. No wings on the back apart from the arms, no beak\.$/, 'and close with what the body never has: ' + looks.slice(-120));
       assert.match(looks, /\b(A|B) cup\b|\bbreasts\b/, 'her chest is described, drawn from the harpy pool: ' + looks);
       assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
       clean(h);

@@ -183,13 +183,14 @@ window.WINDLASS_WORLDS.sundered = {
       'heavy round breasts, an E, the whole weight of them shifting when the arms lift, with pale puffy areolae the width of a palm and short broad nipples', 'close-set breasts, a D, that touch in the middle and keep their own shadow between them, the areolae no wider than a coin around deeply coloured nipples', 'bell-shaped breasts, a small B, with areolae so near the skin\'s own colour that the eye finds only the long, fine, slightly darker nipples', 'breasts a full C carried low, that swing a little at a step, with wide areolae that crinkle faintly at the edge around long blunt-tipped nipples', 'conical breasts, a small B, the skin smooth and even from base to point, each narrowing to its areola and, at the very tip, the nipple'
     ],
     // How a person's looks are put together. The page composes them from the world's own lines and adds no prose of its own:
-    // a height in feet and inches, a build told part by part, the bust, hair and eyes from the pools above and below, and then
-    // every finished feature of the person's kind for that sex, each once, in the words of the track's range (the person's
-    // lean, a step either side for a feature, the face from its own draw), in the order given here. labels name a line where
-    // the track's own name will not do; to opens a range column that starts "To ..." (where a covering starts); unless leaves
-    // a line out when an earlier line already tells it; swap changes a word of a line for one sex (a fairy man's wings are
-    // tinted where the kind's are clear). absent is what that sex of the kind never has: it is told to the
-    // narrator beside the looks as "Not on this body", never stored. counts sums what the lines give part by part, for the check
+    // a height in feet and inches, a build that draws one figure word first (figures) and then its parts to agree with it (build,
+    // the kind's pools over these), the bust, hair and eyes from the pools above and below, and then every finished feature of the
+    // person's kind for that sex, each once, in the words of the track's range at the person's one column (drawn once for the whole
+    // body; the face from its own draw), in the order given here. labels give each track's line a plain label (Arms, Legs, Feet,
+    // Spine); two tracks under one label go in one line. to opens a range column that starts "To ..." (where a covering starts);
+    // unless leaves a line out when an earlier line already tells it; swap changes a word of a line for one sex (a fairy man's
+    // wings are tinted where the kind's are clear). absent is what that sex of the kind never has: it closes the looks as plain
+    // negatives ("No horns, no crest, no heavy neck."). counts sums what the lines give part by part, for the check
     // on a habit's anatomy ("her third hoof"). dress is what the body asks of clothes, as plain facts;
     // the clothes themselves are the narrator's, drawn from a role, a taste and the occasion. ways are the kind's senses, appetites
     // and instincts (its inner-life and by-sex nature tracks), whose finished lines every person of the kind shows in what they do;
@@ -204,7 +205,42 @@ window.WINDLASS_WORLDS.sundered = {
         male: { shoulders: ['broad shoulders', 'square shoulders', 'narrow shoulders', 'sloping shoulders', 'heavy shoulders', 'wide shoulders'], chest: ['a deep chest', 'a flat chest', 'a broad chest', 'a lean chest', 'a solid chest', 'a narrow chest'], waist: ['a narrow waist', 'a lean waist', 'a thick waist', 'a trim waist', 'a solid waist'] },
         nonbinary: { shoulders: ['broad shoulders', 'square shoulders', 'narrow shoulders', 'sloping shoulders'], waist: ['a narrow waist', 'a slim waist', 'a soft waist', 'a thick waist', 'a trim waist'], hips: ['wide hips', 'narrow hips', 'slim hips', 'full hips'] }
       },
-      labels: { further_pairs: 'Further pairs of nipples', finned_ears: 'Ears', water_tail: 'In water', webbed_feet: 'Feet', light_bones: 'Frame', build: 'Frame', figure: 'Figure', flowering: 'In season', catkins: 'In season', bark: 'Shoulder bark', webbed_hands: 'Hands', feet_and_roots: 'Feet' },
+      // The figure is drawn first, as one word; each part of the build is then a phrase of its pool that fits the figure (fits, by
+      // part), and a woman's figure is one her drawn chest allows (cups): no E cup on a slight figure, no A cup on a heavy one.
+      // A kind whose build pools fit a figure in no part cannot draw it (a goblin woman is never slight; a fairy never heavy).
+      figures: {
+        female: [
+          { word: 'slight', fits: { waist: ['slight', 'narrow', 'slim', 'long'], hips: ['slight', 'narrow', 'slim'], thighs: ['slight', 'slim', 'long'], rear: ['small', 'high', 'narrow'] }, cups: ['AA', 'A', 'B'] },
+          { word: 'slim', fits: { waist: ['slim', 'narrow', 'long', 'trim'], hips: ['slim', 'narrow'], thighs: ['slim', 'long'], rear: ['small', 'high', 'narrow'] }, cups: ['AA', 'A', 'B', 'C'] },
+          { word: 'athletic', fits: { waist: ['firm', 'trim', 'narrow', 'slim'], hips: ['narrow', 'slim'], thighs: ['strong', 'long', 'firm'], rear: ['small', 'high', 'round'] }, cups: ['A', 'B', 'C'] },
+          { word: 'soft', fits: { waist: ['soft', 'long', 'slim'], hips: ['full', 'wide', 'generous'], thighs: ['soft', 'full'], rear: ['round', 'full'] }, cups: ['B', 'C', 'D'] },
+          { word: 'full', fits: { waist: ['soft', 'firm', 'thick', 'long'], hips: ['wide', 'full', 'broad', 'generous'], thighs: ['full', 'strong', 'soft'], rear: ['round', 'full', 'heavy'] }, cups: ['C', 'D', 'DD', 'E'] },
+          { word: 'heavy', fits: { waist: ['thick', 'soft', 'solid'], hips: ['wide', 'broad', 'generous'], thighs: ['heavy', 'full', 'strong'], rear: ['heavy', 'full', 'round'] }, cups: ['D', 'DD', 'E', 'F', 'G'] }
+        ],
+        male: [
+          { word: 'slight', fits: { shoulders: ['narrow', 'sloping', 'slight', 'slim', 'wiry', 'bony'], chest: ['flat', 'lean', 'narrow', 'slight', 'slim'], waist: ['narrow', 'lean', 'trim', 'slight', 'slim'] } },
+          { word: 'lean', fits: { shoulders: ['square', 'narrow', 'wiry', 'slim'], chest: ['lean', 'flat', 'narrow', 'slim'], waist: ['lean', 'trim', 'narrow', 'slim'] } },
+          { word: 'athletic', fits: { shoulders: ['broad', 'square', 'wide'], chest: ['deep', 'broad', 'lean'], waist: ['trim', 'narrow', 'lean'] } },
+          { word: 'solid', fits: { shoulders: ['broad', 'heavy', 'square', 'wide'], chest: ['solid', 'broad', 'deep'], waist: ['solid', 'thick', 'trim'] } },
+          { word: 'heavy', fits: { shoulders: ['heavy', 'broad', 'wide'], chest: ['deep', 'broad', 'solid'], waist: ['thick', 'solid'] } }
+        ],
+        nonbinary: [
+          { word: 'slight', fits: { shoulders: ['narrow', 'sloping'], waist: ['narrow', 'slim'], hips: ['narrow', 'slim'] } },
+          { word: 'slim', fits: { shoulders: ['square', 'narrow'], waist: ['slim', 'trim', 'narrow'], hips: ['slim', 'narrow'] } },
+          { word: 'athletic', fits: { shoulders: ['broad', 'square'], waist: ['trim', 'narrow'], hips: ['narrow', 'slim'] } },
+          { word: 'soft', fits: { shoulders: ['sloping', 'square'], waist: ['soft'], hips: ['full', 'wide'] } },
+          { word: 'solid', fits: { shoulders: ['broad', 'square'], waist: ['thick', 'soft'], hips: ['wide', 'full'] } }
+        ]
+      },
+      labels: {
+        forearm_pelt: 'Arms', forearm_coat: 'Arms', arm_scales: 'Arms', arm_bark: 'Arms', arm_feathers: 'Arms', sheen: 'Sheen', wings: 'Wings', webbed_hands: 'Hands', hands_and_feet: 'Hands and feet',
+        leg_and_hip_pelt: 'Legs', leg_and_hip_coat: 'Legs', leg_and_hip_feathers: 'Legs', leg_and_hip_scales: 'Legs', leg_and_hip_bark: 'Legs', belly_fur: 'Belly',
+        toes_and_claws: 'Feet', toes_and_hooves: 'Feet', toes: 'Feet', hind_feet: 'Feet', feet_and_stance: 'Feet', talons: 'Feet', webbed_feet: 'Feet', feet_and_roots: 'Feet',
+        spine_ruff: 'Spine', spine_strip: 'Spine', spine_line: 'Spine', spine_ridge: 'Spine', tail: 'Tail', bob_tail: 'Tail', tail_fan: 'Tail', water_tail: 'In water',
+        ears: 'Ears', finned_ears: 'Ears', crest_and_ears: 'Crest', nose_and_face: 'Face', whiskers_and_face: 'Face', nose_and_lip: 'Face', teeth_and_jaw: 'Teeth', teeth: 'Teeth', front_teeth: 'Teeth', teeth_and_tongue: 'Teeth and tongue',
+        further_pairs: 'Nipples', teats_and_udder: 'Teats and udder', mantle: 'Mantle', bib: 'Bib', toms_build: 'Neck', horns_and_crest: 'Horns', light_bones: 'Frame', build: 'Frame',
+        gills: 'Gills', sheen_and_skin: 'Skin', grain: 'Skin', leaves: 'Leaves', glow_and_dust: 'Glow', flowering: 'In season', catkins: 'In season', bark: 'Shoulders', colours: 'Colours'
+      },
       to: { forearm_pelt: 'From the hands', forearm_coat: 'From the hands', arm_scales: 'From the hands', arm_bark: 'From the hands', sheen: 'From the fingertips', webbed_hands: 'Long fingers webbed' },
       absent: ['paws in place of hands', 'an animal\'s whole shape', 'any change of shape with the moon'],
       kinds: {
@@ -245,7 +281,6 @@ window.WINDLASS_WORLDS.sundered = {
           ways: ['voice_and_song', 'preening', 'appetite', 'heights_and_flock', 'own_scent', 'laying', 'brooding_and_moult'],
           sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear', 'a round rear'] } },
           build: { female: { waist: ['a narrow waist', 'a slim waist', 'a long waist'], hips: ['narrow hips', 'slim hips', 'full hips'], thighs: ['strong thighs', 'long thighs', 'slim thighs'] } },
-          labels: { wings: 'Arms as wings' },
           parts: ['arm_feathers', 'wings', 'hands', 'leg_and_hip_feathers', 'talons', 'tail_fan', 'crest_and_ears', 'face', 'light_bones'],
           absent: { all: ['wings on the back apart from the arms', 'a beak'] },
           dress: { all: ['wing-arms need open backs or no sleeves', 'talons rule out closed shoes', 'a tail fan needs an opening or a low waist'] } },
@@ -253,14 +288,14 @@ window.WINDLASS_WORLDS.sundered = {
           ways: ['voice', 'water_need', 'cool_blood', 'appetite', 'own_scent', 'spring_tides', 'display'],
           sexDraws: { man: { bodyHair: ['smooth, with almost none'] } },
           bustAvoid: ['soft', 'heavy', 'sway', 'swing'],
-          parts: ['webbed_hands', 'arm_scales', 'leg_and_hip_scales', 'webbed_feet', 'water_tail', 'gills', 'spine_ridge', 'sheen_and_skin', 'finned_ears', 'face', 'breasts', 'colours'],
+          parts: ['webbed_hands', 'arm_scales', 'leg_and_hip_scales', 'webbed_feet', 'water_tail', 'gills', 'spine_ridge', 'sheen_and_skin', 'finned_ears', 'face', 'colours'],
           absent: { female: ['the taller back fin of a mer man', 'the brighter male colours'], all: ['a fish tail more than an hour out of the water'] },
           dress: { all: ['merfolk wear what survives water'] } },
         dryad: { colour: 'Bark', height: { female: [63, 72], male: [70, 78] },
           ways: ['sun_and_water', 'stillness', 'the_year', 'the_tree', 'voice', 'own_scent'],
           sexDraws: { man: { bodyHair: ['smooth, with almost none'] } },
           labels: { hands: 'Fingers and toes' },
-          parts: ['hands', 'arm_bark', 'leg_and_hip_bark', 'feet_and_roots', 'spine_ridge', 'grain', 'leaves', 'ears', 'face', 'breasts', 'flowering', 'bark', 'catkins'],
+          parts: ['hands', 'arm_bark', 'leg_and_hip_bark', 'feet_and_roots', 'spine_ridge', 'grain', 'leaves', 'ears', 'face', 'flowering', 'bark', 'catkins'],
           absent: { female: ['heavy shoulder bark', 'catkins'], male: ['flowers or fruit'], all: ['a tail'] } },
         goblin: { colour: 'Skin', colourTrack: 'green_skin', heightTrack: 'height',
           born: { height: { least: 'About four and a half feet' } },
@@ -268,14 +303,14 @@ window.WINDLASS_WORLDS.sundered = {
           sexDraws: { woman: { rear: ['a round rear', 'a full rear', 'a heavy rear'] }, man: { beard: ['no beard'], bodyHair: ['smooth, with almost none'] } },
           bustAvoid: ['A cup', 'a small A', 'small B', 'slightest'],
           build: { female: { hips: ['wide hips', 'broad hips', 'full hips'] }, male: { shoulders: ['wiry shoulders', 'narrow shoulders', 'bony shoulders'], chest: ['a lean chest', 'a narrow chest'], waist: ['a lean waist', 'a narrow waist'] } },
-          parts: ['hands', 'feet', 'ears', 'nose_and_face', 'teeth', 'figure', 'build'],
+          parts: ['hands', 'feet', 'ears', 'nose_and_face', 'teeth', 'build'],
           absent: { female: ['tusks'], all: ['a tail'] },
           dress: { all: ['goblins wear small sizes, cut for adults'] } },
         fairy: { colour: { male: 'Wing tint' }, colourSkip: 'clear', heightTrack: 'height',
           ways: ['lightness', 'sweet_tooth', 'warmth', 'promises', 'iron', 'voice', 'own_scent'],
           sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear'] }, man: { beard: ['no beard'], bodyHair: ['smooth, with almost none'] } },
           build: { female: { waist: ['a slight waist', 'a slim waist', 'a narrow waist'], hips: ['slight hips', 'slim hips', 'narrow hips'], thighs: ['slight thighs', 'slim thighs', 'long thighs'] }, male: { shoulders: ['slight shoulders', 'slim shoulders', 'narrow shoulders'], chest: ['a slight chest', 'a slim chest', 'a narrow chest'], waist: ['a slight waist', 'a slim waist', 'a narrow waist'] } },
-          parts: ['wings', 'sheen', 'hands_and_feet', 'ears', 'face', 'glow_and_dust', 'figure', 'build'],
+          parts: ['wings', 'sheen', 'hands_and_feet', 'ears', 'face', 'glow_and_dust', 'build'],
           swap: { male: { wings: [['clear', 'tinted']] } },
           absent: { female: ['tinted wings'], all: ['a tail'] },
           dress: { all: ['fairies wear small sizes, cut for adults', 'wings need open backs or no sleeves'] } }
@@ -292,7 +327,7 @@ window.WINDLASS_WORLDS.sundered = {
         nameStyle: 'in the bovine fashion: warm, old-fashioned first names; farming, Alpine or Mediterranean surnames',
         first: { female: ['Marisol', 'Clover', 'Delphine', 'Rosalind', 'Bettany', 'Sunniva', 'Mireille', 'Greta'], male: ['Mateo', 'Bram', 'Tobias', 'Ferdinand', 'Rufus', 'Caspar', 'Otto', 'Emil'] }, last: ['Vega', 'Halloran', 'Dunmore', 'Aldous', 'Brennan', 'Okoro', 'Marchetti', 'Haugen'],
         colours: ['dun', 'black-and-white', 'red-and-white', 'red roan', 'cream', 'chestnut', 'smoke-grey'],
-        eyes: ['dark eyes, wide', 'eyes the brown of wet bark, long-lashed', 'soft hazel eyes, slow to blink', 'dark eyes with a blue cast like a calf\'s'],
+        eyes: ['dark eyes, wide', 'eyes the brown of wet bark, long-lashed', 'soft hazel eyes, slow to blink', 'dark eyes with a faint blue cast'],
         hair: ['{colour} hair worn long and loose, parting of itself around the ears and falling to the shoulder blades', 'hair cropped as close as the hide and {colour} to match it, so that from behind the one runs straight into the other', 'a single thick plait, {colour}, down the middle of the back, heavy enough to knock against the spine when the head turns', 'hair {colour} as the hide, twisted up into a soft knot at the crown, a few strands loose at the nape', 'hair cut blunt at the jaw, {colour}, that falls forward when the head bends over a book and is pushed back with the back of the wrist'],
         breasts: ['full heavy breasts, a D cup and more, that sit high for their weight and are veined blue under the thin skin, with wide dark areolae; long thick nipples the length of a finger-joint', 'big soft breasts, an E cup, warm and veined and heavy enough to rest on the forearms when the arms fold, with broad areolae; the nipples long and thick as a thumb-end', 'heavy pale breasts, a DD, that shift when the shoulders turn and are veined blue at the slope; long dark nipples that stand out the length of a knuckle', 'round full breasts, a D cup, high and close-set, veined faintly blue toward wide areolae; the nipples long and dark, tilting a little upward'],
         senses: ['smells of hay and a plain sweet soap, and of cut grass, which gets caught in the tuft of the tail', 'the coat at the forearm is short and dense under the hand and warm through, the ears soft as felt; the hooves click on stone and go silent on grass', 'breathes slow and deep, loud enough to hear in a quiet room; the ears move with a small leathery sound, and the tail-tuft whispers against the chair', 'a steady warm weight that does not shift when leaned on; a hug from {rm_them} comes slowly, holds, and is let go of last', 'a low unhurried voice that carries across a room without rising; when {rm_they} leans in, the breath smells of sweet grass', 'the jaw works sideways in a quiet moment, chewing cud; a sharp sudden noise is hard for {rm_them} to bear, and a hum of contentment comes through a shared seat'],
@@ -980,7 +1015,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The nails are curved claws that draw back into the fingertip and slide out when the fingers flex. They come out with temper or pleasure before the mind decides.',
               'Five supple fingers with soft pads and sharp claws that sheathe completely, as far as the draw sets. A hand that can be velvet or hooks; kneading something soft is a deep comfort.'
             ] },
-          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, needs: [{ track: 'hands', stage: 3 }], endsAs: 'Four toes with sheathing claws and a dewclaw',
+          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, needs: [{ track: 'hands', stage: 3 }], endsAs: 'Four toes, the claws sheathed, and a dewclaw',
             stages: [
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
@@ -1124,14 +1159,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The nails are short blunt claws, good for digging; the palms stay bare and soft, with no pads.',
               'Five fingers furred on the backs with short blunt claws and soft bare palms. Deft, gentle hands that dig and groom well.'
             ] },
-          { key: 'toes', name: 'Toes', weight: 4, endsAs: 'four long furred toes with blunt claws',
+          { key: 'toes', name: 'Toes', weight: 4, endsAs: 'four long furred toes, blunt-clawed',
             stages: [
               'Toenails thicker and blunter. Socks and shoes begin to disagree with them.',
               'The big toe shortens and draws in beside the others.',
               'Four long toes close together with blunt claws; the first toe is gone into the foot. Fur grows between and under them.',
               'Four long toes, furred above and below, with blunt claws for grip and digging. Nothing with a closed toe fits.'
             ] },
-          { key: 'hind_feet', name: 'Hind feet', weight: 9, needs: [{ track: 'toes', stage: 2 }], range: { least: 'A little long, heel down', standard: 'Long, furred to the sole', most: 'Very long, up on the toes' }, endsAs: 'long feet furred to the sole',
+          { key: 'hind_feet', name: 'Hind feet', weight: 9, needs: [{ track: 'toes', stage: 2 }], range: { least: 'Longer than a human\'s, heel down', standard: 'Long, furred to the sole', most: 'Very long, up on the toes' }, endsAs: 'long feet furred to the sole',
             stages: [
               'The arches ache, and the feet feel long in their shoes.',
               'The foot lengthens from heel to toe, and fine fur spreads over the top of it.',
@@ -1746,12 +1781,12 @@ window.WINDLASS_WORLDS.sundered = {
               'Wide hips, a small waist, breasts full for the frame, the nipples dark green.',
               'A compact, wide-hipped grown woman\'s figure with breasts full for the height and dark green nipples, at the size the draw sets.'
             ] },
-          { key: 'build', name: 'Build', weight: 8, sex: 'men', range: { least: 'Wiry and long-armed, with big hands', standard: 'Wiry and long-armed, with big hands and lower canines a little long', most: 'Wiry and long-armed, with big hands and small tusks' }, endsAs: 'wiry and long-armed, with big hands and lower canines a little long',
+          { key: 'build', name: 'Build', weight: 8, sex: 'men', range: { least: 'Wiry and long-armed, with big hands', standard: 'Wiry and long-armed, with big hands and lower canines a shade long', most: 'Wiry and long-armed, with big hands and small tusks' }, endsAs: 'wiry and long-armed, with big hands and lower canines a shade long',
             stages: [
               'The arms feel long, and the hands broaden.',
               'Long arms and big knuckled hands on a wiry frame. The nose and ears grow further than a woman\'s.',
               'The lower canines lengthen and show against the upper lip.',
-              'A wiry, long-armed grown man with big clever hands, a larger nose and ears, and lower canines a little long.'
+              'A wiry, long-armed grown man with big clever hands, a larger nose and ears, and lower canines a shade long.'
             ] }
         ],
         fairy: [
