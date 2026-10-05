@@ -1495,6 +1495,13 @@
       }
       // The chest a path grew stays told once the body has gone over: the path's own draw, its shape alone (what it does is a form step).
       if (path && path.sex === 'female' && tf.sex && tf.sex.species === k && tf.sex.to === 'female') parts.push('The breasts grown on this path: ' + chestShape(pathFill(tf, k, '{breasts}')) + '.');
+      // So does the rest of what lasts from the way over: the shared stages (skin, rhythm, gait, scent) and the kind's complete shape from its last sex rung.
+      // The breast stages are in the grown chest above, and the genitals were stated once and are not repeated.
+      if (path && path.sex && tf.sex && tf.sex.species === k) {
+        const told = Array.isArray(path.sexTold) ? path.sexTold : [], lastRung = sp.ladder[lastSexRung(sp) - 1], shape = (lastRung && lastRung.sex) || [];
+        const kept = told.filter((x) => (/^\{[a-z]+\d?\}$/.test(x) ? !/^\{(?:tanner\d|genitals)\}$/.test(x) : shape.includes(x)));
+        if (kept.length) parts.push('Settled on the way over: ' + (compact ? kept.slice(-2) : kept).map(pf).join('; ') + '.');
+      }
       // The kind's form on a woman's body, every step told.
       if (path) {
         const form = formToldOf(tf, k);
@@ -2105,8 +2112,9 @@
     if (!W.transformation || !text) return [];
     const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
     // "I have" counts only with a measure of it ("I have a cup of cocoa"): a bare "I have the milk" or "I have a milk allergy" is not drinking.
+    // "I had" is the meal told after: "I had some milk" and "I had cheese" count, "I had the milk in my bag" does not.
     const DAIRY = '(?:cocoa|milk|cream|cheese|butter|dairy)\\b', MEASURE = '(?:(?:a|some|the|another|my)\\s+)?(?:sip|taste|cup|mug|glass|bowl|serving|plate)s?\\s+of\\s+';
-    const dairy = new RegExp('^[\\s]*[Ii]\\s+(?:(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed)\\s+(?:(?:a|some|the|another|my)\\s+)?(?:' + MEASURE + ')?|(?:have|had)\\s+' + MEASURE + ')' + DAIRY, 'i').test(text);
+    const dairy = new RegExp('^[\\s]*[Ii]\\s+(?:(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed)\\s+(?:(?:a|some|the|another|my)\\s+)?(?:' + MEASURE + ')?|have\\s+' + MEASURE + '|had\\s+(?:' + MEASURE + '|(?:some\\s+)?))' + DAIRY, 'i').test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
       if (!exposures.has(species) || exposures.get(species).intensity < intensity) exposures.set(species, { species, method: 'explicit player action: ' + text.trim().slice(0, 80), intensity });
