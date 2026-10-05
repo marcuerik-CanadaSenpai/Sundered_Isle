@@ -695,8 +695,14 @@
     const lead = sp && sp.leadByGender && sp.leadByGender[gender] && sp.leadByGender[gender].length ? pick(sp.leadByGender[gender]) : '';
     const byG = sp && sp.bodyByGender && sp.bodyByGender[gender] && sp.bodyByGender[gender].length ? '. ' + pick(sp.bodyByGender[gender]) : '';
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
+    const hair = pick((sp && sp.hair) || G.hair || []);
+    const breasts = gender === 'female' ? pick((sp && sp.breasts) || G.breasts || []) : '';
     const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/\{colour\}/g, colour) : '';
-    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText, p.eyes), p) : '');
+    const lookText = opts.looks || (bodyText ? (lead ? lead.replace(/\{colour\}/g, colour) + '. ' + cap(bodyText) : bodyText) : '');
+    const hasHairSlot = /\{hair\}/i.test(lookText), hasBreastSlot = /\{breasts\}/i.test(lookText);
+    p.looks = personFill(kindText(Wc, speciesKey, lookText, p.eyes).replace(/\{hair\}/gi, hair).replace(/\{breasts\}/gi, breasts), p);
+    if (!hasHairSlot && hair) p.looks += (p.looks ? ' ' : '') + 'Hair: ' + hair + '.';
+    if (gender === 'female' && !hasBreastSlot && !/\b(?:breasts?|nipples?|bust|mammary)\b/i.test(lookText) && breasts) p.looks += (p.looks ? ' ' : '') + breasts + '.';
     if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
@@ -1127,6 +1133,16 @@
   function stepGapMin() { const T = W.transformation || {}; const h = T.stepGapHours != null ? T.stepGapHours : 1.5; const sc = PACE_STEP_SCALE[adv.settings.pace]; return Math.round(h * 60 * (sc == null ? 1 : sc)); }
   const hasSteps = (rung) => !!(rung && Array.isArray(rung.steps) && rung.steps.length);
   const lastSexRung = (sp) => sp.ladder.reduce((m, r, i) => (r.sex && r.sex.length ? i + 1 : m), 0);
+  function sexStageSteps(sp, position, target, fallback) {
+    const stages = W.transformation.sexStages && W.transformation.sexStages[target];
+    if (!Array.isArray(stages) || !stages.length) return fallback.slice();
+    const total = sp.ladder.reduce((n, rung) => n + ((rung.sex && rung.sex.length) || 0), 0);
+    const before = sp.ladder.slice(0, position).reduce((n, rung) => n + ((rung.sex && rung.sex.length) || 0), 0);
+    return fallback.map((_, i) => {
+      const index = before + i;
+      return stages[Math.floor(index * (stages.length - 1) / Math.max(1, total - 1))];
+    });
+  }
   // Fading. A change has a completion: the steps told over the steps in all, 0 (as it was) to 100 (the paw). One not yet at the
   // line (half done) with no exposure to its kind for afterHours of story time stops growing and loses a step, then another every
   // everyHours, told as the body going back toward how it was; one at or past the line has set and only completes. A change faded
@@ -1196,10 +1212,11 @@
         if (hasSteps(rung)) {
           if (!tf.paths[k]) {
             const sc = (T.sexChange || {})[k];
+            const sexTarget = sc && sc.to ? (p.gender === sc.to ? (sc.reverseTo || null) : sc.to) : null;
             const sexPathExists = !!tf.sex || Object.values(tf.paths || {}).some((path) => path && path.sex) || (tf.tracks || []).some((track) => track.kind === 'sex');
-            const roll = !!(!sexPathExists && sc && sc.to && p.gender !== sc.to && Math.random() < (sc.chance == null ? 0.5 : sc.chance));
-            tf.paths[k] = { sex: roll ? sc.to : null, sexTold: [], day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
-            if (roll) notes.push(k + ' path drawn: the body will also go toward a ' + (sc.to === 'female' ? 'woman' : 'man') + '\'s');
+            const roll = !!(!sexPathExists && sexTarget && Math.random() < (sc.chance == null ? 0.5 : sc.chance));
+            tf.paths[k] = { sex: roll ? sexTarget : null, sexTold: [], day: state.day, order: drawOrder(sp, k), eye: pathEye(k) };
+            if (roll) notes.push(k + ' path drawn: the body will also go toward a ' + (sexTarget === 'female' ? 'woman' : 'man') + '\'s');
             if (tf.paths[k].eye) notes.push(k + ' path drawn: the eyes will go ' + eyeColour(tf.paths[k].eye));
             if (tf.paths[k].order.some((c, i) => c !== i)) notes.push(k + ' path drawn: the changes come in the order ' + tf.paths[k].order.map((c) => c + 1).join(' '));
           }
@@ -1207,7 +1224,9 @@
           tf.traits.push({ species: k, trait: content.trait, day: state.day, settled: false });
           if (tf.last[k] == null || tf.last[k] < now) tf.last[k] = now;
           tf.tracks.push({ species: k, rung: r + 1, kind: 'body', trait: content.trait, steps: drawSteps(content.steps), anatomy: content.anatomy || '', habits: shuffled(sp.habits || []).slice(0, 2), noticed: pick(sp.noticed || []) || '', i: 0, nextAt: now, day: state.day, beganAt: now });
-          if (tf.paths[k].sex && rung.sex && rung.sex.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'sex', to: tf.paths[k].sex, trait: content.trait, steps: rung.sex.slice(), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day });
+          if (tf.paths[k].sex && rung.sex && rung.sex.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'sex', to: tf.paths[k].sex, trait: content.trait, steps: sexStageSteps(sp, r, tf.paths[k].sex, rung.sex), i: 0, nextAt: now + Math.round(stepGapMin() / 2), day: state.day });
+          const femaleBody = tf.paths[k].sex ? tf.paths[k].sex === 'female' : p.gender === 'female';
+          if (femaleBody && content.women && content.women.length) tf.tracks.push({ species: k, rung: r + 1, kind: 'women', to: 'female', trait: content.trait, steps: content.women.slice(), i: 0, nextAt: now, day: state.day });
           diff.push({ path: 'tf.traits', from: '', to: sp.short + ': ' + content.trait + ' (beginning)' });
         } else {
           tf.traits.push({ species: k, trait: rung.trait, day: state.day, settled: false });
@@ -1255,6 +1274,7 @@
       if (isLast && t.rung >= lastSexRung(sp)) return 'The body has finished going over (' + sp.name + ' path): ' + step + '. ' + who + '\'s body is ' + what + ' now, the whole of it. Say so once, plainly, as a fact found in the mirror or in clothes, without ceremony or explanation; then the scene goes on. What ' + who + ' is called and how ' + who + ' feels about it are the player\'s; people who know ' + who + ' go by whatever ' + who + ' has said, and otherwise by what they see.';
       return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). One small thing this turn, in your own words: ' + step + '. A sentence or two, plain, found in passing (a mirror, a shirt, a strap, a voice), with its practical consequence; then the scene goes on. Nobody remarks on it unless it is plainly visible and they would have cause, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
     }
+    if (t.kind === 'women') return 'The woman\'s form on the ' + sp.name + ' path: ' + (isFirst ? 'one first detail' : 'one further detail') + ' this turn, in your own words: ' + step + '. Keep it specific to this kind and describe only this step; then the scene goes on. The player decides what it means and how ' + who + ' feels about it.';
     if (isLast) return 'The change completes (' + sp.name + '): ' + t.trait + '. In your own words: ' + step + '. What the body is now, to render once in full, plainly, as ' + who + ' would find it by looking and touching, and to keep to afterwards: ' + pathFill(tf, t.species, t.anatomy || sp.name + ' as the kind has it') + ' From here it is part of ' + who + '\'s body: let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(t.habits[0] || t.trait) + ') without announcement; new parts may move reflexively before their motions are familiar. An animal or a keen-nosed mythkin may react without a word (' + fill(t.noticed || 'a look, a sniff, room made') + '), never naming it. Hiding it, if ' + who + ' chooses to, costs something practical each time. How ' + who + ' feels about it is the player\'s; do not presume a reaction in the suggested actions.';
     if (isFirst) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + t.trait + '. Only one small thing this turn, in your own words: ' + step + '. It is a first sensation, small enough to put down to tiredness, the cold or the food, and nothing shows: a sentence or two from inside ' + who + '\'s body, then the scene goes on and ' + who + ' may forget it. Do not name what it is becoming; nobody else notices. One suggested action may touch it; the others need not.';
     return 'The change continues (' + sp.name + '): ' + t.trait + '. One more small thing this turn, in your own words: ' + step + '. Found in passing (a shoe, a sock, a chair, a sleeve, a mirror, a task the body does differently), with its practical consequence, in a sentence or two; the rest of the turn is the scene. ' + who + ' may attend to it or let it go: that is the player\'s. What was told before stays true (<transformation> lists it). Nobody remarks on it unless it is plainly visible and they would have cause, and nobody names or predicts it.';
@@ -1266,18 +1286,22 @@
     const T = W.transformation; if (!T || !state.tf) return [];
     const tf = state.tf; tf.tracks = tf.tracks || []; const now = storyMin(state); const gap = stepGapMin(); const out = [];
     const held = (t) => { const b = bodyTrackOf(tf, t); return !!b && fadeHeld(tf, b, now); };
-    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t)).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
+    const due = tf.tracks.filter((t) => t.nextAt <= now && !held(t) && !(t.kind === 'women' && tf.tracks.some((x) => x.species === t.species && x.rung === t.rung && x.kind === 'sex'))).sort((a, b) => a.nextAt - b.nextAt).slice(0, 2);
     for (const t of due) {
       out.push(stepNote(t, tf, t.steps[t.i]));
       if (t.kind === 'sex') {
         const path = tf.paths[t.species];
         if (path) { path.sexTold = path.sexTold || []; path.sexTold.push(t.steps[t.i]); }
       }
+      if (t.kind === 'women') {
+        const path = tf.paths[t.species];
+        if (path) { path.womenTold = path.womenTold || []; path.womenTold.push(t.steps[t.i]); }
+      }
       const last = t.i === t.steps.length - 1; t.i += 1; t.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
       if (!last) continue;
       if (t.kind === 'body') { const tr = tf.traits.find((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (tr) tr.settled = true; notes.push('change complete: ' + t.species + ' rung ' + t.rung); }
-      else if (t.rung >= lastSexRung(T.species[t.species])) { if (!tf.sex) tf.sex = { to: t.to, species: t.species, rung: t.rung, day: state.day }; notes.push('the body is ' + (t.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now (' + t.species + ' path)'); }
-      else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
+      else if (t.kind === 'sex' && t.rung >= lastSexRung(T.species[t.species])) { if (!tf.sex) tf.sex = { to: t.to, species: t.species, rung: t.rung, day: state.day }; notes.push('the body is ' + (t.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now (' + t.species + ' path)'); }
+      else if (t.kind === 'sex') notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
     return out.concat(fadeTracks(state, notes));
@@ -1303,9 +1327,10 @@
       }
       if (t.i === 0) {
         // Gone: the trait, the rung, the sex steps of the same rung, and influence to just under the line, so the body remembers.
-        tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && x.kind === 'sex' && x.rung === t.rung));
+        tf.tracks = tf.tracks.filter((x) => x !== t && !(x.species === t.species && x.rung === t.rung && (x.kind === 'sex' || x.kind === 'women')));
         const path = (tf.paths || {})[t.species], rung = sp.ladder[t.rung - 1];
         if (path && Array.isArray(path.sexTold) && rung && rung.sex) path.sexTold = path.sexTold.filter((x) => !rung.sex.includes(x));
+        if (path && Array.isArray(path.womenTold) && rung && rung.women) path.womenTold = path.womenTold.filter((x) => !rung.women.includes(x));
         const i = tf.traits.findIndex((x) => x.species === t.species && x.trait === t.trait && x.settled === false); if (i >= 0) tf.traits.splice(i, 1);
         tf.rungs[t.species] = Math.max(0, (tf.rungs[t.species] || 0) - 1);
         if (!tf.rungs[t.species] && !tf.traits.some((x) => x.species === t.species) && tf.paths) delete tf.paths[t.species];
@@ -1433,6 +1458,7 @@
         }
         if (told.length) parts.push('Toward ' + (path.sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far: ' + (compact ? told.slice(-2) : told).map(pf).join('; ') + '.');
       }
+      if (path && Array.isArray(path.womenTold) && path.womenTold.length) parts.push('Kind-specific details of the woman\'s form so far: ' + (compact ? path.womenTold.slice(-2) : path.womenTold).map(pf).join('; ') + '.');
       const bt = (tf.tracks || []).find((t) => t.species === k && t.kind === 'body');
       if (bt && bt.i > 0) parts.push('Under way (' + bt.trait + (bt.fadeAt != null ? ', fading' : '') + '), told so far: ' + (compact ? bt.steps.slice(Math.max(0, bt.i - 2), bt.i) : bt.steps.slice(0, bt.i)).map(pf).join('; ') + '.');
       if (parts.length) out.push('Body now (' + sp.name + '): ' + parts.join(' '));
@@ -1455,7 +1481,12 @@
     lines.push(compact
       ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
       : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
-    lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
+    lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Sex changes follow the ordered Tanner stages given here, from breast buds to a grown chest or in reverse; keep those steps clinical and non-erotic, with genital changes stated clinically only in the last step. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
+    const sexTargets = [...new Set(Object.entries(tf.paths || {}).filter(([k, path]) => path && path.sex && !(tf.sex && tf.sex.species === k)).map(([, path]) => path.sex))];
+    for (const target of sexTargets) {
+      const stages = T.sexStages && T.sexStages[target];
+      if (Array.isArray(stages) && stages.length) lines.push('Sex-change stages toward a ' + (target === 'female' ? 'woman' : 'man') + '\'s body, in order; describe them clinically and non-erotically: ' + stages.join('; ') + '.');
+    }
     lines.push('Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
     const methodKinds = kinds;
     lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
@@ -1533,6 +1564,7 @@
       if (sc && sc.to) {
         const them = sc.to === 'female' ? 'women' : 'men', other = sc.to === 'female' ? 'man' : 'woman', toward = sc.to === 'female' ? 'a woman\'s' : 'a man\'s';
         t += (sc.chance == null ? 0.5 : sc.chance) >= 1 ? ' ' + cap(sp.name) + ' are all ' + them + '; a human ' + other + ' who goes far down this path becomes one along the way, and the ' + sp.name + ' think nothing of it.' : ' Some who go this way find the body going toward ' + toward + ' as well.';
+        if (sc.reverseTo) t += ' In reverse, a woman or man may find the body going toward a ' + (sc.reverseTo === 'female' ? 'woman' : 'man') + '\'s form.';
       }
     }
     return t;
@@ -2230,6 +2262,7 @@
       for (const lim of [
         { events: 20, earlier: 12 },
         { events: 20, earlier: 12, exemplars: 1 },
+        { events: 20, earlier: 12, exemplars: 1, loreBudget: 4500 },
         { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000 },
         { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean' },
         { events: 20, earlier: 12, exemplars: 1, loreBudget: 3000, castLevel: 'lean', gmLevel: 'lean' },

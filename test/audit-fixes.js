@@ -569,7 +569,7 @@ const S = {
     const h0 = await begin({ rmSpecies: 'harpy', rmName: 'Wren Skye' });
     const store = h0.mock.store; let id;
     try {
-      patchTurns(h0, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element: 'air', d6: 3, total: 7, difficulty: 'Medium', outcome: 'success', reason: 'a ward sung on the air' }; });
+      patchTurns(h0, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element: 'air', d6: 3, total: 99, difficulty: 'Medium', outcome: 'success', reason: 'a ward sung on the air' }; });
       assert(await h0.turn('I try to sing the small ward Wren taught me.')); id = onlyAdv(store).id;
       const p0 = promptOf(lastTurn(h0)); const t0 = storedTurns(store, id).at(-1);
       assert.match(p0, /carries no element yet/, 'a human with no change carries no element');
@@ -589,7 +589,7 @@ const S = {
     try {
       assert(await h.settle(150, 6000));
       let element = 'air';
-      patchTurns(h, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element, d6: 3, total: 7, difficulty: 'Medium', outcome: 'success', reason: 'a working' }; });
+      patchTurns(h, (r) => { r.evaluation = { rules_in_play: [], stat: 'wits', element, d6: 3, total: 99, difficulty: 'Medium', outcome: 'success', reason: 'a working' }; });
       assert(await h.turn('I sing the ward again, on the air.'));
       let p = promptOf(lastTurn(h)), t = storedTurns(h.mock.store, id).at(-1);
       assert.match(p, /carries air \(Harpy\)/, 'the body line names the carried element: ' + (p.match(/carries [^.]*/) || [''])[0]);
@@ -706,8 +706,152 @@ const S = {
       const leads = [/^Shorter than you and light enough to lift, fine-boned and quick/, /^A small woman built for the air/, /^Slight and poised, a head shorter than you/];
       assert(leads.some((re) => re.test(looks)), 'the looks open with a beauty line: ' + looks.slice(0, 120));
       assert.match(looks, /\. [A-Z][^.]*(feathers|wing|down)/i, 'the body follows as its own capitalised sentence: ' + looks.slice(0, 200));
-      assert.match(looks, /small breasts beneath the down|Down runs between the breasts/, 'the kind\'s anatomy is still stated: ' + looks);
+      assert.match(looks, /A-cup breasts|small, close-set breasts/i, 'the kind\'s chest is drawn from its pool: ' + looks);
       assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  async castBreastsAndHair() {
+    const h = await boot({});
+    try {
+      assert(await h.settle(150, 6000));
+      const W = h.window.WINDLASS_WORLDS.sundered, G = W.genPools;
+      for (const [kind, sp] of Object.entries(G.species)) {
+        assert(Array.isArray(sp.hair) && sp.hair.length, kind + ' needs a hair pool');
+        if (sp.genders.includes('female')) assert(sp.bodyByGender && sp.bodyByGender.female.every((line) => /\{breasts\}/i.test(line)), kind + ' female body lines need the breasts placeholder');
+      }
+      assert(G.breasts.some((line) => /A-cup/.test(line)) && G.breasts.some((line) => /D-cup/.test(line)), 'the general pool spans cup sizes');
+      assert(G.breasts.every((line) => /nipples/i.test(line) && /areolae/i.test(line)), 'the general pool describes nipples and areolae');
+      for (const kind of ['cow', 'harpy', 'fairy']) assert(G.species[kind].breasts && G.species[kind].breasts.length > 1, kind + ' needs its own varied breast pool');
+      assert(G.species.cow.breasts.some((line) => /heavy.*long thick.*veins.*milk/i.test(line)), 'bovine breasts include their established weight, nipples, veins and milk');
+
+      const choir = W.castRoles.find((role) => role.key === 'choir');
+      choir.species = 'harpy'; choir.gender = 'female'; choir.looks = 'An authored look in a blue coat.';
+      h.$('#cGender').value = 'male'; h.type('#cRmSpecies', 'harpy'); h.type('#cRmName', 'Wren Skye');
+      h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish');
+      const data = onlyAdv(h.mock.store).data, authored = data.cast.generated.characters.find((c) => c.key === 'choir');
+      assert.match(data.roommate.looks, /Hair: /, 'generated looks carry a hair-pool pick');
+      assert.match(data.roommate.looks, /(?:A-cup|small, close-set) breasts/i, 'generated female looks carry a harpy breast-pool pick');
+      assert.match(authored.looks, /Hair: /, 'an authored look receives hair when it lacks a hair slot');
+      assert.match(authored.looks, /(?:A-cup|small, close-set) breasts/i, 'an authored female look receives breasts when it lacks a breast description');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  async harpyWingArms() {
+    const h = await boot({});
+    try {
+      assert(await h.settle(150, 6000));
+      const W = h.window.WINDLASS_WORLDS.sundered, harpy = W.genPools.species.harpy;
+      const forbidden = /from the elbow|from elbow|at the wrist|to the wrist|elbow to wrist/i;
+      for (const line of harpy.body) {
+        assert.match(line, /wing[^.]*shoulder|shoulder[^.]*wing/i, 'harpy arms are wings from the shoulders: ' + line);
+        assert.match(line, /hand[^.]*four fingers and a thumb[^.]*talon/i, 'each wing ends in a taloned hand: ' + line);
+        assert.doesNotMatch(line, forbidden, 'harpy anatomy must not place wings at elbows or hands at wrists');
+      }
+      for (const line of harpy.bodyByGender.female) {
+        assert.match(line, /arm[^.]*wings?/i, 'the female chest line includes wing-arms');
+        assert.match(line, /four fingers and a thumb[^.]*talons?/i, 'the female chest line includes taloned hands');
+        assert.doesNotMatch(line, forbidden);
+      }
+      const ladder = W.transformation.species.harpy.ladder;
+      for (const rung of ladder) assert.doesNotMatch(JSON.stringify(rung), forbidden, 'harpy rung ' + rung.at + ' must not place wings at elbows or hands at wrists');
+      for (const position of [3, 4]) {
+        const rung = ladder[position];
+        assert.match(rung.trait, /wings?/i, 'harpy rung ' + rung.at + ' names wings');
+        assert.match(rung.anatomy, /wings?[^.]*shoulders?|shoulders?[^.]*wings?/i, 'harpy rung anatomy gives shoulder wings');
+        assert.match(rung.anatomy, /hand[^.]*talon/i, 'harpy rung anatomy gives taloned hands');
+        assert.doesNotMatch(rung.anatomy, forbidden);
+      }
+      assert(ladder[3].steps.some((step) => /fingernails.*curve into black talons/i.test(step)), 'rung 70 includes nails becoming talons');
+      assert.match(W.lore.find((entry) => entry.species === 'harpy').text, /arms are her wings.*shoulder.*four fingers and a thumb.*talons/i, 'harpy lore gives the corrected arm anatomy');
+      assert.doesNotMatch(W.lore.find((entry) => entry.species === 'harpy').text, forbidden);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  async sexChangeStages() {
+    let h = await boot({});
+    try {
+      assert(await h.settle(150, 6000));
+      h.$('#cGender').value = 'male'; h.type('#cRmSpecies', 'cow'); h.click('#cBegin');
+      assert(await h.idle(30000), 'creating the adventure did not finish');
+      const store = h.mock.store, { id } = onlyAdv(store), data = store.get('adventures/' + id).data;
+      const W = h.window.WINDLASS_WORLDS.sundered, stages = W.transformation.sexStages.female;
+      assert.match(stages[0], /Tanner stage II.*breast buds/);
+      assert.deepEqual(Array.from(stages).slice(0, 4).map((text) => ['II', 'III', 'IV', 'V'].indexOf(/Tanner stage (III|IV|II|V)/.exec(text)[1]) + 2), [2, 3, 4, 5], 'breast stages progress from buds to a grown chest');
+      assert.match(stages.at(-1), /external genital anatomy.*clinically/i, 'genitals are the clinical final stage');
+      assert.match(W.transformation.sexStages.male[0], /Tanner stage V/);
+      assert.match(W.transformation.sexStages.male.at(-1), /external genital anatomy.*clinically/i, 'the reverse path is also defined');
+
+      data.settings.pace = 'unbounded';
+      const tf = data.state.tf, ladder = W.transformation.species.cow.ladder;
+      const [hour, minute] = data.state.time.split(':').map(Number), now = (data.state.day - 1) * 1440 + hour * 60 + minute;
+      tf.last = tf.last || {}; tf.drifted = tf.drifted || {}; tf.paths = tf.paths || {};
+      tf.rungs = { cow: 1 }; tf.influence.cow = ladder[1].at; tf.traits = []; tf.arcs = []; tf.tracks = [];
+      tf.paths.cow = { sex: 'female', sexTold: [], day: data.state.day, order: [0, 1, 2, 3, 4, 5], eye: 'dark eyes' };
+      tf.last.cow = now; tf.drifted.cow = 0;
+      h.close();
+      h = await boot({ setup(w, m) { m.store = store; } });
+      assert(await h.settle(150, 6000));
+      patchTurns(h, (r) => { r.time_advance_minutes = 15; r.exposures = []; });
+      let turnNo = 0; const sexNotes = [], womenNotes = [];
+      async function reload() {
+        h.close();
+        h = await boot({ setup(w, m) { m.store = store; } });
+        assert(await h.settle(150, 6000));
+        patchTurns(h, (r) => { r.time_advance_minutes = 15; r.exposures = []; });
+      }
+      async function turnAndCollect(action) {
+        assert(await h.turn(action || 'I wait.'));
+        turnNo += 1;
+        const notes = onlyAdv(h.mock.store).data.pendingNotes || [];
+        for (const note of notes) {
+          if (/Tanner stage|external genital anatomy/i.test(note) || /^The body has finished going over/i.test(note)) sexNotes.push({ turn: turnNo, note });
+          if (/woman's form|Milk begins/i.test(note)) womenNotes.push({ turn: turnNo, note });
+        }
+      }
+      for (let position = 1; position <= 4; position++) {
+        const current = store.get('adventures/' + id).data.state.tf;
+        current.rungs.cow = position; current.influence.cow = ladder[position].at; current.traits = []; current.tracks = []; current.arcs = [];
+        await reload();
+        await turnAndCollect();
+        let live = store.get('adventures/' + id).data.state.tf;
+        while (live.tracks.some((track) => track.kind === 'sex')) {
+          live.tracks = live.tracks.filter((track) => track.kind === 'sex' || track.kind === 'women');
+          await reload();
+          await turnAndCollect();
+          live = store.get('adventures/' + id).data.state.tf;
+        }
+        if (position === 4) {
+          const finishedTurn = sexNotes.at(-1).turn;
+          while (live.tracks.some((track) => track.kind === 'women')) {
+            live.tracks = live.tracks.filter((track) => track.kind === 'women');
+            await reload();
+            await turnAndCollect();
+            live = store.get('adventures/' + id).data.state.tf;
+          }
+          assert(womenNotes.length >= 2, 'the cow path tells the udder and milk form steps');
+          assert(womenNotes.every((entry) => entry.turn > finishedTurn), 'women steps wait for the sex steps and a later turn');
+          assert.match(womenNotes.find((entry) => /Milk begins/i.test(entry.note)).note, /Milk begins to gather/i, 'the lactation step follows the finished sex-change step');
+        }
+      }
+      const labels = sexNotes.flatMap(({ note }) => Array.from(note.matchAll(/Tanner stage (III|IV|II|V)/g), (match) => ['II', 'III', 'IV', 'V'].indexOf(match[1])));
+      assert(labels.includes(0) && labels.includes(1) && labels.includes(2) && labels.includes(3), 'all breast Tanner stages are narrated');
+      assert(labels.every((label, i) => !i || label >= labels[i - 1]), 'Tanner stages are narrated in order');
+      assert.match(sexNotes.at(-1).note, /The body has finished going over.*external genital anatomy/i, 'the final clinical sex step completes the path: ' + sexNotes.at(-1).note);
+      const reverse = store.get('adventures/' + id).data, reverseTf = reverse.state.tf;
+      reverse.player.gender = 'female'; delete reverseTf.sex;
+      reverseTf.rungs = { cow: 1 }; reverseTf.influence.cow = ladder[1].at; reverseTf.traits = []; reverseTf.arcs = []; reverseTf.tracks = []; reverseTf.paths = {};
+      const [rh, rm] = reverse.state.time.split(':').map(Number);
+      reverseTf.last = { cow: (reverse.state.day - 1) * 1440 + rh * 60 + rm }; reverseTf.drifted = {};
+      await reload();
+      h.window.WINDLASS_WORLDS.sundered.transformation.sexChange.cow.chance = 1;
+      await turnAndCollect();
+      const reversed = store.get('adventures/' + id).data;
+      assert.equal(reversed.state.tf.paths.cow.sex, 'male', 'a female player can take the reverse sex-change path');
+      assert((reversed.pendingNotes || []).some((note) => /Tanner stage V/.test(note)), 'the reverse path begins at the grown-chest Tanner stage');
       clean(h);
     } finally { h.close(); }
   },
