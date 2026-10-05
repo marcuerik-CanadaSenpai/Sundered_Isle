@@ -591,14 +591,130 @@
     return String(text || '').replace(/\{(rm_[A-Za-z_]+)\}/g, (m, k) => (k in v ? v[k] : m));
   }
   const speciesPool = (Wc, key) => (Wc.genPools && key && Wc.genPools.species[key]) || null;
+  // ---------- looks, composed from the world's own lines ----------
+  // A person's looks are never prose of their own: Height and Build first, in absolute terms and part by part, then Bust, Hair
+  // and Eyes from the pools, the kind's colour, and every finished feature of the kind for that sex in the words of its track's
+  // range at this person's extent (the lean, a step either side for a feature, the face from its own draw), each once and under
+  // its own label, in the order genPools.looks gives. What that sex of the kind never has is told beside the looks (absentText),
+  // never stored in them. opts.extent (-1, 0 or 1) sets every feature to one column of the range, for the checks.
+  const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
+  const heightWords = (inches) => 'about ' + NUMBER_WORDS[Math.floor(inches / 12)] + ' foot' + (inches % 12 ? ' ' + NUMBER_WORDS[inches % 12] : '');
+  const looksSpec = (Wc) => (Wc && Wc.genPools && Wc.genPools.looks) || null;
+  const looksKind = (Wc, k) => { const L = looksSpec(Wc); return (L && L.kinds && k && L.kinds[k]) || null; };
+  const sexKey = (gender) => (gender === 'female' || gender === 'male' ? gender : 'nonbinary');
+  const genderOf = (c) => c && (c.gender || (c.pronouns && c.pronouns.they === 'she' ? 'female' : c.pronouns && c.pronouns.they === 'he' ? 'male' : 'nonbinary'));
+  const lowerFirst = (t) => String(t || '').replace(/^[A-Z](?![A-Z])/, (ch) => ch.toLowerCase());
+  function composeLooks(Wc, k, p, opts) {
+    opts = opts || {};
+    const L = looksSpec(Wc) || {}, K = looksKind(Wc, k) || {}, sp = speciesPool(Wc, k);
+    const sx = sexKey(p.gender), forced = [-1, 0, 1].includes(opts.extent);
+    const roll = (a, b) => { const r = Math.random(); return r < a ? -1 : r < b ? 0 : 1; };
+    const lean = forced ? opts.extent : roll(1 / 6, 5 / 6), face = forced ? 15 + 10 * opts.extent : Math.round(Math.random() * 30);
+    const T = Wc.transformation && Wc.transformation.tracks && Wc.transformation.tracks.species;
+    const M = (T && T[k]) || [], track = (key) => M.find((t) => t.key === key);
+    const cols = {}, column = (t) => {
+      let s = '';
+      if (t.range) {
+        const l = t.extentWith && cols[t.extentWith] != null ? cols[t.extentWith] : t.face ? (face < 10 ? -1 : face > 20 ? 1 : 0) : Math.max(-1, Math.min(1, lean + (forced ? 0 : roll(0.15, 0.85))));
+        // A column told relative to the body before (a goblin's least, "a head shorter than before") has a born person's own words.
+        const col = l < 0 ? 'least' : l > 0 ? 'most' : 'standard'; cols[t.key] = l; s = ((K.born || {})[t.key] || {})[col] || t.range[col] || ''; if (/^none$/i.test(s)) return '';
+      }
+      return s || t.endsAs || '';
+    };
+    // A column reads as a line of its own: no "in the drawn colour", no colon inside the line, and a "To ..." column says where it starts.
+    const tidy = (s, key) => {
+      s = String(s || '').replace(/,? in the drawn colou?r/gi, '').replace(/\s+for good\b/gi, '').replace(/: /g, ', ').replace(/\.\s*$/, '').trim();
+      const to = (K.to && K.to[key]) || (L.to && L.to[key]);
+      return lowerFirst(to && /^To /.test(s) ? to + ' ' + lowerFirst(s) : s);
+    };
+    const lines = [], add = (label, text) => { text = String(text || '').replace(/[.;,\s]+$/, '').trim(); if (text) lines.push(label + ': ' + text + '.'); };
+    const ht = K.heightTrack && track(K.heightTrack), hr = K.height && (K.height[sx] || K.height.female || K.height.male);
+    if (ht) add('Height', tidy(column(ht), ht.key) + ', adult in proportion');
+    else if (hr) add('Height', heightWords(hr[0] + Math.floor(Math.random() * (hr[1] - hr[0] + 1))));
+    const base = (L.build || {})[sx] || {}, B = Object.assign({}, base, (K.build || {})[sx] || {});
+    const build = Object.keys(base).map((part) => (B[part] && B[part].length ? pick(B[part]) : '')).filter(Boolean);
+    if (build.length) add('Build', build.length > 1 ? build.slice(0, -1).join(', ') + ' and ' + build[build.length - 1] : build[0]);
+    // The kind's finished features for this sex, read first so a part that takes the place of hair leaves the hair out.
+    const parts = []; let told = '';
+    for (const key of K.parts || []) {
+      const t = track(key); if (!t) continue;
+      if (t.sex && t.sex !== (sx === 'female' ? 'women' : sx === 'male' ? 'men' : '')) continue;
+      if (K.unless && K.unless[key] && told.toLowerCase().includes(String(K.unless[key]).toLowerCase())) continue;
+      let text = tidy(column(t), key); if (!text) continue;
+      for (const [from, to] of ((K.swap || {})[sx] || {})[key] || []) text = text.replace(new RegExp('\\b' + from + '\\b', 'g'), to);
+      if (key === 'water_tail' && !/on land|legs stay legs/i.test(text)) text += '; legs on land';
+      const label = (K.labels && K.labels[key]) || (L.labels && L.labels[key]) || (t.face ? 'Face' : t.name);
+      if (text.toLowerCase().startsWith(label.toLowerCase() + ', ')) text = text.slice(label.length + 2);
+      parts.push([label, text]); told += ' ' + text;
+    }
+    if (p.breasts) add('Bust', (K.bustShape || []).includes(sx) ? String(p.breasts).split(';')[0].trim() : p.breasts);
+    if (parts.some(([, x]) => /in place of hair/i.test(x))) p.hair = '';
+    if (p.hair) add('Hair', p.hair);
+    const te = track('eyes'); add('Eyes', [p.eyes, te ? tidy(te.endsAs, 'eyes') : ''].filter(Boolean).join('; '));
+    const colourLabel = K.colour && typeof K.colour === 'object' ? K.colour[sx] : K.colour;
+    const drawn = (K.draws || []).filter((d) => d.pool && d.pool.length).map((d) => d.label + ' ' + pick(d.pool));
+    if (colourLabel && opts.colour) add(colourLabel, [opts.colour].concat(drawn, K.colourTrack && track(K.colourTrack) ? [tidy(column(track(K.colourTrack)), K.colourTrack)] : []).join('; '));
+    for (const [label, text] of parts) add(label, text);
+    // The kinds without tracks keep a line of their own body; an authored look (a role's) stands in for it.
+    const body = opts.body || (!(K.parts || []).length && sp && sp.body && sp.body.length ? pick(sp.body) : '');
+    if (body) add('Body', String(body).replace(/\{colour\}/g, opts.colour || ''));
+    return personFill(kindText(Wc, k, lines.join(' '), p.eyes, p.breasts), p);
+  }
+  // What this person's body does not have, said beside the looks: the kind's other sex's features, what no body of the kind has,
+  // what no body here has, and a muzzle wherever the face line gives none.
+  function absentText(Wc, k, c) {
+    const L = looksSpec(Wc), K = looksKind(Wc, k); if (!L || !K || !(K.parts || []).length) return '';
+    const A = K.absent || {}, list = [].concat(A[sexKey(genderOf(c))] || [], A.all || [], L.absent || []);
+    if (c && c.looks && !/\bmuzzle\b/i.test(c.looks)) list.push('a muzzle');
+    return list.join(', ');
+  }
+  // The kind's ways for this person's sex: the finished lines of its senses, appetites and instincts (genPools.looks.kinds[k].ways),
+  // which every person of the kind shows in what they do; the narrator shows them and never explains them.
+  function kindWays(Wc, k, c) {
+    const K = looksKind(Wc, k), T = Wc.transformation && Wc.transformation.tracks && Wc.transformation.tracks.species && Wc.transformation.tracks.species[k];
+    if (!K || !K.ways || !T) return '';
+    const sx = sexKey(genderOf(c)), want = sx === 'female' ? 'women' : sx === 'male' ? 'men' : '';
+    return K.ways.map((key) => T.find((t) => t.key === key)).filter((t) => t && t.endsAs && (!t.sex || t.sex === want)).map((t) => lowerFirst(String(t.endsAs).replace(/\.$/, ''))).join('; ');
+  }
+  // A labelled look read back by its labels ("Height", "Hair" ...); an unlabelled one (written in the Cast editor) is itself.
+  const looksField = (looks, label) => { const m = new RegExp('(?:^|\\s)' + label + ': ([^]*?)\\.(?=\\s+[A-Z][A-Za-z\' ]{1,30}: |\\s*$)').exec(String(looks || '')); return m ? m[1] : ''; };
+  const looksLabelled = (looks) => /^Height: /.test(String(looks || ''));
+  function looksBrief(looks) {
+    if (!looksLabelled(looks)) return String(looks || '');
+    const build = looksField(looks, 'Build'); return [looksField(looks, 'Height') + (build ? ', with ' + build : ''), looksField(looks, 'Hair'), looksField(looks, 'Eyes')].filter(Boolean).join('; ');
+  }
+  // A look as a phrase inside another line ({npc_<key>_looks}): the body line where there is one, else the brief.
+  const looksPhrase = (looks) => (looksLabelled(looks) ? looksField(looks, 'Body') || looksBrief(looks) : String(looks || ''));
+  // What a person wears is the narrator's to invent from three draws (the role, a taste, the scene's occasion) within the plain
+  // facts of what the body allows; no outfit is ever drawn, so no kind falls back on one garment.
+  const DRESS_TASTES = ['plain', 'neat', 'showy', 'practical', 'careless'];
+  const dressTastes = (Wc) => (Wc && Wc.genPools && Wc.genPools.dress && Wc.genPools.dress.tastes) || DRESS_TASTES;
+  function dressOf(c) {
+    if (c && c.dress && c.dress.taste) return c.dress;
+    // A save from before the dress draw: the role from the sheet, a taste fixed by the name so it holds from turn to turn.
+    const n = Array.from(String((c && c.name) || '')).reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7), tastes = dressTastes(W);
+    return { role: /\bstaff\b/i.test(String((c && (c.sheet || c.brief)) || '')) ? 'staff' : 'student', taste: tastes[n % tastes.length] };
+  }
+  function dressLine(c, slot, where) {
+    const d = dressOf(c), D = (W.genPools && W.genPools.dress) || {}, occ = D.occasions || {};
+    const sport = D.sport && new RegExp('\\b(?:' + D.sport + ')\\b', 'i').test(String(where || ''));
+    const o = occ[slot] === 'sleep' ? 'sleep' : sport ? 'sport' : occ[slot] || (d.role === 'student' ? 'class' : 'work');
+    const K = looksKind(W, c && c.species), F = (K && K.dress) || {}, facts = [].concat(F.all || [], F[sexKey(genderOf(c))] || []);
+    return d.role + ', ' + d.taste + ' taste, dressed for ' + (o === 'evening' ? 'the evening' : o) + (facts.length ? '; the body: ' + facts.join('; ') : '');
+  }
   // A kind's facts live in its pool once each and reach every text through placeholders: {eyes} is an entry of the eye pool
   // ("yellow eyes", "eyes the green of a pond, grained"); {eye} is the colour alone, for the change steps ("gone yellow", "gone
   // the green of a pond"); {teats} is the kind's one phrase for what its women carry. The same texts fill for a drawn person
   // (the body pool) and for the player's path (the steps), so the werewolf two tables down and the werewolf {first} is
   // becoming are described from the same facts.
   const eyeColour = (phrase) => { const p = String(phrase || '').replace(/,.*$/, '').trim(); const m = /^eyes (.+)$/.exec(p); return m ? m[1] : p.replace(/\s*\beyes\b\s*/, ' ').trim(); };
-  // {breasts} is one woman's chest (cup, nipple, areola), drawn once from the kind's pool or the world's, so no two women share it.
-  const pickBreasts = (Wc, key) => { const sp = speciesPool(Wc, key); const pool = sp && sp.breasts && sp.breasts.length ? sp.breasts : ((Wc.genPools && Wc.genPools.breasts) || []); return pool.length ? pick(pool) : 'breasts'; };
+  // {breasts} is one woman's chest (cup, nipple, areola), drawn once from the kind's pool or the world's, so no two women share it;
+  // a kind whose finished lines set the chest (a goblin woman's full for her height, a mer woman's firm) leaves out the lines that say otherwise.
+  const pickBreasts = (Wc, key) => {
+    const sp = speciesPool(Wc, key); const all = sp && sp.breasts && sp.breasts.length ? sp.breasts : ((Wc.genPools && Wc.genPools.breasts) || []);
+    const avoid = (looksKind(Wc, key) || {}).bustAvoid || [], pool = all.filter((b) => !avoid.some((a) => b.includes(a)));
+    return pool.length ? pick(pool) : (all.length ? pick(all) : 'breasts');
+  };
   function kindText(Wc, key, text, eyes, breasts) {
     const sp = speciesPool(Wc, key); const e = eyes || (sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '');
     const ph = e || 'eyes of no particular colour'; const b = breasts || pickBreasts(Wc, key);
@@ -650,7 +766,8 @@
     const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
     const NUM = '(' + ANATOMY_SOME + '|\\d+)', NUMS = '(' + WORDS.join('|') + '|\\d+)', words = "(?:[\\w'-]+,? ){0,3}?";
     const nounRe = '(' + ANATOMY_PART + ')', stemOf = (w) => { w = w.toLowerCase(); return /^hoo(?:f|fs|ves)$/.test(w) ? 'hoo' : w.replace(/(?:ves|s)$/, ''); };
-    const kindLower = sp ? JSON.stringify(sp).toLowerCase() : '';
+    // A hyphened count in the kind's text is a count too ("a four-teated udder" gives four teats).
+    const kindLower = sp ? JSON.stringify(sp).toLowerCase().replace(new RegExp('\\b(' + WORDS.join('|') + ')-(?=[a-z])', 'g'), '$1 ') : '';
     // "Two pairs of wings" must be pairs in the kind's text too.
     for (const m of text.matchAll(new RegExp('\\b' + NUM + ' ' + ANATOMY_MODS + '((?:pairs?|sets?|rows?) of ' + ANATOMY_MODS + ')?' + nounRe + '\\b', 'gi'))) {
       const n = m[1].toLowerCase(), other = /^\d+$/.test(n) ? WORDS[+n] : (WORDS.includes(n) ? String(WORDS.indexOf(n)) : '');
@@ -668,7 +785,8 @@
       // Ordinals joined before this one ("her fifth and third pairs of", "third, fifth and second") are the same claim: the largest counts.
       for (let c; (c = new RegExp('\\b(second|2nd|' + ANATOMY_ORD + ')(?:,|,? (?:and|or))? $', 'i').exec(pre));) { n = Math.max(n, ordN(c[1])); pre = pre.slice(0, c.index); }
       if (n === 2 && m[2][0] === ',' && /\b(?:an?|one|another) $/i.test(text.slice(0, m.index))) continue;
-      const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' ' + words + (m[3] ? '(?:pairs?|sets?|rows?) of ' + words : '') + stem, 'g')), (k) => numOf(k[1]));
+      // Every count before the part, overlapping ones too: "two or three full tails" gives three as well as two.
+      const counts = Array.from(kindLower.matchAll(new RegExp('\\b' + NUMS + ' (?=' + words + (m[3] ? '(?:pairs?|sets?|rows?) of ' + words : '') + stem + ')', 'g')), (k) => numOf(k[1]));
       if (!m[3] && new RegExp('\\b' + stem + '(?:e?s|ves)\\b').test(kindLower)) counts.push(2);
       if (!counts.some((c) => c >= n)) return false;
     }
@@ -676,6 +794,14 @@
     const norm = (w) => { w = w.toLowerCase(); if (/^hoo(?:f|fs|ves)$/.test(w)) return 'hoof'; if (/^genital(?:s|ia)$/.test(w)) return 'genital'; w = w.replace(/ed$/, '').replace(/([^aeiou])\1$/, '$1'); return w.length > 3 ? w.replace(/(?<!s)s$/, '') : w.replace(/s$/, ''); };
     const kindWords = new Set(sp ? (JSON.stringify(sp).match(/[a-z]+/gi) || []).map(norm) : []);
     return (text.match(ANATOMY_WORDS) || []).every((w) => kindWords.has(norm(w)));
+  }
+  // What anatomyFits reads a kind's body from: its pool, its finished track lines for this sex (name, end state and range), with
+  // "never a ..." taken out so a line that rules a part out never counts as having it, and the counts its looks entry sums up.
+  function kindAnatomy(Wc, k, sp, gender) {
+    const T = (Wc.transformation && Wc.transformation.tracks && Wc.transformation.tracks.species && Wc.transformation.tracks.species[k]) || [];
+    const K = Wc.genPools && Wc.genPools.looks && Wc.genPools.looks.kinds && Wc.genPools.looks.kinds[k];
+    return sp && Object.assign({}, sp, { lines: T.filter((t) => !t.sex || t.sex === (gender === 'female' ? 'women' : 'men'))
+      .map((t) => [t.name, t.endsAs].concat(t.range ? Object.values(t.range) : []).join('; ').replace(/\bnever an? [^;,.]*/gi, '')).concat((K && K.counts) || []) });
   }
   // Draws one person from the pools: name, looks and a personality of their own. opts: species (a key or a list of keys to
   // choose from), gender, name, course, looks, wants, speciesText.
@@ -689,32 +815,22 @@
     const given = opts.given || {};
     const name = (opts.name || '').trim() || (given.first && given.last ? given.first + ' ' + given.last : '') || (pick(firsts) + ' ' + pick(lasts));
     const p = { name, first: name.split(' ')[0], last: name.split(' ').slice(1).join(' '), gender, pronouns: gdef.pronouns, species: speciesKey };
-    const colour = sp ? pick(sp.colours) : '';
+    const K = looksKind(Wc, speciesKey), colours = sp ? sp.colours.filter((c) => !(K && K.colourSkip && c.includes(K.colourSkip))) : [];
+    const colour = colours.length ? pick(colours) : '';
     p.race = opts.race || (sp ? speciesRace(Wc, speciesKey) : cap(String(opts.speciesText || '')));
-    // The body, plus what the kind's women or men carry that the body pool leaves out (an udder, a second row of nipples): a plain sentence, never omitted.
-    // The kind's facts come from one place each: {eyes} draws from the kind's eye pool (a line without the placeholder gets the
-    // eyes added, unless it already describes them), {teats} is the kind's one phrase for what its women carry.
-    // What is noticed first (a woman's beauty, in her kind's way) opens the looks; the body and its plain anatomy follow.
-    const lead = sp && sp.leadByGender && sp.leadByGender[gender] && sp.leadByGender[gender].length ? pick(sp.leadByGender[gender]) : '';
-    const byG = sp && sp.bodyByGender && sp.bodyByGender[gender] && sp.bodyByGender[gender].length ? '. ' + pick(sp.bodyByGender[gender]) : '';
+    // The eyes, the hair and a woman's chest are drawn once each; the looks are then composed from the kind's own lines for this
+    // sex (composeLooks), never written: an authored look (a role's) stands in only for the body line of a kind without tracks.
     p.eyes = sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : '';
-    // Hair (its style, and its colour where the kind's colour pool is hair colour) comes right after the lead, before the body.
     p.hair = sp && sp.hair && sp.hair.length ? pick(sp.hair).replace(/\{colour\}/g, colour) : '';
     p.breasts = gender === 'female' ? pickBreasts(Wc, speciesKey) : '';
-    const bodyText = sp && sp.body.length ? (pick(sp.body) + byG).replace(/(^|\. )\{colour\}/g, (m, pre) => pre + cap(colour)).replace(/\{colour\}/g, colour) : '';
-    const head = [lead ? lead.replace(/\{colour\}/g, colour) : '', p.hair].filter(Boolean).map(cap);
-    p.looks = opts.looks || (bodyText ? personFill(kindText(Wc, speciesKey, head.length ? head.join('. ') + '. ' + cap(bodyText) : bodyText, p.eyes, p.breasts), p) : '');
-    if (!opts.looks && p.looks && p.eyes && !/\beyes?\b/i.test(p.looks)) p.looks += '; ' + p.eyes;
-    // An authored look (a role's) gets the hair, and a woman's chest, added after it when it says nothing of them.
-    if (opts.looks) {
-      const add = [p.hair && !/\b(hair|plumage|feathers?|crest|plait|crop|braid|mane|bald|shaved)\b/i.test(p.looks) ? p.hair : '', p.breasts && !/\b(breasts?|chest|cup|bosom|nipples?)\b/i.test(p.looks) ? p.breasts : ''].filter(Boolean);
-      if (add.length) p.looks = String(p.looks).replace(/[.;,]\s*$/, '') + '. ' + add.map(cap).join('. ');
-    }
+    p.looks = sp ? composeLooks(Wc, speciesKey, p, { colour, body: opts.looks, extent: opts.extent }) : (opts.looks || '');
+    // Clothes are the narrator's, from a role, a taste and the scene's occasion (dressLine); the cast deals the tastes round.
+    p.dress = { role: opts.dressRole || 'student', taste: opts.taste || pick(dressTastes(Wc)) };
     // What it is like to stand near them: two of the kind's close-range notes (smell, touch, sound, warmth, movement).
     p.senses = sp && sp.senses && sp.senses.length ? shuffled(sp.senses).slice(0, 2).map((t) => personFill(t, p)).join('; ') : '';
     p.temperament = given.temperament || pick(G.temperaments);
     // An invented habit is kept unless it names a body part the kind does not have (the looks never take an invented line).
-    p.quirk = (given.quirk && anatomyFits(given.quirk, sp) ? given.quirk : '') || personFill(pick(G.quirks), p);
+    p.quirk = (given.quirk && anatomyFits(given.quirk, kindAnatomy(Wc, speciesKey, sp, gender)) ? given.quirk : '') || personFill(pick(G.quirks), p);
     p.want = given.want || personFill(pick(opts.wants || G.wants), p);
     p.privateMatter = given.private || personFill(pick(G.privates), p);
     p.course = opts.course || given.course || pick(G.courses);
@@ -745,7 +861,7 @@
     const clash = (f, l) => [f, l].some((name) => normaliseName(name).split(' ').some((part) => taken.has(part)));
     if (given && clash(given.first, given.last)) given = Object.assign({}, given, { first: '', last: '' });
     let p = null;
-    for (let i = 0; i < 20; i++) { p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null }); if (String(c.rmName || '').trim() || !clash(p.first, p.last)) break; }
+    for (let i = 0; i < 20; i++) { p = genPerson(W, { species: species || null, speciesText: typed, gender: plan.gender, name: c.rmName, given: given || null, dressRole: 'student' }); if (String(c.rmName || '').trim() || !clash(p.first, p.last)) break; }
     const race = species ? speciesRace(W, species) : cap(typed);
     const hope = sp ? sp.hope : 'whatever draws a human toward ' + p.pronouns.their + ' kind, which ' + p.pronouns.they + ' will not be the first to say';
     const aims = Object.assign({ default: 'get to know {first} and find out what kind of roommate {they} will be; hopes, in time, for ' + hope + ', and does not push' }, sp ? sp.aims : {});
@@ -766,7 +882,7 @@
     const normName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const namedCharacter = (W.characters || []).find((ch) => ch && ch.key !== 'roommate' && [ch.name].concat(ch.aliases || []).some((name) => normName(name) === normName(p.name)));
     const replaces = replacement && [replacement.name].concat(replacement.aliases || []).some((name) => normName(name) === normName(p.name)) ? replacementKey : (namedCharacter ? namedCharacter.key : null);
-    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
+    const r = { key: 'roommate', species: species || 'custom', speciesName: spName, race, gender: p.gender, pronouns: p.pronouns, name: p.name, first: p.first, last: p.last, replaces, brief, sheet, looks: p.looks, senses: p.senses, dress: p.dress, where, aims, attitude: 4 + Math.floor(Math.random() * 4), aliases: [p.first], gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, looks: p.looks, senses: p.senses, room: p.room, hello: p.hello, hope, greeting: p.greeting } };
     r.intro = composeIntro(r);
     return r;
   }
@@ -775,14 +891,14 @@
     const g = r.gen; const pr = r.pronouns;
     const room = g.room || 'The left-hand side of the room is already lived in, in the way of your roommate\'s kind: you cannot say exactly what is different about it, only that it is arranged for a body that is not yours.';
     const says = pr.they === 'they' ? 'say' : 'says';
-    const appearance = g.looks ? ': ' + g.looks : (g.senses ? ': close up, ' + g.senses : ': ' + String(r.race || 'a stranger').toLowerCase() + ', unfamiliar in the doorway');
+    const appearance = g.looks ? ': ' + String(r.race || '').toLowerCase() + ', ' + looksBrief(g.looks) : (g.senses ? ': close up, ' + g.senses : ': ' + String(r.race || 'a stranger').toLowerCase() + ', unfamiliar in the doorway');
     return room + ' Your own bed is made, with a card on the pillow that says your name.\n\n' + r.name + ' comes in behind you and stops in the doorway' + appearance + '. "' + r.first + '," ' + pr.they + ' ' + says + '. "' + (r.last || r.first) + '. Second-year, ' + g.course + '. They told me the human was mine; I said I\'d try not to hold it against you." ' + (g.hello ? cap(pr.they) + ' reaches out, stops, and folds the hand back in, the way people do when a greeting is on offer and optional. ' : '') + '"Mixer\'s at seven. I\'ll walk you down, if you like. It\'s loud."';
   }
   // The structural draws for a cast (the kind, the gender and the variant of every role), made once so that the invention
   // call and the build that follows agree on who each person is.
   function castPlan(Wc) {
     if (!Wc.castRoles || !Wc.genPools) return null;
-    const one = (role) => { const species = Array.isArray(role.species) ? pick(role.species) : (role.species || null); const sp = speciesPool(Wc, species); const genders = sp ? sp.genders : ['female', 'male', 'nonbinary']; const gender = genders.includes(role.gender) ? role.gender : pick(genders); return { key: role.key, species, gender, variant: role.variants && role.variants.length ? pick(role.variants) : null }; };
+    const one = (role) => { const species = Array.isArray(role.species) ? pick(role.species) : (role.species || null); const sp = speciesPool(Wc, species); const genders = sp ? sp.genders : ['female', 'male', 'nonbinary']; const variant = role.variants && role.variants.length ? pick(role.variants) : null; const want = role.gender || (variant && variant.gender); const gender = genders.includes(want) ? want : pick(genders); return { key: role.key, species, gender, variant }; };
     return { characters: Wc.castRoles.map(one), minors: (Wc.minorRoles || []).map(one) };
   }
   // The cast for worlds with castRoles: the role is the world's, the person is drawn fresh for this adventure, and where the
@@ -800,21 +916,22 @@
     const vfill = (text, v) => v ? String(text || '').replace(/\{v_([a-z_]+)\}/g, (m, k) => (k in v ? v[k] : m)) : String(text || '');
     // A title may depend on the drawn gender ({ male: 'Mr', female: 'Mrs', nonbinary: 'Mx' }).
     const titleFor = (role, gender) => { const t = role.title; if (!t) return ''; return typeof t === 'object' ? (t[gender] || '') : t; };
+    const deck = [], deal = () => { if (!deck.length) deck.push(...shuffled(dressTastes(W))); return deck.pop(); };
     const characters = W.castRoles.map((role, i) => {
       const pl = plan.characters[i] || {}; const v = pl.variant || null;
-      const p = draw({ species: pl.species || role.species, gender: pl.gender || role.gender, course: role.course, looks: role.looks ? vfill(role.looks, v) : undefined, wants: G.castWants, given: given[role.key] });
+      const p = draw({ species: pl.species || role.species, gender: pl.gender || role.gender, course: role.course, looks: role.looks ? vfill(role.looks, v) : undefined, wants: G.castWants, given: given[role.key], dressRole: role.dress || (/staff/.test(String(role.year || '')) ? 'staff' : 'student'), taste: deal() });
       const att = role.attitude ? role.attitude[0] + Math.floor(Math.random() * (role.attitude[1] - role.attitude[0] + 1)) : 5;
       const t = titleFor(role, p.gender); const title = t ? t + ' ' : '';
       const aliases = [p.first, p.last].concat(t ? [t + ' ' + p.last] : []).filter(Boolean);
       const course = role.course || (/staff/.test(String(role.year || '')) ? '' : p.course); const yearBit = role.year + (course ? ', ' + course : '');
       const roleText = vfill(role.role, v), hope = vfill(role.hope, v);
-      return { key: role.key, name: title + p.name, first: p.first, last: p.last, gender: p.gender, pronouns: p.pronouns, race: p.race, species: p.species, aliases, looks: p.looks, senses: p.senses,
+      return { key: role.key, name: title + p.name, first: p.first, last: p.last, gender: p.gender, pronouns: p.pronouns, race: p.race, species: p.species, aliases, looks: p.looks, senses: p.senses, dress: p.dress,
         brief: p.race + ', ' + yearBit + '; ' + roleText + '. ' + cap(p.temperament) + '.',
         sheet: p.race + ', ' + yearBit + '. ' + cap(roleText) + '. ' + cap(p.temperament) + '; ' + p.quirk + '. Wants ' + p.want + '. Does not say: ' + p.privateMatter + '.' + (role.knows && role.knows.length ? ' Knows ' + role.knows.map((k) => '{npc_' + k + '}').join(', ') + '; nobody else outside class, club or dorm.' : ''),
         where: role.where || { default: 'around campus' }, aims: Object.assign({ default: 'go about ' + p.pronouns.their + ' own day' + (hope ? '; hopes, in time, for ' + hope + ', and does not push' : '') }, role.aims || {}), attitude: att,
         gen: { course: p.course, temperament: p.temperament, quirk: p.quirk, want: p.want, privateMatter: p.privateMatter, invented: p.invented } };
     });
-    const minors = (W.minorRoles || []).map((m, i) => { const pl = plan.minors[i] || {}; const v = pl.variant || null; const p = draw({ species: pl.species || m.species, gender: pl.gender || m.gender, given: given[m.key] }); const t = titleFor(m, p.gender); return { key: m.key, name: (t ? t + ' ' : '') + p.name, first: p.first, last: p.last, race: p.race, species: p.species, pronouns: p.pronouns, text: vfill(m.text, v), looks: p.looks, senses: p.senses, invented: p.invented }; });
+    const minors = (W.minorRoles || []).map((m, i) => { const pl = plan.minors[i] || {}; const v = pl.variant || null; const p = draw({ species: pl.species || m.species, gender: pl.gender || m.gender, given: given[m.key], looks: m.looks ? vfill(m.looks, v) : undefined, dressRole: m.dress || 'student', taste: deal() }); const t = titleFor(m, p.gender); return { key: m.key, name: (t ? t + ' ' : '') + p.name, first: p.first, last: p.last, race: p.race, species: p.species, gender: p.gender, pronouns: p.pronouns, text: vfill(m.text, v), looks: p.looks, senses: p.senses, dress: p.dress, invented: p.invented }; });
     return { characters, minors, invented: characters.filter((c) => c.gen.invented).length + minors.filter((m) => m.invented).length };
   }
   // A name as a whole word in lower-cased text ("Rin" is not in "stringing").
@@ -822,10 +939,10 @@
   const properWordIn = (hay, name) => !!name && name.length >= 3 && new RegExp('(^|[^A-Za-z])' + escRe(String(name)) + '([^A-Za-z]|$)').test(hay);
   // Minor figures: one line each, and their looks only when they are on the page or were just mentioned.
   function minorCharactersText(mentioned) {
-    const gen = adv && adv.cast && adv.cast.generated;
+    const gen = adv && adv.cast && adv.cast.generated, slot = adv && adv.state ? slotInfo(adv.state).cur.slot : '';
     if (gen && gen.minors && gen.minors.length) return 'Minor characters who may be mentioned and may speak a line, but should not be given speeches: ' + gen.minors.map((m) => {
-      const near = mentioned && [m.first, m.last].some((n) => wordIn(mentioned, n));
-      return m.name + ' (' + m.race.toLowerCase() + (m.pronouns ? ', pronouns ' + m.pronouns.they + '/' + m.pronouns.them : '') + ', ' + fill(m.text) + (near && m.looks ? '; looks: ' + fill(m.looks) + (m.senses ? '; close up: ' + fill(m.senses) : '') : '') + ')';
+      const near = mentioned && [m.first, m.last].some((n) => wordIn(mentioned, n)), notOn = near && m.looks ? absentText(W, m.species, m) : '';
+      return m.name + ' (' + m.race.toLowerCase() + (m.pronouns ? ', pronouns ' + m.pronouns.they + '/' + m.pronouns.them : '') + ', ' + fill(m.text) + (near && m.looks ? '; looks: ' + fill(m.looks).replace(/\.$/, '') + (notOn ? ' Not on this body: ' + notOn + '.' : '') + ' Dress: ' + dressLine(m, slot, '') + (m.senses ? '; close up: ' + fill(m.senses) : '') + (kindWays(W, m.species, m) ? '; ways: ' + kindWays(W, m.species, m) : '') : '') + ')';
     }).join('; ') + '.';
     return fill(W.minorCharacters || '');
   }
@@ -874,6 +991,25 @@
     if (!c) c = cast.find((ch) => handles(ch).slice(2).some((n) => n.length >= 3 && new RegExp('(^|\\s)' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s|$)').test(bare)));
     return c ? nameWithRace(c) : String(pn);
   }
+  // A look written as prose by an earlier version, composed again from the kind's lines, keeping the hair, the eyes, the
+  // colour and a woman's chest it already had wherever they can be found in it (and drawing them where they cannot).
+  function recomposeLooks(Wc, c) {
+    const sp = speciesPool(Wc, c && c.species); if (!sp) return '';
+    const old = String(c.looks || '').toLowerCase(), has = (t) => !!t && old.includes(String(t).toLowerCase());
+    const K = looksKind(Wc, c.species), colours = (sp.colours || []).filter((x) => !(K && K.colourSkip && x.includes(K.colourSkip)));
+    const colour = colours.find(has) || (colours.length ? pick(colours) : '');
+    const p = { gender: genderOf(c), pronouns: c.pronouns || NB };
+    p.eyes = (sp.eyes || []).find(has) || (sp.eyes && sp.eyes.length ? pick(sp.eyes) : '');
+    const hairs = (sp.hair || []).map((h) => h.replace(/\{colour\}/g, colour));
+    p.hair = hairs.find(has) || (hairs.length ? pick(hairs) : '');
+    const chests = sp.breasts && sp.breasts.length ? sp.breasts : ((Wc.genPools && Wc.genPools.breasts) || []);
+    p.breasts = p.gender === 'female' ? (chests.find((b) => has(b.split(';')[0])) || pickBreasts(Wc, c.species)) : '';
+    // A role's authored look (the runner who stopped partway) is kept as the body line when the old look opened with it.
+    const role = (Wc.castRoles || []).concat(Wc.minorRoles || []).find((x) => x.key === c.key);
+    const lead = role && role.looks ? String(role.looks).split('{')[0].toLowerCase() : '';
+    const body = lead && old.startsWith(lead) ? String(c.looks).split('. ')[0] : '';
+    return composeLooks(Wc, c.species, p, { colour, body });
+  }
   // Saves from before v9 kept a cast edit's species as speciesLabel; it is race now.
   function migrateAdv() {
     const fix = (o) => { if (o && o.speciesLabel != null) { if (o.speciesLabel && !o.race) o.race = o.speciesLabel; delete o.speciesLabel; } };
@@ -881,6 +1017,16 @@
     fix(adv.roommate);
     // Saves from before v24 kept the roommate's looks only inside the sheet; the Cast editor and the prompt read a field of its own now.
     if (adv.roommate && adv.roommate.gen && !adv.roommate.looks && adv.roommate.gen.looks) { adv.roommate.looks = adv.roommate.gen.looks; adv.roommate.senses = adv.roommate.gen.senses || ''; adv.roommate.sheet = String(adv.roommate.sheet || '').replace(/ Looks: [^]*$/, ''); }
+    // Saves from before v83 kept generated looks written as prose, which drifted from the kind (horns on a bovine woman, a height
+    // measured against the player): each is composed again from the kind's lines, and a Cast edit that only carried the old look along follows it.
+    const relook = (c) => {
+      if (!c || !c.looks || looksLabelled(c.looks) || !speciesPool(W, c.species)) return;
+      const old = c.looks, fresh = recomposeLooks(W, c); if (!fresh) return;
+      c.looks = fresh; if (c.gen && c.gen.looks === old) c.gen.looks = fresh;
+      const o = adv.cast && adv.cast.overrides && adv.cast.overrides[c.key]; if (o && (o.looks === old || o.looks === fill(old))) o.looks = fresh;
+    };
+    relook(adv.roommate);
+    const genCast = adv.cast && adv.cast.generated; if (genCast) [].concat(genCast.characters || [], genCast.minors || []).forEach(relook);
     // Saves from before v20 called the Keel flag choice_made, which the narrator took for an ordinary choice; it is keel_choice_made now and only counts once the Keel is open.
     if (adv.state && adv.state.flags && 'choice_made' in adv.state.flags) { const open = W.dungeons && dungeonsCleared(adv.state).length === W.dungeons.length; adv.state.flags.keel_choice_made = !!(adv.state.flags.choice_made && open); delete adv.state.flags.choice_made; }
     // Saves from before v17 did not track the kinds met: derive them from everyone who has been present so far.
@@ -906,7 +1052,7 @@
     const sub = (t) => String(t || '').replace(/\{([a-zA-Z_]+)\}/g, (m, k) => (k in v ? v[k] : m));
     for (const c of people) { const pr = c.pronouns || NB; v['npc_' + c.key] = c.name; v['npc_' + c.key + '_first'] = c.first || c.name.split(' ')[0]; v['npc_' + c.key + '_last'] = c.last || c.name.split(' ').slice(-1)[0]; v['npc_' + c.key + '_they'] = pr.they; v['npc_' + c.key + '_them'] = pr.them; v['npc_' + c.key + '_their'] = pr.their; v['npc_' + c.key + '_race'] = String(c.race || '').toLowerCase(); }
     // _looks and _text (a minor figure's line) after every name is known, so a line that names another person resolves.
-    for (const c of people) { if (c.looks) v['npc_' + c.key + '_looks'] = sub(c.looks); if (c.text) v['npc_' + c.key + '_text'] = sub(c.text); }
+    for (const c of people) { if (c.looks) v['npc_' + c.key + '_looks'] = sub(looksPhrase(c.looks)); if (c.text) v['npc_' + c.key + '_text'] = sub(c.text); }
     return v;
   }
   function fill(text, extra) {
@@ -1189,10 +1335,24 @@
   }
   // The eye colour a path gives, drawn once from the kind's pool when the path begins (a save from before v29 draws it when first asked).
   const pathEye = (k) => { const sp = speciesPool(W, k); return sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : ''; };
+  // The coat's colour and the kind's other per-person draws (a werewolf's fur and its pads and claws), drawn once for a path, so a
+  // covering comes in one colour from its first waypoint to its last and the narrator never picks a new one.
+  const pathColour = (k) => { const sp = speciesPool(W, k), K = looksKind(W, k) || {}; const pool = ((sp && sp.colours) || []).filter((c) => !(K.colourSkip && c.includes(K.colourSkip))); return pool.length ? pick(pool) : ''; };
+  const pathDraws = (k) => ((looksKind(W, k) || {}).draws || []).filter((d) => d.pool && d.pool.length).map((d) => ({ label: d.label, when: d.when || '', value: pick(d.pool) }));
+  // What was drawn, said for the lines that bring it up (the colour for a covering, a draw for its own words), or all of it.
+  function pathDrawn(tf, k, line) {
+    const path = tf && tf.paths && tf.paths[k], K = looksKind(W, k) || {}; if (!path) return '';
+    const label = K.colour && typeof K.colour === 'object' ? K.colour[sexKey(bodySex(tf, adv.player || defaultPlayer()))] : K.colour;
+    const covers = /\b(?:fur|furred|pelt|coat|hide|ruff|mantle|brush|feathers?|feathered|plumage|scales?|scaled|bark|skin|wings?)\b/i;
+    const out = label && path.colour && (line == null || covers.test(line)) ? [label.toLowerCase() + ' ' + path.colour] : [];
+    for (const d of path.draws || []) if (line == null || (d.when && new RegExp('\\b(?:' + d.when + ')\\b', 'i').test(line))) out.push(d.label + ' ' + d.value);
+    return out.join('; ');
+  }
   // A step, an anatomy or a sex line of the player's path, with the kind's facts filled: the path's eye colour, the kind's teats phrase.
   const isSexStage = (key) => { const st = W.transformation && W.transformation.sexStages; return !!st && Object.prototype.hasOwnProperty.call(st, key) && st[key] != null; };
   function pathFill(tf, k, text) {
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
+    if (path && path.colour == null) { path.colour = pathColour(k); path.draws = pathDraws(k); }
     if (path && !path.breasts) path.breasts = pickBreasts(W, k);
     // Any brace token that names one of the world's sexStages is filled from it, whatever the key's spelling; other tokens go on to fill().
     const staged = String(text || '').replace(/\{([^{}\s]+)\}/g, (m, key) => (isSexStage(key) ? W.transformation.sexStages[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
@@ -1424,15 +1584,19 @@
     if (!T) return { notes, next };
     ensureTf(state); const tf = state.tf; const who = firstName();
     if (spaReset && spaReset.length) {
-      const keys = spaReset.includes('all') ? Object.keys(T.species) : spaReset.filter((k) => T.species[k]);
+      // A world with tracks heals one step a visit (spaHeal); an older one resets the kinds named whole.
+      const heal = T.tracks ? spaHeal(state, spaReset, diff, notes, next) : null;
+      const keys = heal ? heal.kinds : spaReset.includes('all') ? Object.keys(T.species) : spaReset.filter((k) => T.species[k]);
       const restored = [], slipped = [], lifted = []; let sexUndone = false;
       for (const k of keys) {
+        if (!heal) {
         if (tf.influence[k] || (tf.rungs[k] || 0) > 0) restored.push(T.species[k].name);
         if (tf.influence[k]) { diff.push({ path: 'tf.influence.' + k, from: tf.influence[k], to: 0 }); tf.influence[k] = 0; }
         const before = tf.traits.length; tf.traits = tf.traits.filter((t) => t.species !== k);
         if (tf.traits.length !== before) diff.push({ path: 'tf.traits', from: (before - tf.traits.length) + ' ' + k + ' change(s)', to: 'removed' });
         tf.rungs[k] = 0; tf.arcs = (tf.arcs || []).filter((a) => a.species !== k); tf.tracks = (tf.tracks || []).filter((t) => t.species !== k); if (tf.paths) delete tf.paths[k]; if (tf.prog) delete tf.prog[k]; if (tf.sexprog && tf.sexprog.species === k) delete tf.sexprog;
         if (tf.sex && tf.sex.species === k) { diff.push({ path: 'tf.sex', from: tf.sex.to, to: 'as it was' }); sexUndone = true; delete tf.sex; }
+        }
         // The font slips off the kind's cursed pieces and lifts its curses; ordinary charms stay where they are.
         const cursedOf = (T.charms || []).filter((c) => c.cursed && c.species === k), cursesOf = (T.curses || []).filter((c) => c.species === k);
         if (state.items && Array.isArray(state.items.wearing) && cursedOf.length) { const keep = state.items.wearing.filter((x) => !cursedOf.some((c) => matchesKeys(x, c.keys))); if (keep.length !== state.items.wearing.length) { slipped.push(...state.items.wearing.filter((x) => !keep.includes(x))); diff.push({ path: 'items.wearing', from: state.items.wearing, to: keep }); state.items.wearing = keep; } }
@@ -1442,8 +1606,8 @@
       if (slipped.length || lifted.length) { notes.push('Spa: slipped off ' + (slipped.join(', ') || 'nothing') + '; lifted ' + (lifted.join(', ') || 'nothing')); next.push('The Spa\'s water also ' + (slipped.length ? 'slipped off ' + slipped.join(' and ') + ', which ' + (slipped.length > 1 ? 'lie' : 'lies') + ' inert on the bath\'s edge for ' + who + ' to leave or keep as a dead thing' : '') + (slipped.length && lifted.length ? ', and ' : '') + (lifted.length ? 'lifted ' + lifted.join(' and ') : '') + '. Say so in passing.'); }
       if (state.items && typeof state.items.spa_visits === 'number') { diff.push({ path: 'items.spa_visits', from: state.items.spa_visits, to: state.items.spa_visits + 1 }); state.items.spa_visits += 1; }
       if (state.flags && 'has_used_spa' in state.flags && !state.flags.has_used_spa) { state.flags.has_used_spa = true; diff.push({ path: 'flags.has_used_spa', from: false, to: true }); }
-      notes.push('Spa reset: ' + (keys.join(', ') || 'nothing'));
-      if (restored.length) {
+      if (!heal) notes.push('Spa reset: ' + (keys.join(', ') || 'nothing'));
+      if (!heal && restored.length) {
         const gone = keys.filter((k) => restored.includes(T.species[k].name) && T.species[k].gone && T.species[k].gone.length).map((k) => fill(pick(T.species[k].gone)));
         next.push(who + ' used the Restoration Spa last turn: the ' + restored.join(', ') + ' changes are gone and the body is human again where it had changed. Show the return from inside: the warm bath, the hour\'s sleep, and waking with the body plain again, in a sensation or two of absence' + (gone.length ? ' (' + gone.join('; ') + ')' : '') + ', which ' + who + ' may find a relief, a loss, or both; the player decides which. Nobody comments unless asked.' + (sexUndone ? ' The body\'s sex is as it was when ' + who + ' came to the Isle; say so once, plainly, in the same finding.' : ''));
       }
@@ -1571,6 +1735,8 @@
     const underWay = T.tracks ? Object.keys(tf.prog || {}).map((k) => { const n = (trackModel(k) || []).filter((t) => { const r = tf.prog[k].tracks[t.key]; return r && r.told > 0 && r.told < t.stages.length; }).length; return n ? n + ' ' + T.species[k].short : ''; }).filter(Boolean) : [];
     lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none finished') + (underWay.length ? '; parts under way: ' + underWay.join(', ') : '') + '.');
     const body = trackBodyLines(tf, who, compact).concat(bodyNowLines(tf, who, compact)); if (body.length) lines.push(body.join('\n'));
+    // At the Spa, what the healer tells before a bath: the changes that stand on others and go back with them.
+    if (T.tracks && /\b(?:spa|restoration)\b/i.test(text + ' ' + (state.location || ''))) { const links = healLinks(tf); if (links.length) lines.push('Healing links (the Spa\'s healer says these before the bath, plainly): ' + links.slice(0, 6).join('; ') + '.'); }
     lines.push('World-authored transformation traits, steps and habits are sensory references, not permission to make ' + who + ' perform voluntary actions or to assign desires, feelings, values, memories or identity. Recast such wording as a bodily sensation or reflex, or omit it; the player chooses what ' + who + ' does and feels.');
     if (begun) lines.push(compact
       ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
@@ -1604,8 +1770,8 @@
         + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
     }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape. The body never reverts by itself; the Spa heals on purpose, one step a visit.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + (T.tracks ? ' The body never changes back by itself, but any change can be healed on purpose at the Restoration Spa, at any time, however old, at ' + who + '\'s asking: one change, a kind\'s whole set, the body\'s sex or everything, each taken back one step a visit, the same slow morph in reverse. Bonds with people are not the Spa\'s to heal. Report what ' + who + ' asks it to heal in "spa_reset".' : ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset".') + ' Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1647,7 +1813,7 @@
     return sx;
   }
   // The body's sex as the tracks see it: the player's own, or where a path has carried it (going over counts once it is over).
-  const bodySex = (tf, p) => (tf.sex ? tf.sex.to : (p || {}).gender === 'female' ? 'female' : (p || {}).gender === 'male' ? 'male' : 'other');
+  const bodySex = (tf, p) => (tf.sex ? tf.sex.to : tf.sexprog && tf.sexprog.from ? tf.sexprog.from.to : (p || {}).gender === 'female' ? 'female' : (p || {}).gender === 'male' ? 'male' : 'other');
   const sexStage = (tf, key) => { const sx = tf.sexprog; if (!sx) return null; const M = sexModel(sx.to); const t = M && M.find((x) => x.key === key); const r = sx.tracks && sx.tracks[key]; return t && r ? r.told : null; };
   // Whether a by-sex track is open: a born body of that sex opens it; a body going over opens a woman's tracks once Chest is at
   // stage 3 and a man's once Frame is at stage 2; a path rolled toward the other body never opens them.
@@ -1684,9 +1850,10 @@
   // feature, the face from its own draw (0 to 30: under 10 the least, over 20 the most).
   function extentText(pr, t) {
     if (!t.range) return '';
-    let lean = t.face ? (pr.face < 10 ? -1 : pr.face > 20 ? 1 : 0) : Math.max(-1, Math.min(1, pr.lean + ((pr.tracks[t.key] || {}).ext || 0)));
+    let lean = t.face ? (pr.face < 10 ? -1 : pr.face > 20 ? 1 : 0) : Math.max(-1, Math.min(1, pr.lean + ((pr.tracks[t.extentWith && pr.tracks[t.extentWith] ? t.extentWith : t.key] || {}).ext || 0)));
     return t.range[lean < 0 ? 'least' : lean > 0 ? 'most' : 'standard'] || '';
   }
+  const noneHere = (pr, t) => /^none$/i.test(extentText(pr, t));
   // Moves every track of every kind with influence to where the influence sits in its window (never back), under its needs, only
   // when open, and never past the next waypoint not yet told (the body goes as far as what has been lived through, so the influence
   // may run ahead and the telling catch up at its own pace); the same for the body's sex. Called once per committed turn, after influence has moved.
@@ -1697,7 +1864,7 @@
       const M = trackModel(k), D = tf.influence[k] || 0; if (!M || !(D > 0)) continue;
       const pr = ensureProg(tf, k);
       const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) { const SM = sexModel(sx.to); for (const t of SM) { const r = sx.tracks[t.key]; if (heldBack(tf, k, r)) continue; const cap = needCap(tf, k, SM, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); } }
-      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
+      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r) || noneHere(pr, t)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
     }
   }
   // A part the body has fought back stays where it eased to until something of its kind touches the player again.
@@ -1744,8 +1911,12 @@
   function trackNote(tf, k, t, j, pr, firstEver) {
     const sp = W.transformation.species[k]; const who = firstName(); const inf = tf.influence[k] || 0; const n = t.stages.length;
     const line = pathFill(tf, k, t.stages[j - 1]); const ext = j === n ? extentText(pr, t) : '';
-    const fact = t.name + ' (' + sp.name + ', waypoint ' + j + ' of ' + n + '): ' + line + (ext ? ' How far it goes on this body: ' + fill(ext) + '.' : '');
-    if (j === n) return 'The change completes a part (' + sp.name + '): ' + fact + ' Render it once in full, plainly, as ' + who + ' would find it by looking and touching, and keep to it afterwards' + (sp.habits && sp.habits.length ? '; let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(pick(sp.habits)) + ') without announcement' : '') + '. An animal or a keen-nosed mythkin may react without a word (' + fill(pick(sp.noticed || []) || 'a look, a sniff, room made') + '), never naming it. How ' + who + ' feels about it is the player\'s; do not presume a reaction in the suggested actions.';
+    const drawn = pathDrawn(tf, k, line);
+    const fact = t.name + ' (' + sp.name + ', waypoint ' + j + ' of ' + n + '): ' + line + (ext ? ' How far it goes on this body: ' + fill(ext) + '.' : '') + (drawn ? ' Drawn for this body: ' + drawn + '.' : '');
+    const ways = (looksKind(W, k) || {}).ways, own = ways && (trackModel(k) || []).filter((x) => ways.includes(x.key) && (x.key === t.key || (pr.tracks[x.key] && pr.tracks[x.key].told >= x.stages.length)));
+    const way = own ? (own.find((x) => x.key === t.key) || (own.length ? pick(own) : null)) : null;
+    const habit = own ? (way ? pathFill(tf, k, way.endsAs || way.stages[way.stages.length - 1]).replace(/\.$/, '') : '') : (sp.habits && sp.habits.length ? fill(pick(sp.habits)) : '');
+    if (j === n) return 'The change completes a part (' + sp.name + '): ' + fact + ' Render it once in full, plainly, as ' + who + ' would find it by looking and touching, and keep to it afterwards' + (habit ? '; let it show in how ' + who + ' moves, eats, sleeps or reacts (' + habit + ') without announcement' : '') + '. An animal or a keen-nosed mythkin may react without a word (' + fill(pick(sp.noticed || []) || 'a look, a sniff, room made') + '), never naming it. How ' + who + ' feels about it is the player\'s; do not presume a reaction in the suggested actions.';
     if (firstEver) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + fact + ' Only one small thing this turn, in your own words: a first sensation, small enough to put down to tiredness, the cold or the food, and nothing shows. A sentence or two from inside ' + who + '\'s body, then the scene goes on and ' + who + ' may forget it. Do not name what it is becoming; nobody else notices. One suggested action may touch it; the others need not.';
     return 'The change continues (' + sp.name + '): ' + fact + ' The line is the fact; how and when ' + who + ' finds it is yours, different every time (a shoe, a sock, a mirror, a sleeve, a task the body does differently), in a sentence or two with its practical consequence; the rest of the turn is the scene. Between waypoints the part keeps changing by degrees. Nobody remarks on it before ' + who + ' has found it, and nobody names or predicts it. What ' + who + ' makes of it is the player\'s.';
   }
@@ -1795,6 +1966,7 @@
           const who = firstName(), what = sx.to === 'female' ? 'a woman\'s' : 'a man\'s';
           out.push('The body has finished going over (' + sp.name + ' path): ' + who + '\'s body is ' + what + ' now, the whole of it. Say so once, plainly, as a fact found in the mirror or in clothes, without ceremony or explanation; then the scene goes on. What ' + who + ' is called and how ' + who + ' feels about it are the player\'s; people who know ' + who + ' go by whatever ' + who + ' has said, and otherwise by what they see.');
           notes.push('the body is ' + what + ' now (' + sx.species + ' path)');
+          for (const k2 of Object.keys(tf.paths || {})) { const path = tf.paths[k2]; if (!path || !path.sexPending) continue; const want = path.sexPending; delete path.sexPending; if (want !== tf.sex.to) { path.sex = want; startCrossing(tf, k2, want, notes); break; } }
         }
       }
     }
@@ -1803,7 +1975,7 @@
   // The influence at which a kind's next waypoint would come, for the override panel: the least over every open track.
   function nextWaypointInfluence(tf, k) {
     const M = trackModel(k); const pr = ensureProg(tf, k); const p = adv.player || defaultPlayer(); let best = null;
-    for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || needCap(tf, k, M, t, p) <= r.p) continue; const st = stageOf(r.p, t.stages.length); if (st >= t.stages.length) continue; const need = stageAt(st + 1, t.stages.length); const D = r.s + Math.ceil(need * (r.e - r.s) / 100); if (best == null || D < best) best = D; }
+    for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || noneHere(pr, t) || needCap(tf, k, M, t, p) <= r.p) continue; const st = stageOf(r.p, t.stages.length); if (st >= t.stages.length) continue; const need = stageAt(st + 1, t.stages.length); const D = r.s + Math.ceil(need * (r.e - r.s) / 100); if (best == null || D < best) best = D; }
     return best;
   }
   // What the body is now on the tracks, for the narrator: per kind, the current line of every track under way or finished (the
@@ -1814,12 +1986,124 @@
       const M = trackModel(k), pr = tf.prog && tf.prog[k]; if (!M || !pr) continue;
       const parts = [];
       for (const t of M) { const r = pr.tracks[t.key]; if (!r || !r.told) continue; const n = t.stages.length; const done = r.told >= n; parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + ': ' + (done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (done && t.range ? ' [' + fill(extentText(pr, t)) + ']' : '')); }
-      if (parts.length) out.push('Body now (' + T.species[k].name + ', ' + kindTotal(tf, k) + ' of 100): ' + parts.join('; ') + '.');
+      const drawn = pathDrawn(tf, k);
+      if (parts.length) out.push('Body now (' + T.species[k].name + ', ' + kindTotal(tf, k) + ' of 100): ' + parts.join('; ') + '.' + (drawn ? ' Drawn for this body, for when it shows: ' + drawn + '.' : ''));
     }
     const sx = tf.sexprog;
     if (sx && !tf.sex) { const SM = sexModel(sx.to) || []; const parts = SM.filter((t) => sx.tracks[t.key] && sx.tracks[t.key].told).map((t) => t.name + ' (' + sx.tracks[t.key].told + ' of ' + t.stages.length + '): ' + pf(sx.species, t.stages[sx.tracks[t.key].told - 1])); if (parts.length) out.push('Toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far (' + sexTotal(tf) + ' of 100, ' + T.species[sx.species].name + ' path): ' + (compact ? parts.slice(-3) : parts).join('; ') + '.'); }
     if (sx && tf.sex && tf.sex.species === sx.species) { const SM = sexModel(sx.to) || []; const keep = SM.filter((t) => sx.tracks[t.key] && !/^(?:chest|below)$/.test(t.key)).map((t) => pf(sx.species, t.stages[t.stages.length - 1]).trim().replace(/([^.!?])$/, '$1.')); const chest = sx.to === 'female' ? ' The breasts grown on this path: ' + chestShape(pf(sx.species, '{breasts}')) + '.' : ''; if (keep.length) out.push('Settled on the way over (' + T.species[sx.species].name + ' path): ' + (compact ? keep.slice(-3) : keep).join(' ') + chest); }
     return out;
+  }
+  // ---------- healing ----------
+  // The body never changes back by itself, but the Spa heals on purpose: one change (a track of a kind, or of the body's sex), one
+  // kind's whole set, the body's sex, or everything. A Spa target is "all", a kind ("cow"), "<kind>.<track>", "sex" or
+  // "sex.<track>", read from the narrator's words (a kind or track by its key or its name). An older world heals kinds only.
+  function spaTarget(s) {
+    const T = W.transformation; if (!T) return '';
+    const norm = (x) => String(x || '').toLowerCase().replace(/[’']s\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const raw = String(s || '').trim(), m = /^(.+?)\s*[.:/]\s*(.+)$/.exec(raw), head = norm(m ? m[1] : raw), tail = m ? m[2] : '';
+    if (!head) return '';
+    if (/^(?:all|everything)$/.test(head) && !tail) return 'all';
+    const kind = Object.keys(T.species).find((k) => { const nm = norm(T.species[k].name); return k === head || nm === head || nm.split(' ')[0] === head || norm(T.species[k].short) === head; }) || '';
+    if (!T.tracks) return tail ? '' : kind;
+    const track = (M) => { const x = norm(tail); const t = (M || []).find((t) => norm(t.key) === x || norm(t.name) === x); return t ? t.key : ''; };
+    if (/^(?:sex|(?:the )?body sex)$/.test(head)) { if (!tail) return 'sex'; const key = track((sexModel('female') || []).concat(sexModel('male') || [])); return key ? 'sex.' + key : ''; }
+    if (!kind) return '';
+    if (!tail) return kind;
+    const key = track(trackModel(kind)); return key ? kind + '.' + key : '';
+  }
+  // Each visit takes every change named back one waypoint, the same morph in reverse, so the stage line before is the state it returns
+  // to; at 0 the part is the person's own again and what is missing is told once. A change another needs at its stage cannot go
+  // below it while the other stands, so the other goes back with it (first, where it has further to go) and the healer says so.
+  // Senses, appetites and instincts are tracks like the rest. The draws (window, extent, lean, face, the path's eye, chest and
+  // sex) are kept, so a change taken up again comes back the same; a healed part waits for new contact of its kind, and a kind
+  // healed whole keeps only the influence its changes now stand at. Bonds are never the Spa's.
+  function spaHeal(state, targets, diff, notes, next) {
+    const T = W.transformation, tf = state.tf, p = adv.player || defaultPlayer(), now = storyMin(state), who = firstName();
+    const sx = tf.sexprog, SM = (sx && sexModel(sx.to)) || [];
+    const pool = Object.keys(tf.prog || {}).flatMap((k) => { const M = trackModel(k), pr = tf.prog[k]; return M && pr && pr.tracks ? M.filter((t) => pr.tracks[t.key]).map((t) => ({ dom: 'kind', k, t, r: pr.tracks[t.key] })) : []; })
+      .concat(sx ? SM.filter((t) => sx.tracks && sx.tracks[t.key]).map((t) => ({ dom: 'sex', k: sx.species, t, r: sx.tracks[t.key] })) : []);
+    const id = (s) => s.dom + ':' + s.k + ':' + s.t.key;
+    // A need points at the kind's own track first, else at the way over (as needMet reads it).
+    const needs = (d, need, s) => { const own = (trackModel(d.k) || []).some((t) => t.key === need.track); return own ? s.dom === 'kind' && s.k === d.k && s.t.key === need.track : s.dom === 'sex' && s.t.key === need.track; };
+    // The most d may keep once s is at stage j: under a need on s that j does not meet, the stage before the one it binds from; a
+    // by-sex track of a body going over closes again with Chest under 3 (a woman's) or Frame under 2 (a man's).
+    const keepWith = (d, s, j) => {
+      let max = d.t.stages.length;
+      for (const need of d.t.needs || []) { if (!needs(d, need, s)) continue; const st = need.stage === 'finished' ? s.t.stages.length : Number(need.stage); if (j < st) max = Math.min(max, need.from ? need.from - 1 : 0); }
+      if (s.dom === 'sex' && d.dom === 'kind' && d.k === s.k && d.t.sex) {
+        const want = d.t.sex === 'women' ? 'female' : 'male', born = p.gender === 'female' ? 'female' : p.gender === 'male' ? 'male' : 'other';
+        if (born !== want && sx.to === want && s.t.key === (want === 'female' ? 'chest' : 'frame') && j < (want === 'female' ? 3 : 2)) max = 0;
+      }
+      return max;
+    };
+    const blocker = (s, j) => pool.find((d) => id(d) !== id(s) && d.r.told > keepWith(d, s, j));
+    const done = new Set(), stepped = [], waiting = [];
+    const step = (s, why, depth) => {
+      if (!s.r.told || done.has(id(s)) || depth > 12) return;
+      const b = blocker(s, s.r.told - 1);
+      if (b) { step(b, s, depth + 1); const still = blocker(s, s.r.told - 1); if (still) { if (!waiting.some((w) => w.s === s)) waiting.push({ s, on: still }); return; } }
+      const n = s.t.stages.length, from = s.r.told, was = pathFill(tf, s.k, s.t.stages[from - 1]).replace(/\.$/, '');
+      s.r.told = from - 1; s.r.p = s.r.told ? stageAt(s.r.told, n) : 0; s.r.eased = now; s.r.nextAt = Math.max(s.r.nextAt || 0, now + stepGapMin());
+      done.add(id(s));
+      if (from === n && s.dom === 'kind') tf.traits = (tf.traits || []).filter((x) => !(x.species === s.k && x.track === s.t.key));
+      if (s.dom === 'sex' && tf.sex) { diff.push({ path: 'tf.sex', from: tf.sex.to, to: 'on the way back' }); delete tf.sex; }
+      diff.push({ path: (s.dom === 'sex' ? 'tf.sexprog' : 'tf.prog.' + s.k) + '.tracks.' + s.t.key + '.told', from, to: s.r.told });
+      stepped.push({ s, from, was, why });
+    };
+    const kinds = new Set(), asked = [];
+    for (const tg of targets) {
+      const [head, key] = String(tg).split('.');
+      const set = head === 'all' ? pool : head === 'sex' ? pool.filter((s) => s.dom === 'sex' && (!key || s.t.key === key)) : pool.filter((s) => s.dom === 'kind' && s.k === head && (!key || s.t.key === key));
+      if (head === 'all') Object.keys(T.species).forEach((k) => kinds.add(k)); else if (head !== 'sex' && !key && T.species[head]) kinds.add(head);
+      const named = key && (head === 'sex' ? SM : trackModel(head) || []).find((t) => t.key === key);
+      asked.push(head === 'all' ? 'everything' : head === 'sex' ? (key ? 'the way over: ' + (named ? named.name : key).toLowerCase() : 'the body\'s sex') : T.species[head] ? T.species[head].name + (key ? ': ' + (named ? named.name : key).toLowerCase() : '') : tg);
+      for (const s of set) step(s, null, 0);
+      // What a kind healed whole was carrying toward its next waypoint goes too.
+      if (!key && head !== 'sex') for (const s of set) if (s.dom === 'kind') s.r.p = Math.min(s.r.p, s.r.told ? stageAt(s.r.told, s.t.stages.length) : 0);
+    }
+    // A kind healed whole keeps only the influence its changes now stand at: just under the next waypoint of any of them, so nothing
+    // comes back without new contact. A kind whose every change is gone is met afresh, its draws kept.
+    for (const k of kinds) {
+      const M = trackModel(k), pr = tf.prog && tf.prog[k]; if (!M || !(tf.influence[k] > 0)) continue;
+      let D = pr && Object.values(pr.tracks || {}).some((r) => r.told > 0) ? 100 : 0;
+      if (D) for (const t of M) { const r = pr.tracks[t.key]; if (!r) continue; const n = t.stages.length; if (r.told >= n) continue; D = Math.min(D, r.s + Math.ceil(stageAt(r.told + 1, n) * (r.e - r.s) / 100) - 1); }
+      D = Math.max(0, D);
+      if (D < tf.influence[k]) { diff.push({ path: 'tf.influence.' + k, from: tf.influence[k], to: D }); tf.influence[k] = D; }
+      if (!pr || !Object.values(pr.tracks || {}).some((r) => r.told > 0)) { tf.traits = (tf.traits || []).filter((x) => x.species !== k); tf.rungs[k] = 0; tf.arcs = (tf.arcs || []).filter((a) => a.species !== k); tf.tracks = (tf.tracks || []).filter((t) => t.species !== k); }
+    }
+    notes.push('Spa heal (' + (targets.join(', ') || 'nothing') + '): ' + (stepped.length ? stepped.map(({ s, from }) => (s.dom === 'sex' ? 'sex' : s.k) + ' ' + s.t.name + ' ' + from + '→' + s.r.told).join(', ') : 'nothing to heal'));
+    if (!stepped.length) { next.push(who + ' asked the Restoration Spa to heal ' + asked.join(', ') + ' last turn, but there was nothing of it on the body to take back; the healer said so kindly, and nothing changed. Say so in passing if it has not been said.'); return { kinds: [...kinds] }; }
+    // What is missing at 0: the kind's own line for it where one names the part, else the narrator's, told once.
+    const COMMON = /^(?:with|that|from|this|they|them|their|there|more|into|over|under|only|each|what|when|where|which|while|body|part|like|again|than|then|also|once|some|most|much|down|along|front|back|side|high|every|other)$/;
+    const goneFor = (s) => { if (s.dom !== 'kind') return ''; const words = (s.t.name.toLowerCase().match(/[a-z]{4,}/g) || []).filter((w) => !COMMON.test(w)).map((w) => w.replace(/s$/, '')); const items = [].concat(...((T.species[s.k].gone || []).map((g) => fill(g).split(/;\s*/)))); return items.find((x) => words.some((w) => new RegExp('\\b' + w + 's?\\b', 'i').test(x))) || ''; };
+    const lines = [], links = [], gone = [];
+    for (const { s, why, was } of stepped) {
+      const what = s.dom === 'sex' ? (sx.to === 'female' ? 'toward a woman\'s body' : 'toward a man\'s body') : T.species[s.k].name;
+      if (why) links.push(s.t.name + ' had to go back with ' + why.t.name + ', since the one is built on the other');
+      if (s.r.told) lines.push(s.t.name + ' (' + what + '): ' + was + ' no longer, back to ' + pathFill(tf, s.k, s.t.stages[s.r.told - 1]).replace(/\.$/, ''));
+      else { lines.push(s.t.name + ' (' + what + '): ' + was + ' no longer; the part is ' + who + '\'s own again'); const g = goneFor(s); if (g) gone.push(g); }
+    }
+    for (const { s, on } of waiting) if (!done.has(id(s))) lines.push(s.t.name + ' stays as it is this visit, until ' + on.t.name + ' is back far enough');
+    const zero = stepped.some(({ s }) => !s.r.told), sexBack = stepped.some(({ s }) => s.dom === 'sex');
+    next.push(who + ' used the Restoration Spa last turn (' + asked.join(', ') + '): each change went back one step, the same slow morph in reverse. ' + lines.join('; ') + '. '
+      + (links.length ? 'Before the bath the healer said so: ' + links.join('; ') + '. ' : '')
+      + 'Show the return from inside: the warm bath, the hour\'s sleep, and waking with the body as it was a step before, the earlier line returning' + (zero ? '; where a part is ' + who + '\'s own again, tell once what is missing' + (gone.length ? ' (' + gone.join('; ') + ')' : ', the weight of a part or a sense gone quiet') : '') + '. '
+      + (sexBack ? 'The body\'s sex is on its way back with it; say so plainly where it shows. ' : '')
+      + 'What ' + who + ' felt and remembers stays ' + who + '\'s; whether it is a relief, a loss or both is the player\'s. Nobody comments unless asked.');
+    return { kinds: [...kinds] };
+  }
+  // The links the Spa's healer tells before a bath: each change that another stands on, while the other has gone past where it may
+  // stay without it. Given to the narrator only at the Spa.
+  function healLinks(tf) {
+    const out = [], sx = tf.sexprog, SM = (sx && sexModel(sx.to)) || [];
+    for (const k of Object.keys(tf.prog || {})) {
+      const M = trackModel(k) || [], pr = tf.prog[k];
+      for (const d of M) { const r = pr.tracks[d.key]; if (!r || !r.told) continue;
+        for (const need of d.needs || []) { const base = M.find((t) => t.key === need.track) || SM.find((t) => t.key === need.track); if (!base) continue; const keep = need.from ? need.from - 1 : 0; if (r.told > keep) out.push(base.name + ' cannot go back below stage ' + (need.stage === 'finished' ? base.stages.length : need.stage) + ' while ' + d.name + ' stands; ' + d.name + ' goes back with it'); } }
+    }
+    for (const d of SM) { const r = sx.tracks && sx.tracks[d.key]; if (!r || !r.told) continue; for (const need of d.needs || []) { const base = SM.find((t) => t.key === need.track); if (base && r.told > (need.from ? need.from - 1 : 0)) out.push(base.name + ' cannot go back below stage ' + need.stage + ' while ' + d.name + ' stands; ' + d.name + ' goes back with it'); } }
+    return [...new Set(out)];
   }
   // ---------- bonds ----------
   // A bond with a person is nine facets, each 0 to 100 with a weight, their lines what the person does toward the player now; the
@@ -1900,15 +2184,29 @@
     const p = adv.player || defaultPlayer(); const sc = (T.sexChange || {})[k] || {};
     const taken = !!tf.sex || !!tf.sexprog || Object.values(tf.paths || {}).some((path) => path && path.sex);
     const allWomen = sc.to === 'female' && (sc.chance == null ? 0.5 : sc.chance) >= 1;
-    let to = null;
+    let to = null, cross = null;
+    if (allWomen && taken && sexModel('female')) {
+      const going = tf.sexprog && !tf.sex ? tf.sexprog.to : null;
+      if (going === 'male') cross = 'later'; else if (!going && bodySex(tf, p) === 'male') cross = 'now';
+    }
     if (!taken) {
       if (allWomen) { if (p.gender !== 'female' && sexModel('female')) to = 'female'; }
       else if (sc.to) { const other = p.gender === 'female' ? 'male' : 'female'; if (sexModel(other) && Math.random() < (sc.chance == null ? 0.5 : sc.chance)) to = other; }
     }
-    tf.paths[k] = { sex: to, sexTold: [], formTold: [], day: state.day, order: [], eye: pathEye(k) };
+    tf.paths[k] = { sex: to, sexTold: [], formTold: [], day: state.day, order: [], eye: pathEye(k), colour: pathColour(k), draws: pathDraws(k) };
+    if (cross === 'now') { tf.paths[k].sex = 'female'; startCrossing(tf, k, 'female', notes); } else if (cross) tf.paths[k].sexPending = 'female';
     if (to) { ensureSexProg(tf, k, to); notes.push(k + ' path drawn: the body will also go toward a ' + (to === 'female' ? 'woman' : 'man') + '\'s'); }
     if (tf.paths[k].eye) notes.push(k + ' path drawn: the eyes will go ' + eyeColour(tf.paths[k].eye));
+    const drawn = pathDrawn(tf, k); if (drawn) notes.push(k + ' path drawn: ' + drawn);
     return tf.paths[k];
+  }
+  // A body that is a man's through another path going over again on an all-women kind's path: the earlier crossing is kept as where
+  // this one starts (bodySex reads it until this one finishes), and the new way over takes the sex tracks' place.
+  function startCrossing(tf, k, to, notes) {
+    const from = tf.sex || null; delete tf.sex;
+    tf.sexprog = null; const sx = ensureSexProg(tf, k, to); if (!sx) { if (from) tf.sex = from; return; }
+    if (from) sx.from = from;
+    notes.push(k + ' path drawn: the body will go over again, toward a ' + (to === 'female' ? 'woman' : 'man') + '\'s');
   }
   // A save from before the tracks (v77) carries ladder rungs: its progress is read from its influence and marked told, so nothing
   // already lived through is announced again, and the ladder's running steps for a tracked kind are dropped.
@@ -2267,7 +2565,8 @@
     if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation, mentioned + ' ' + (turnInput.director || ''))));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
-    const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
+    const was = S.tf && !S.tf.sex && S.tf.sexprog && S.tf.sexprog.from, sexNow = S.tf && (S.tf.sex || was);
+    const sexLine = (W.transformation && sexNow) ? ' The body is ' + (sexNow.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[sexNow.species].name + ' path' + (was ? ', and going over again on the ' + W.transformation.species[S.tf.sexprog.species].name + ' path' : '') + ' (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
     parts.push(x('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + ')' + (p.last ? '' : '; no surname was given, so never invent one') + '. ' + fill(p.description) + sexLine + '\nStats (1 to 5): ' + Object.keys(p.stats).map((k) => W.stats[k] + ' ' + p.stats[k]).join(', ') + '.' + metLine, 'note="everything known about the player; invent nothing else about them"'));
     // Shedding stages shorten the cast: 'lean' keeps full sheets and looks only for people in the scene or just mentioned;
     // 'brief' clips everyone to a line.
@@ -2281,8 +2580,11 @@
       const genderDefn = (W.creation && W.creation.genders || []).find((g) => g.key === c.gender);
       const sheet = castLevel === 'brief' ? clip(fill(c.brief || c.sheet), 240) : (castLevel === 'lean' && !full) ? clip(fill(c.brief || c.sheet), 320) : fill(full ? (c.sheet || c.brief) : (c.brief || c.sheet));
       const looks = castLevel !== 'brief' && c.looks && (full || (!c.gen && castLevel !== 'lean')) ? ' Looks: ' + fill(c.looks).replace(/([^.!?])$/, '$1.') : '';
+      const notOn = looks ? absentText(W, c.species, c) : '';
+      const dress = castLevel !== 'brief' && full ? ' Dress: ' + dressLine(c, slot, where) + '.' : '';
       const senses = castLevel !== 'brief' && c.senses && full ? ' Close up: ' + fill(c.senses) + '.' : '';
-      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (genderDefn ? ' (gender: ' + genderDefn.label + ')' : '') + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + sheet + looks + senses + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
+      const ways = castLevel !== 'brief' && full ? kindWays(W, c.species, c) : '';
+      return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (genderDefn ? ' (gender: ' + genderDefn.label + ')' : '') + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + sheet + looks + (notOn ? ' Not on this body: ' + notOn + '.' : '') + dress + senses + (ways ? ' Ways, shown in what ' + (c.pronouns ? c.pronouns.they : 'they') + ' do' + (c.pronouns && c.pronouns.they !== 'they' ? 'es' : '') + ', never explained: ' + ways + '.' : '') + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
     parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates"'));
     const bondsText = bondModel() ? bondsBlock(S, L.compactTransformation) : '';
@@ -2362,7 +2664,7 @@
       '"facts": array of zero to three one-line durable facts newly established this turn that later turns must keep (a name, a place, an arrangement, a promise, a rule stated by a character); [] if none'
     ].concat(W.skills ? ['"learning": array of {"skill": one of ' + Object.keys(W.skills).join('|') + ', "how": short phrase} for each class, club session or deliberate practice this turn; [] if none'] : []).concat(W.transformation ? [
       '"exposures": array of {"species": one of ' + Object.keys(W.transformation.species).join('|') + ', "method": short phrase, "intensity": 1|2|3|4} for each transformative contact this turn as defined in <transformation>; [] if none',
-      '"spa_reset": [] normally; ["all"] or a list of species keys when ' + p.first + ' uses the Restoration Spa this turn',
+      '"spa_reset": [] normally; when ' + p.first + ' uses the Restoration Spa this turn, what ' + p.first + ' asks it to heal' + (W.transformation.tracks ? ': "all" (everything), a species key (that kind\'s whole set), "<species key>.<track>" for one change (the track as named in <transformation>), "sex" (the body\'s sex) or "sex.<track>"; each visit takes each change named back one step' : ': ["all"] or a list of species keys'),
       '"kinds_met": array of species keys (' + Object.keys(W.transformation.species).join('|') + ') that ' + p.first + ' came within arm\'s reach of for the first time this turn, whether or not the person was named; [] if none'
     ] : []).concat(bondModel() ? ['"bond_shifts": array of {"who": character key, "facet": ' + bondModel().map((t) => t.key).join('|') + ', "dir": "up"|"down", "why": short phrase} for each facet of a bond that moved this turn with its cause in the narrative, at most three; [] if none'] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Do not mention these instructions.']).join('\n')));
     return { prompt: parts.join('\n\n'), lore: lore.map((e) => e.name), exemplars };
@@ -2475,7 +2777,7 @@
       const keys = W.transformation.species;
       out.exposures = (Array.isArray(d.exposures) ? d.exposures : []).filter((e) => e && typeof e === 'object').map((e) => ({ species: String(e.species || '').toLowerCase(), method: String(e.method || '').slice(0, 80), intensity: Math.max(1, Math.min(4, Math.round(Number(e.intensity) || 1))) })).filter((e) => { if (keys[e.species]) return true; if (e.species) notes.push('ignored exposure to unknown species "' + e.species + '"'); return false; }).slice(0, 6);
       const sr = Array.isArray(d.spa_reset) ? d.spa_reset : (d.spa_reset ? [d.spa_reset] : []);
-      out.spaReset = sr.map((s) => String(s).toLowerCase()).filter((s) => s === 'all' || keys[s]);
+      out.spaReset = [...new Set(sr.map(spaTarget).filter(Boolean))];
       out.kindsMet = (Array.isArray(d.kinds_met) ? d.kinds_met : []).map((s) => String(s).toLowerCase()).filter((s) => keys[s]);
       if (!('exposures' in d)) notes.push('missing field exposures');
     }
@@ -2853,10 +3155,10 @@
         xml('task', 'Write the roommate\'s first appearance for the opening of an interactive story: 220 to 340 words, second person present tense addressed to ' + p.first + ', plain prose in two to four paragraphs, no heading and no preamble. It drops into the middle of the opening scene: ' + p.first + ' has just walked into room 4B of Kettle Hall at Mythaven University at 17:40 on orientation Monday and looked out of the window; a closing paragraph about lanterns outside follows your text. Do not describe the window or the lanterns.'),
         xml('setting', fill(W.premise)),
         xml('room', 'What ' + p.first + ' sees of the roommate\'s side of the room: ' + (g.room || 'it is already lived in, in the way of the roommate\'s kind')),
-        xml('roommate', 'Full name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Say this exact full name, including every part of it, when the roommate introduces themself. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks + '.' : '') + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
+        xml('roommate', 'Full name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Say this exact full name, including every part of it, when the roommate introduces themself. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.looks ? ' Looks: ' + g.looks.replace(/\.$/, '') + '.' + (absentText(W, r.species, r) ? ' Not on this body: ' + absentText(W, r.species, r) + '.' : '') : '') + ' Dress: ' + dressLine(r, adv.state ? slotInfo(adv.state).cur.slot : '', '') + '.' + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (kindWays(W, r.species, r) ? ' Ways of the kind, shown and never explained: ' + kindWays(W, r.species, r) + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
         xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen of mythkin so far: one glamour slipping in the world below three weeks ago, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ' with no glamour on, and nothing about it is ordinary to ' + p.pronouns.them + ' yet.'),
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
-        xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
+        xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. The body is exactly what Looks gives and nothing else: add no part, covering, colour, by-sex feature, size or comparison it does not give, nothing under Not on this body, and end each covering where Looks ends it; the height is as Looks gives it, never measured against ' + p.first + '. The clothes are yours to choose by the Dress line, within what the body allows. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].join('\n\n');
       const res = await sample(prompt, { label: 'roommate introduction', modelTier: narrTierFor(null), cache: false, signal: ctl.signal });
       const text = String(res.text || '').trim().replace(/^```[a-z]*\n?|```$/g, '').trim();
