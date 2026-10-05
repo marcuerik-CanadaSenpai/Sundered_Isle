@@ -1024,6 +1024,29 @@ const S = {
   // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
   // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names
   // nobody; a harpy's hair line says her hair is feathers; and a bovine roommate's sheet still carries her udder, teats and milk, shown.
+  // 8n. Every kind's ladder carries the change-tracks document's lines, folded into the steps, women steps and habits of the kinds that
+  // exist (the kitsune is the fox): one of each kind's distinctive lines is here, and the fold kept the ladder's pinned facts and shape.
+  async docTracksFold() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const T = ctx.window.WINDLASS_WORLDS.sundered.transformation;
+    const textOf = (sp) => sp.ladder.flatMap((r) => [].concat(r.steps, r.women || [], r.sex || [])).concat(sp.habits || []).join('\n');
+    const lines = {
+      wolf: [/dusk is the best light there is/, /the jaw muscle standing at the hinge/], cow: [/let down by warmth, touch or strong feeling/, /heel wants to lift and resists coming down/],
+      fox: [/what the asker wants and what they are hiding/, /rims of the human ears gone thin and hot/], cat: [/swivel apart to follow two voices at once/, /slow wave for thought, a lash for temper/],
+      rabbit: [/every room is entered knowing where its doors are/, /faint sounds sharpen/], harpy: [/whistles and trills come by themselves/, /opened into pins, then into soft down/],
+      mer: [/the cold tap in the morning does not bite/, /toes feel long in their shoes/], dryad: [/fine rootlets creep from the soles/, /knows from across the Isle when it is thirsty/],
+      goblin: [/a bargain once struck sits in the chest like a debt/], fairy: [/colours moving in it like the inside of a shell/, /fingernails gleam as if polished/]
+    };
+    for (const [k, res] of Object.entries(lines)) { const t = textOf(T.species[k]); for (const re of res) assert.match(t, re, k + ' carries the document\'s line ' + re); }
+    // The fold is prose only: the rung-100 whole-animal forms stay, every ladder keeps its 30/50/70/85 rungs with the Tanner stages, and no step ends in a full stop.
+    for (const k of ['wolf', 'fox', 'cat']) assert(/whole (?:fox|cat)|true muzzle/.test(T.species[k].ladder[T.species[k].ladder.length - 1].steps.join(' ')), k + ' keeps its last rung');
+    for (const [k, sp] of Object.entries(T.species)) {
+      const at = (n) => sp.ladder.find((r) => r.at === n);
+      assert(at(30).sex.includes('{tanner2}') && at(50).sex.includes('{tanner3}') && at(70).sex.includes('{tanner4}') && at(85).sex[0] === '{genitals}', k + ' keeps the Tanner stages on their rungs');
+      for (const r of sp.ladder) for (const x of [].concat(r.steps, r.women || [])) { assert(!/\.$/.test(x), k + ' rung ' + r.at + ': a step ends in a full stop: ' + x.slice(-60)); assert(!/[\u201c\u201d]/.test(x) && !/\s{2,}/.test(x), k + ' rung ' + r.at + ': stray quotes or spaces: ' + x.slice(0, 60)); }
+      for (const h of sp.habits) assert(!/\.$/.test(h), k + ': a habit ends in a full stop: ' + h);
+    }
+  },
   // 8m. The rest of a body going over is shared: every kind's sex steps at rungs 30, 50 and 70 carry the skin, rhythm, gait and
   // scent stages from transformation.sexStages, and the engine fills any stage key, not only the Tanner ones, so no placeholder
   // reaches the narrator. The werewolf and bovine ladders carry the change-tracks document's lines, and closeness is a rule.
