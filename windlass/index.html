@@ -1184,11 +1184,12 @@
   // The eye colour a path gives, drawn once from the kind's pool when the path begins (a save from before v29 draws it when first asked).
   const pathEye = (k) => { const sp = speciesPool(W, k); return sp && sp.eyes && sp.eyes.length ? pick(sp.eyes) : ''; };
   // A step, an anatomy or a sex line of the player's path, with the kind's facts filled: the path's eye colour, the kind's teats phrase.
+  const isSexStage = (key) => { const st = W.transformation && W.transformation.sexStages; return !!st && Object.prototype.hasOwnProperty.call(st, key) && st[key] != null; };
   function pathFill(tf, k, text) {
     const path = tf && tf.paths && tf.paths[k]; if (path && !path.eye) path.eye = pathEye(k);
     if (path && !path.breasts) path.breasts = pickBreasts(W, k);
-    const st = (W.transformation && W.transformation.sexStages) || {};
-    const staged = String(text || '').replace(/\{([a-z]+\d?)\}/g, (m, key) => (st[key] != null ? st[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
+    // Any brace token that names one of the world's sexStages is filled from it, whatever the key's spelling; other tokens go on to fill().
+    const staged = String(text || '').replace(/\{([^{}\s]+)\}/g, (m, key) => (isSexStage(key) ? W.transformation.sexStages[key] : m)).replace(/\{chest\}/g, () => chestShape(path && path.breasts));
     return fill(kindText(W, k, staged, path && path.eye, path && path.breasts));
   }
   // A chest draw's shape alone, the part before its first semicolon: what the breasts do (a bovine woman's milk) is told by the kind's form steps.
@@ -1499,7 +1500,7 @@
       // The breast stages are in the grown chest above, and the genitals were stated once and are not repeated.
       if (path && path.sex && tf.sex && tf.sex.species === k) {
         const told = Array.isArray(path.sexTold) ? path.sexTold : [], lastRung = sp.ladder[lastSexRung(sp) - 1], shape = (lastRung && lastRung.sex) || [];
-        const kept = told.filter((x) => (/^\{[a-z]+\d?\}$/.test(x) ? !/^\{(?:tanner\d|genitals)\}$/.test(x) : shape.includes(x)));
+        const kept = told.filter((x) => { const m = /^\{([^{}\s]+)\}$/.exec(x); return m ? (isSexStage(m[1]) && !/^(?:tanner\d+|genitals)$/.test(m[1])) : shape.includes(x); });
         if (kept.length) parts.push('Settled on the way over: ' + (compact ? kept.slice(-2) : kept).map(pf).join('; ') + '.');
       }
       // The kind's form on a woman's body, every step told.

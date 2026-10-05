@@ -1053,19 +1053,23 @@ const S = {
     doc.state.tf = {
       influence: { cow: 35 }, rungs: { cow: 2 }, traits: [{ species: 'cow', trait: cow.ladder[1].trait, day: 1, settled: true }], arcs: [],
       paths: { cow: { sex: 'female', sexTold: [], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'brown' } },
-      tracks: [{ species: 'cow', rung: 2, kind: 'sex', to: 'female', trait: cow.ladder[1].trait, steps: ['{skin1}', '{tanner2}'], i: 0, nextAt: 0, day: 1 }],
+      tracks: [{ species: 'cow', rung: 2, kind: 'sex', to: 'female', trait: cow.ladder[1].trait, steps: ['{skin1}', '{hormone_phase1}', '{tanner2}'], i: 0, nextAt: 0, day: 1 }],
       last: {}, drifted: {},
     };
     doc.settings.pace = 'unbounded';
     const h = await boot({ setup(w, m) { m.store = seeded; } });
     try {
       assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      // A stage key of any spelling is filled, not only letters and one digit.
+      h.window.WINDLASS_WORLDS.sundered.transformation.sexStages.hormone_phase1 = 'a stage whose key carries an underscore and a digit, filled all the same';
       patchTurns(h, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
+      assert(await h.turn('I get on with the day.'));
       assert(await h.turn('I get on with the day.'));
       assert(await h.turn('I get on with the day.'));
       const p = promptOf(lastTurn(h));
       assert.match(p, /thinning and lightening, and the skin of the cheeks smoother under the razor/, 'the shared skin stage is told');
-      assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}/, 'and no stage placeholder reaches the narrator');
+      assert.match(p, /carries an underscore and a digit, filled all the same/, 'a stage of any key spelling is filled: ' + (p.match(/Toward a woman[^\n]*/) || [''])[0]);
+      assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}|\{hormone_phase1\}/, 'and no stage placeholder reaches the narrator');
       assert.match(p, /Closeness grows in facets/, 'the closeness rule reaches the narrator');
       clean(h);
     } finally { h.close(); }
@@ -1077,7 +1081,7 @@ const S = {
     const doc2 = seeded2.get([...seeded2.keys()].find((k) => /^adventures\/[^/]+$/.test(k))).data;
     doc2.state.tf = {
       influence: { cow: 90 }, rungs: { cow: 5 }, traits: [{ species: 'cow', trait: cow.ladder[4].trait, day: 1, settled: true }], arcs: [],
-      paths: { cow: { sex: 'female', sexTold: ['{skin1}', cow.ladder.find((r) => r.at === 30).sex[2], '{tanner2}', '{skin2}', '{rhythms1}', '{tanner3}', '{gait1}', '{scent1}', '{tanner4}', '{genitals}', '{tanner5}'], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'brown', breasts: Wd.genPools.species.cow.breasts[0] } },
+      paths: { cow: { sex: 'female', sexTold: ['{skin1}', cow.ladder.find((r) => r.at === 30).sex[2], '{tanner2}', '{skin2}', '{rhythms1}', '{tanner3}', '{gait1}', '{scent1}', '{tanner4}', '{stage10}', '{genitals}', '{tanner5}'], day: 1, order: [0, 1, 2, 3, 4, 5], eye: 'brown', breasts: Wd.genPools.species.cow.breasts[0] } },
       tracks: [{ species: 'cow', rung: 5, kind: 'sex', to: 'female', trait: cow.ladder[4].trait, steps: ['{genitals}', '{tanner5}', summary], i: 2, nextAt: 0, day: 1 }],
       last: {}, drifted: {},
     };
@@ -1085,6 +1089,7 @@ const S = {
     const h2 = await boot({ setup(w, m) { m.store = seeded2; } });
     try {
       assert(await h2.settle(150, 8000)); await h2.idle(10000); await h2.settle(100, 4000);
+      h2.window.WINDLASS_WORLDS.sundered.transformation.sexStages.stage10 = 'a tenth stage, its key a word and two digits, kept once the body has gone over';
       patchTurns(h2, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
       assert(await h2.turn('I get on with the day.'));
       assert(await h2.turn('I get on with the day.'));
@@ -1096,12 +1101,12 @@ const S = {
       assert(settled, 'the completed path keeps a settled summary: ' + (p.match(/Body now \(bovine[^\n]*/) || [''])[0]);
       // The short block, used when the prompt is at its cap, keeps the last two of what lasts; the full one keeps it all.
       const short = /^Influence now[^\n]*\((?:unlisted kinds|every kind) 0\)\.$/m.test(p);
-      const lasting = [/thinning and lightening/, /finer and softer all over/, /tears and laughter both arriving sooner/, /the stride shortening/, /sweat milder/];
+      const lasting = [/thinning and lightening/, /finer and softer all over/, /tears and laughter both arriving sooner/, /the stride shortening/, /sweat milder/, /a tenth stage, its key a word and two digits/];
       for (const re of (short ? lasting.slice(-1) : lasting)) assert.match(settled, re, 'a shared stage lasts ' + re + (short ? ' (short block)' : ''));
       assert.match(settled, /the bovine woman's shape, complete: full at the hip/, 'and the kind\'s complete shape: ' + settled);
       assert.doesNotMatch(settled, /\{first\}/, 'filled: ' + settled);
       assert.doesNotMatch(settled, /first breast buds|penis|soreness behind each nipple/, 'without the breast stages, the genitals or the passing aches: ' + settled);
-      assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}/, 'and no stage placeholder reaches the narrator');
+      assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}|\{stage10\}/, 'and no stage placeholder reaches the narrator');
       clean(h2);
     } finally { h2.close(); }
   },
