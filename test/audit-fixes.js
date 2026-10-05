@@ -830,7 +830,7 @@ const S = {
     const Wd = ctx.window.WINDLASS_WORLDS.sundered, T = Wd.transformation, TR = T.tracks;
     assert(TR && TR.species && TR.woman && TR.man && TR.bond, 'the world carries the track model');
     const sum = (m, sex) => m.filter((t) => !t.sex || t.sex === sex).reduce((a, t) => a + t.weight, 0);
-    const stageAt = (j, n) => Math.round(j * 100 / n);
+    const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
     for (const [k, m] of Object.entries(TR.species)) {
       assert(T.species[k], k + ' has a kind in the world');
       assert.equal(sum(m, 'women'), 100, k + ' weights sum to 100 for a woman\'s body');
@@ -849,7 +849,9 @@ const S = {
     }
     // The reused stage lists are the same text: the coats are the werewolf's pelts, the kitsune's hands the werewolf's, the cat's spine line the bovine's strip.
     const wolf = TR.species.wolf, byKey = (m, k) => m.find((t) => t.key === k);
-    for (const k of ['cow', 'fox', 'cat', 'rabbit']) { assert.deepEqual(byKey(TR.species[k], 'forearm_coat').stages, byKey(wolf, 'forearm_pelt').stages, k + ' forearm coat reuses the werewolf\'s forearm pelt'); assert.deepEqual(byKey(TR.species[k], 'leg_and_hip_coat').stages, byKey(wolf, 'leg_and_hip_pelt').stages, k + ' leg and hip coat reuses the werewolf\'s'); }
+    for (const k of ['cow', 'fox', 'cat', 'rabbit']) { assert.deepEqual(byKey(TR.species[k], 'forearm_coat').stages, byKey(wolf, 'forearm_pelt').stages, k + ' forearm coat reuses the werewolf\'s forearm pelt'); if (k !== 'cow') assert.deepEqual(byKey(TR.species[k], 'leg_and_hip_coat').stages, byKey(wolf, 'leg_and_hip_pelt').stages, k + ' leg and hip coat reuses the werewolf\'s'); }
+    // A hooved kind's coat runs from the hooves, never from paws it does not have.
+    assert.doesNotMatch(JSON.stringify(byKey(TR.species.cow, 'leg_and_hip_coat').stages), /paw/i, 'the bovine leg coat names no paws'); assert.match(byKey(TR.species.cow, 'leg_and_hip_coat').stages.at(-1), /hoove/i, 'and runs from the hooves');
     assert.deepEqual(byKey(TR.species.fox, 'hands').stages, byKey(wolf, 'hands').stages, 'the kitsune\'s hands are the werewolf\'s');
     assert.deepEqual(byKey(TR.species.cat, 'spine_line').stages, byKey(TR.species.cow, 'spine_strip').stages, 'the cat\'s spine line is the bovine\'s strip');
     for (const k of ['woman', 'man', 'bond']) assert.equal(TR[k].reduce((a, t) => a + t.weight, 0), 100, k + ' weights sum to 100');
@@ -989,7 +991,7 @@ const S = {
   async noFading() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const TR = ctx.window.WINDLASS_WORLDS.sundered.transformation.tracks; assert(TR && TR.species && TR.species.cow, 'the world carries the track model');
-    const stageAt = (j, n) => Math.round(j * 100 / n);
+    const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
     const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
     let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
     const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data, id = advKey.split('/')[1];
@@ -1013,6 +1015,60 @@ const S = {
       assert(storedTurns(h.mock.store, id).some((t) => t.notes.some((n) => /^cow influence -\d/.test(n))), 'influence does drift on quiet days');
       clean(h);
     } finally { h.close(); }
+  },
+  // 8p. The PR #52 review fixes. The world data keeps to each kind's body: the bovine coat runs from hooves, the kitsune's stance waits
+  // for its toes, the cat's claws sheathe and it carries four pairs, the harpy's light bones name no breasts and only a woman lays,
+  // the mer's gills sit at the throat, and no rung gives a whole animal. A three-waypoint track reaches its first waypoint (stage 1
+  // of 3 is progress 34, not 33). A lore key ending in * matches its word's forms ("Moonrunners"); a person named in the action
+  // brings their kind's contacts though they are elsewhere; the whole-animal rule is not sent; an older save's whole-animal trait
+  // goes. Fails on e21a35c.
+  async trackReviewFixes() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const T = ctx.window.WINDLASS_WORLDS.sundered.transformation, TR = T.tracks; assert(TR && TR.species, 'the world carries the track model');
+    const byKey = (k, key) => TR.species[k].find((t) => t.key === key), txt = (t) => JSON.stringify(t);
+    assert.doesNotMatch(txt(byKey('cow', 'leg_and_hip_coat')), /paw/i, 'the bovine coat names no paws');
+    assert((byKey('fox', 'feet_and_stance').needs || []).some((n) => n.track === 'toes_and_claws' && Number(n.stage) === 2), 'the kitsune stance waits for the toes at stage 2');
+    assert.match(byKey('cat', 'toes_and_claws').stages.at(-1), /sheathe/, 'the cat\'s claws sheathe');
+    const pairs = byKey('cat', 'further_pairs'); assert.match(pairs.range.standard, /^Four pairs/, 'the cat carries four pairs at the standard'); assert.match(pairs.stages.at(-1), /four pairs/, 'and its last waypoint says so');
+    assert.doesNotMatch(txt(byKey('harpy', 'light_bones')), /breast(?!bone)/i, 'the harpy\'s light bones name no breasts');
+    assert.equal(byKey('harpy', 'laying').sex, 'women', 'only a woman\'s body lays');
+    const gills = byKey('mer', 'gills'); assert.match(gills.endsAs, /throat/, 'the mer gills sit at the throat'); assert.doesNotMatch(txt(gills), /\bribs?\b/, 'not at the ribs');
+    for (const [k, sp] of Object.entries(T.species)) for (const r of sp.ladder) assert.doesNotMatch(String(r.trait), /whole \w+ at will|an? (?:wolf|fox|cat|rabbit) at will/, k + ' rung ' + r.at + ' gives no whole animal');
+    const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9), eyes = byKey('cow', 'eyes'); assert.equal(eyes.stages.length, 3, 'the bovine eyes are a three-waypoint track');
+    // A cow path with only the eyes in reach; a rabbit trait from an older build's last rung.
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
+    const tracks = Object.fromEntries(TR.species.cow.map((t) => [t.key, t.key === 'eyes' ? { s: 10, e: 40, p: 0, told: 0, nextAt: 0 } : { s: 95, e: 100, p: 0, told: 0, nextAt: 0 }]));
+    doc.state.tf = { influence: { cow: 60 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { cow: { sex: null, sexTold: [], formTold: [], day: 1, order: [], eye: 'eyes dark with a blue cast like a calf\'s' } }, prog: { cow: { lean: 0, face: 15, tracks } }, last: {}, drifted: {} };
+    const other = (doc.cast.generated.characters || []).find((c) => c.species === 'dryad'); assert(other, 'the cast has a dryad');
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      patchTurns(h, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, block = () => { const p = promptOf(lastTurn(h)); return p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>')); };
+      assert(await h.turn('I study in my room.'));
+      assert.doesNotMatch(block(), /- wolf \(/, 'no werewolf in the scene yet'); assert.doesNotMatch(block(), /- dryad \(/, 'nor a dryad');
+      assert.doesNotMatch(block(), /Whole-animal shifts|whole animal in it/, 'the whole-animal rule is not sent: no one takes an animal\'s shape');
+      assert(await h.turn('I ask Daisy whether the Moonrunners would let me run.')); assert.match(block(), /- wolf \(/, 'a lore key ending in * matches its plural (Moonrunner* in "Moonrunners")');
+      assert(await h.turn('I wonder whether ' + other.first + ' is free this evening.')); assert.match(block(), /- dryad \(/, 'a person named, though elsewhere, brings their kind\'s contacts');
+      assert(await h.turn('I keep studying.'));
+      const r = tf().prog.cow.tracks.eyes; assert(r.p >= stageAt(1, 3) && r.told >= 1, 'a three-waypoint track reaches its first waypoint: ' + JSON.stringify(r));
+      clean(h);
+    } finally { h.close(); }
+    // An older save (no track progress) whose rabbit trait is a whole rabbit at will: the migration drops it and keeps the rest.
+    const old = new Map([...seeded].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])), od = old.get(advKey).data;
+    od.state.tf = { influence: { rabbit: 100 }, traits: [{ species: 'rabbit', trait: 'the shift: a whole rabbit at will, and the warren-sense', day: 1 }, { species: 'rabbit', trait: 'greens before anything; a nose that will not stay still; a freeze at a sudden noise', day: 1 }], rungs: { rabbit: [30, 50, 70, 85, 100] }, arcs: [], tracks: [], paths: {}, last: {}, drifted: {} };
+    const m = await boot({ setup(w, mk) { mk.store = old; } });
+    try {
+      assert(await m.settle(150, 8000)); await m.idle(10000); await m.settle(100, 4000);
+      patchTurns(m, (r) => { r.exposures = []; });
+      assert(await m.turn('I look in the mirror.'));
+      const traits = onlyAdv(m.mock.store).data.state.tf.traits.map((t) => t.trait).join(' | ');
+      assert.doesNotMatch(traits, /whole rabbit at will/, 'the migration drops the whole-animal trait: ' + traits);
+      assert.match(traits, /greens before anything/, 'and keeps the rest');
+      clean(m);
+    } finally { m.close(); }
   },
   // 8m. The looks show rather than explain. No pool line or ladder step lectures on a kind's biology or custom ("in the way of
   // bovine mythkin", "bovine women lactate, and these breasts do", "accommodated by the wrap"); a chest draw is shape first and names

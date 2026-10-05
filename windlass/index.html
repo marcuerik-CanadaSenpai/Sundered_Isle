@@ -1539,11 +1539,12 @@
     for (const k of Object.keys(T.species)) {
       if ((tf.influence && tf.influence[k] > 0) || (tf.prog && tf.prog[k]) || (tf.paths && tf.paths[k])) { out.add(k); continue; }
       const words = [k, speciesRace(W, k), T.species[k].name, T.species[k].short].concat((W.lore || []).filter((e) => e.species === k).flatMap((e) => e.keys || []));
-      if (words.some((w) => w && wordIn(text, String(w).toLowerCase()))) out.add(k);
+      if (words.some((w) => { const s = String(w || '').toLowerCase(); return s.endsWith('*') ? s.length > 3 && new RegExp('(^|[^a-z])' + escRe(s.slice(0, -1)) + '[a-z]*').test(text) : wordIn(text, s); })) out.add(k);
     }
     for (const c of activeCharacters()) {
       const k = speciesKeyOf(c); if (!k || !T.species[k] || out.has(k)) continue;
-      if ((state.present || []).some((pp) => nameHandles(c).filter((n) => n.length > 2).some((n) => wordIn(String(pp).toLowerCase(), n.toLowerCase())))) out.add(k);
+      const hs = nameHandles(c).filter((n) => n.length > 2).map((n) => n.toLowerCase());
+      if (hs.some((n) => wordIn(text, n)) || (state.present || []).some((pp) => hs.some((n) => wordIn(String(pp).toLowerCase(), n)))) out.add(k);
     }
     return out;
   }
@@ -1599,8 +1600,8 @@
         + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
     }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1622,7 +1623,8 @@
   const drawLean = () => { const r = Math.random(); return r < 1 / 6 ? -1 : r < 5 / 6 ? 0 : 1; };
   const drawExt = () => { const r = Math.random(); return r < 0.15 ? -1 : r < 0.85 ? 0 : 1; };
   const stageOf = (p, n) => Math.max(0, Math.min(n, Math.floor((Number(p) || 0) * n / 100 + 1e-9)));
-  const stageAt = (j, n) => Math.round(j * 100 / n);
+  // The least whole progress at stage j: rounded up, so stageOf of it is j again (round would give 33 for 1 of 3, which is stage 0).
+  const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
   const trackDrive = (D, w) => Math.max(0, Math.min(100, Math.round((D - w.s) * 100 / Math.max(1, w.e - w.s))));
   // Progress and extent records for a kind's path, drawn once when influence first moves.
   function ensureProg(tf, k) {
@@ -1882,6 +1884,8 @@
     if (tf.sexprog && !tf.sex) for (const t of sexModel(tf.sexprog.to)) { const r = tf.sexprog.tracks[t.key]; r.told = stageOf(r.p, t.stages.length); }
     tf.tracks = (tf.tracks || []).filter((t) => !trackModel(t.species)); tf.arcs = (tf.arcs || []).filter((a) => !trackModel(a.species));
     for (const t of tf.traits) if (trackModel(t.species) && t.settled === false) t.settled = true;
+    // Older builds' last rungs gave a whole animal at will; the body now never takes an animal's shape, so those traits go.
+    tf.traits = tf.traits.filter((t) => !(trackModel(t.species) && /\b(?:a whole \w+|an? (?:wolf|fox|cat|rabbit)) at will\b/i.test(String(t.trait || ''))));
   }
 
   // ---------- skills ----------

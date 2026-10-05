@@ -611,7 +611,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Pelt from the paws up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'Coat from the hooves up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
             ] },
           { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 5, endsAs: 'two toes in a split hoof with dewclaws behind',
             stages: [
@@ -861,7 +861,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
               'Four toes with a pad under each and blunt claws that do not sheathe; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, range: { least: 'Heel low on a narrow paw', standard: 'Heel raised, weight on the toes', most: 'A full hock on a long narrow foot' }, endsAs: 'Narrow paws, heel raised',
+          { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a narrow paw', standard: 'Heel raised, weight on the toes', most: 'A full hock on a long narrow foot' }, endsAs: 'Narrow paws, heel raised',
             stages: [
               'The arches ache, then tighten; the ball of the foot takes more of the weight.',
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
@@ -897,7 +897,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
-              'Four toes with a pad under each and blunt claws that do not sheathe; the dewclaw high on the inside. Nothing with a closed toe fits.'
+              'Four toes with a pad under each and sharp claws that sheathe and slide out; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
           { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a soft paw', standard: 'Heel raised, weight on the toes', most: 'A full hock' }, endsAs: 'Soft silent paws, heel raised',
             stages: [
@@ -978,12 +978,12 @@ window.WINDLASS_WORLDS.sundered = {
               'Clean warm fur and little else.',
               'Almost no scent but warm clean fur, with glands at the cheek and wrist that mark what is its own for keen noses.'
             ] },
-          { key: 'further_pairs', name: 'Further pairs', weight: 5, sex: 'women', range: { least: 'Two more pairs', standard: 'Three more pairs', most: 'Four more pairs' },
+          { key: 'further_pairs', name: 'Further pairs', weight: 5, sex: 'women', range: { least: 'Three pairs below the breasts', standard: 'Four pairs below the breasts', most: 'Four pairs, larger and darker' },
             stages: [
               'Tender points on the ribs under each breast, like pressed bruises.',
               'Each is a small flat disc of darker skin. A second pair of tender points sits lower, toward the navel.',
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
-              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, as many as the draw sets (two more pairs at the standard), each as sensitive as the first.'
+              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, as many as the draw sets (four pairs in two rows at the standard), each as sensitive as the first.'
             ] },
           { key: 'toms_build', name: 'Tom\'s build', weight: 5, sex: 'men', range: { least: 'A thick neck', standard: 'Broad cheeks, a thick neck, heavy forearms', most: 'Heavy jowls and shoulders' }, endsAs: 'broad cheeks, a thick neck and heavy forearms',
             stages: [
@@ -1222,12 +1222,12 @@ window.WINDLASS_WORLDS.sundered = {
               'The iris turns {eye}. A face can be read from across a quad.',
               '{eye} eyes that pick out a coin from a rooftop and see colours others cannot. Close work tires them.'
             ] },
-          { key: 'light_bones', name: 'Light bones', weight: 7, endsAs: 'a light frame, a deep breastbone and small high breasts',
+          { key: 'light_bones', name: 'Light bones', weight: 7, endsAs: 'a light frame and a deep breastbone',
             stages: [
               'Lighter on the scales without looking thinner.',
               'The frame slims, and the breastbone deepens into a keel. Bruises come more easily.',
-              'Light enough to be lifted easily. The chest is deep with flight muscle, and the breasts sit small and high on it.',
-              'A light, fine-boned body with a deep breastbone, small high breasts and down between them. Strong for its weight, quick to chill, and easily carried.'
+              'Light enough to be lifted easily. The chest is deep with flight muscle.',
+              'A light, fine-boned body with a deep breastbone and down over it. Strong for its weight, quick to chill, and easily carried.'
             ] },
           { key: 'voice_and_song', name: 'Voice and song', weight: 6, endsAs: 'a carrying voice and a dawn song',
             stages: [
@@ -1261,7 +1261,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Warm feathers and dust.',
               'Warm feathers, clean and dry, like a sun-warmed loft.'
             ] },
-          { key: 'laying', name: 'Laying', weight: 7, endsAs: 'an unfertilised egg every few weeks',
+          { key: 'laying', name: 'Laying', weight: 7, sex: 'women', endsAs: 'an unfertilised egg every few weeks',
             stages: [
               'A dull ache low in the belly every few weeks.',
               'The ache comes with a heaviness and a wish to be somewhere quiet.',
@@ -1315,12 +1315,12 @@ window.WINDLASS_WORLDS.sundered = {
               'In water there is a full tail with the feet fanned into a fluke. Out of it the tail parts back into legs over a few minutes as the scales dry, leaving them weak for a moment.',
               'Legs on land; in water, one long scaled tail and a broad fluke, changing over in the time of a few breaths. Swimming is flight. The seam along the inner legs is very sensitive.'
             ] },
-          { key: 'gills', name: 'Gills', weight: 8, endsAs: 'three gill slits either side of the ribs',
+          { key: 'gills', name: 'Gills', weight: 8, endsAs: 'three gill slits either side of the throat',
             stages: [
-              'An ache along the ribs on both sides, and a wish to hold the breath underwater.',
-              'Three fine lines either side of the ribs, tender and closed.',
+              'An ache down both sides of the throat, and a wish to hold the breath underwater.',
+              'Three fine lines either side of the throat, tender and closed.',
               'The lines open underwater and draw it through. The first breaths of water are frightening, then easy.',
-              'Three gill slits either side of the ribs, sealed flat in air and working in water. Breathes both; the gills are tender to touch and best kept damp.'
+              'Three gill slits either side of the throat, sealed flat in air and working in water. Breathes both; the gills are tender to touch and best kept damp.'
             ] },
           { key: 'finned_ears', name: 'Finned ears', weight: 5, range: { least: 'Small fins', standard: 'Finned ears and a low ridge', most: 'Tall fans and a high back fin' }, endsAs: 'finned, translucent ears',
             stages: [
@@ -2280,9 +2280,9 @@ window.WINDLASS_WORLDS.sundered = {
             steps: ['the skin of the back and belly itches from inside for a day and the shirt is unbearable; {first} sleeps on top of the blanket', 'a tingle at the tip of the nose and a line down the middle of it, and a crease in the upper lip that the tongue finds and worries at', 'a strip of fine fur comes up the spine first, tail to nape, and fine pale down from the navel upward; by the month’s end a soft pale fur lies over the belly from the hips to the ribs, shorter and finer than the coat, the softest on the body and the most alive to a hand', 'whiskers, fine as thread, come in at the cheeks and above the eyes and tell {first} where the doorframe is in the dark', 'the edges of sight widen until the room arrives from the sides as well as the front, and anything moving overhead stops {first} dead; the eyes are larger, set a touch wider, turning {eye}, and best at dawn and dusk', 'the fur has closed over the back, the belly, the arms and the legs to the hip, dense and soft, so that clothes sit on it and not on skin; the nose is cleft to the lip and never still; the eyes in the mirror have finished going {eye}', 'in the mirror the face is still {first}\'s, under the ears and behind the whiskers: a cleft nose that reads the room, a split lip over the long front teeth, eyes {eye} set a little wide; the body is small and quick and furred and sits back on its heels; the warren has made {them} a place in the pile without a word'],
             anatomy: 'The finished shape: upright and human-faced; long turning ears; eyes {eye}, set wide; whiskers; a cleft nose that moves all the time; a split upper lip over long front teeth; fur over back, belly, arms and legs, thinner at the throat; long furred hind feet without pads; a bob tail. A smell of hay.',
             sex: ['{genitals}', '{tanner5}', 'a woman\'s body entire: small and quick, soft at the hip and heavy in the thigh, the breasts carried on a narrow frame; in the mirror, under the ears, a face that is {first}’s and a woman\'s'] },
-          { at: 100, trait: 'the shift: a whole rabbit at will, and the warren-sense',
-            steps: ['the warren sits in the chest like a compass, every rabbit on the Isle a direction and a warmth, even through walls', 'at dawn a pressure in the long bones of the legs, a wanting to be on the Moon Field and on four feet, that waits and does nothing until asked', 'the shift is there to be taken when {first} chooses it, like a gap in a hedge; it can be left alone for a week', 'when {first} chooses it, and only then: the spine folds, the arms shorten and go to forefeet, the face pushes out into a true muzzle, the fur closes over like water, and a rabbit sits in the clothes {first} was wearing, long-eared, and goes across the Moon Field in bounds; and back, when {they} choose{s}, upright and {first}-faced, with grass on {their} knees'],
-            anatomy: 'The rabbit: a true rabbit, four-footed, in {first}\'s colour with {first}\'s eyes, taken and left at will; it lasts as long as {first} wants and ends when {they} decide{s}. The upright, human-faced shape is the one {first} lives in.' }
+          { at: 100, trait: 'rabbit mythkin: the warren-sense',
+            steps: ['the warren sits in the chest like a compass, every rabbit on the Isle a direction and a warmth, even through walls', 'at dawn a pressure in the long bones of the legs and a pull toward the Moon Field, felt and left alone until {first} chooses to go'],
+            anatomy: 'The warren-sense: every rabbit and rabbit mythkin on the Isle felt as a direction and a warmth in the chest. The upright, human-faced shape is the one {first} lives in; no one takes an animal\'s shape.' }
         ],
         habits: ['greens before anything at every meal and the garnish off the next plate; grazing on them in small amounts all day, with a sweet tooth for fruit and carrots, and meat left on the plate', 'sitting very still when a door bangs, then moving all at once; knowing where the doors are in any room, and going entirely loose only among the trusted', 'a foot that thumps the floor when {first} is startled, and the floor below complaining', 'waking at dawn wanting the Moon Field, and sleeping in the afternoon', 'grooming a stray hair off a friend’s shoulder before thinking, and the nose going forward to touch another’s in greeting before the hand has thought to go out', 'a nest made of whatever is soft, the blankets built up into a burrow, and sleep that comes easier in a heap; a count of who is in the room and who is not, before anything else', 'gnawing: a pencil, a carrot, the edge of a crate, because the front teeth ache without it and are kept short by it'],
         noticed: ['the warren rabbits make room for {first} in the pile without a word; the Beastcraft hares sit up as {first} passes', 'a dog on the pier road stares and is called off; the fox mythkin in the library go very still, then grin'],
@@ -2355,7 +2355,7 @@ window.WINDLASS_WORLDS.sundered = {
 
   lore: [
     {name:'species: cow',species:'cow',keys:['cow','bovine','Creamery','cocoa','milk','cream'],priority:7,text:'Bovine mythkin are horned, long-eared and tufted-tailed, with hide over shoulders, arms, back and belly, hands of two broad hoof-fingers and an opposable hoof-thumb, and cloven hooves; some are notably warm to stand near. The Creamery is a dairy science practical where students make milk, cream, butter, cheese and cocoa. Bovine women have full veined breasts with long thick nipples that give milk, and an udder low on the abdomen with four teats; the wrap bovine women wear is made with room for it. Dairy, touch and shared sleep are possible routes of transformation, not social expectations: individuals vary in what they offer, welcome or enjoy.'},
-    {name:'species: wolf',species:'wolf',keys:['wolf','werewol*','pack','Moonrunner*','Moon Field','dusk run'],priority:7,text:'The werewolves run as a pack, the Moonrunners, at dusk on Tuesdays from the Moon Field, and the pack is whoever keeps up, human runners included; anyone may run behind them, and being invited to run with them is another matter. Sharing their meals, sleeping in the pack pile and a playful nip or scratch draw a human toward the wolf; a nip is considered forward. Werewolves live upright and human-faced, like everyone; the wolf is a shape they take.'},
+    {name:'species: wolf',species:'wolf',keys:['wolf','werewol*','pack','Moonrunner*','Moon Field','dusk run'],priority:7,text:'The werewolves run as a pack, the Moonrunners, at dusk on Tuesdays from the Moon Field, and the pack is whoever keeps up, human runners included; anyone may run behind them, and being invited to run with them is another matter. Sharing their meals, sleeping in the pack pile and a playful nip or scratch draw a human toward the wolf; a nip is considered forward. Werewolves live upright and human-faced, like everyone; the wolf is in the body, the senses and the pack, and none of them takes a wolf\'s shape.'},
     {name:'species: harpy',species:'harpy',keys:['harpy','harpies','feather','Aerie','choir','roost','perch'],priority:7,text:'Harpies roost in the Aerie, a roofless tower of ledges, and sing every Wednesday. A harpy who gives you a feather is asking; if you wear it, you have answered. Being preened, roosting overnight in the Aerie and singing with them draw a human toward the harpy. A harpy\'s arms are her wings, feathered from the shoulder, and each ends in a hand whose fingers are talons, for gripping; her feet are talons too, and she perches rather than sits.'},
     {name:'species: goblin',species:'goblin',keys:['goblin','arcade','market','charm','bargain','stall','haggle'],priority:7,text:'Goblins keep the arcade under the old chapel and hold a market there every Monday night. They are small and green, with a faint sheen to the skin like a leaf, long thin ears that move on their own, slit-pupilled eyes, small pointed teeth, long fingers with an extra joint, and bare wide feet with hooked toes that grip. Goblin-made charms worn against the skin, their spiced food and green tea, a signed bargain and traded favours draw a human toward the goblin. A goblin gift is never free, and they will tell you the price if you ask.'},
     {name:'species: fairy',species:'fairy',keys:['fairy','fairies','fae','glamour','ring','dust','bower','theatre'],priority:7,text:'Fairies live in bowers in the Greenhouse Quarter and dance the mown rings on Friday nights. A fairy is knee-high at rest and human-sized when showing off, with long pointed ears, eyes with no white that are iridescent edge to edge, wings that fold flat along the back and buzz when annoyed, fingers a joint too long, and skin that sheds a faint luminous dust onto everything it touches. Fairy dust and glamour on the skin, a fairy\'s kiss (glamour passes mouth to mouth, which is why they kiss hello), dancing through a ring and sleeping in a bower draw a human toward the fae. Iron makes them sneeze.'},
