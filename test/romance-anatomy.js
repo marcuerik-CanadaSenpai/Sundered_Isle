@@ -174,8 +174,8 @@ async function main() {
       'sensory variety must not categorically ban heat descriptions');
     assert.match(sunderedRules, /paths can progress together on one body; they do not compete for a limited number of parts/i,
       'multiple species paths must coexist without arbitrary replacement');
-    assert.match(prompts[1], /successive ten-percent increments from first alteration to fully established form/,
-      'ten-step anatomical progress must be described between its endpoints');
+    assert.doesNotMatch(prompts[1], /Each part changes on its own track/,
+      'the waypoint rule is sent only once a change has begun');
 
     const sunderedCow = worlds.sundered.genPools.species.cow.bodyByGender.female.join(' ');
     assert.match(sunderedCow, /udder.*four teats/i, 'Sundered must retain its established bovine anatomy');

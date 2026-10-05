@@ -751,7 +751,10 @@
     const aims = Object.assign({ default: 'get to know {first} and find out what kind of roommate {they} will be; hopes, in time, for ' + hope + ', and does not push' }, sp ? sp.aims : {});
     // Half of roommates spend their free hours with a club that is not their kind's expected one; the kind's night place (a roost, a pool, a tree) is kept.
     const haunts = (W.genPools && Array.isArray(W.genPools.haunts)) ? W.genPools.haunts : [];
-    const haunt = sp && haunts.length && Math.random() < 0.5 ? pick(haunts) : null;
+    // A haunt that is the kind's own (its place named in the kind's day, or a club for that kind) is not an unexpected one.
+    const ownDay = sp && sp.where ? Object.values(sp.where).join(' | ').toLowerCase() : '';
+    const strange = haunts.filter((h) => !(h.kinds || []).includes(species) && !ownDay.includes(String(h.where && h.where.default || '').toLowerCase()) && !ownDay.includes(String(h.club || '').replace(/^the /i, '').toLowerCase()));
+    const haunt = sp && strange.length && Math.random() < 0.5 ? pick(strange) : null;
     const where = haunt ? Object.assign({}, haunt.where, sp.where && sp.where.night ? { night: sp.where.night } : {}) : (sp && sp.where && sp.where.default ? sp.where : { default: 'room 4B, Kettle Hall, or wherever ' + p.pronouns.their + ' kind gather', evening: 'wherever the evening is', night: 'room 4B' });
     const hauntBit = haunt ? ' Spends free hours with ' + haunt.club + ', which is not where ' + p.pronouns.their + ' kind are expected.' : '';
     const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.' + hauntBit;
@@ -1037,6 +1040,7 @@
         if (!isFinite(n)) { notes.push('bad attitude value for ' + key); continue; }
         const clamped = Math.max(0, Math.min(10, Math.max(prev - 1, Math.min(prev + 1, Math.round(n)))));
         if (clamped !== Math.round(n)) notes.push('attitude ' + key + ' ' + Math.round(n) + ' clamped to ' + clamped + ' (±1 per turn)');
+        if (bondModel() && ensureBonds(state) && state.bonds[key]) { const cur = Number(state.attitudes[key]) || 0; if (clamped !== cur) { const d2 = []; shiftBond(state, key, clamped > cur ? 'liking' : 'trust', clamped > cur ? 'up' : 'down', d2, notes); for (const x of d2) rec(x.path, x.from, x.to); if (state.attitudes[key] !== clamped) { rec(path, state.attitudes[key], clamped); state.attitudes[key] = clamped; } } continue; }
         rec(path, state.attitudes[key], clamped); state.attitudes[key] = clamped;
       } else if (group === 'flags') {
         if (!(key in state.flags)) { notes.push('ignored unknown flag "' + key + '"'); continue; }
@@ -1093,6 +1097,7 @@
     if (r) { if (r.replaces) delete st.attitudes[r.replaces]; st.attitudes = Object.assign({ roommate: r.attitude }, st.attitudes); }
     const gen = adv && adv.cast && adv.cast.generated;
     for (const c of (gen ? gen.characters : W.characters)) if (!(c.key in st.attitudes) && typeof c.attitude === 'number' && !(r && r.replaces === c.key)) st.attitudes[c.key] = c.attitude;
+    ensureBonds(st);
     // Kinds met before the story opens: whoever is present at Turn 0, plus the cast members the seed says were met on the way.
     if (W.transformation) { st.met = []; const seeded = ((W.memorySeed && W.memorySeed.met) || []).map((k) => speciesKeyOf(charByKey(k) || (gen && (gen.minors || []).find((m) => m.key === k)))); recordMet(st, seeded.filter(Boolean)); }
     return st;
@@ -1132,6 +1137,7 @@
     state.tf.traits = state.tf.traits || []; state.tf.rungs = state.tf.rungs || {}; state.tf.arcs = state.tf.arcs || [];
     state.tf.tracks = state.tf.tracks || []; state.tf.paths = state.tf.paths || {};
     state.tf.last = state.tf.last || {}; state.tf.drifted = state.tf.drifted || {};
+    if (W.transformation.tracks) migrateTracks(state);
   }
   // Story time in minutes from the start of Day 1, for pacing the steps of a change.
   const storyMin = (state) => ((Number(state.day) || 1) - 1) * 1440 + timeToMin(state.time);
@@ -1145,7 +1151,7 @@
   // to nothing is gone (the trait, the rung, and influence to five under the rung's line, so the body remembers). Influence itself
   // drifts down after a quiet day, influencePerDay a day, never below the line of the last change begun. The pace setting scales
   // the hours as it does the step gap, and the unbounded pace turns fading off. The world's transformation.fade overrides these.
-  const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2 };
+  const FADE_DEFAULTS = { line: 50, afterHours: 6, everyHours: 6, influenceAfterDays: 1, influencePerDay: 2, trackAfterHours: 24, trackEveryHours: 24 };
   const fadeCfg = () => Object.assign({}, FADE_DEFAULTS, (W.transformation && W.transformation.fade) || {});
   // The elements the player carries: one per kind with at least one settled change (a change under way gives nothing yet).
   function carriedElements(tf) {
@@ -1236,7 +1242,7 @@
     const p = adv.player || defaultPlayer();
     for (const k of Object.keys(T.species)) {
       const sp = T.species[k]; const r = tf.rungs[k] || 0;
-      if (trackBusy(tf, k)) continue;
+      if (trackModel(k) || trackBusy(tf, k)) continue;
       if (r < sp.ladder.length && (tf.influence[k] || 0) >= sp.ladder[r].at) {
         const rung = sp.ladder[r]; tf.rungs[k] = r + 1;
         if (hasSteps(rung)) {
@@ -1340,7 +1346,7 @@
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
-    return out.concat(fadeTracks(state, notes));
+    return out.concat(fadeTracks(state, notes), easeTracks(state, notes), tellTracks(state, notes));
   }
   // The fading itself: one step back per held change per turn, on its own clock (the first when the quiet reaches afterHours, then
   // every everyHours), told to the narrator as the step easing. At nothing told the change is gone, with its sex steps.
@@ -1425,7 +1431,7 @@
         if (tf.influence[k]) { diff.push({ path: 'tf.influence.' + k, from: tf.influence[k], to: 0 }); tf.influence[k] = 0; }
         const before = tf.traits.length; tf.traits = tf.traits.filter((t) => t.species !== k);
         if (tf.traits.length !== before) diff.push({ path: 'tf.traits', from: (before - tf.traits.length) + ' ' + k + ' change(s)', to: 'removed' });
-        tf.rungs[k] = 0; tf.arcs = (tf.arcs || []).filter((a) => a.species !== k); tf.tracks = (tf.tracks || []).filter((t) => t.species !== k); if (tf.paths) delete tf.paths[k];
+        tf.rungs[k] = 0; tf.arcs = (tf.arcs || []).filter((a) => a.species !== k); tf.tracks = (tf.tracks || []).filter((t) => t.species !== k); if (tf.paths) delete tf.paths[k]; if (tf.prog) delete tf.prog[k]; if (tf.sexprog && tf.sexprog.species === k) delete tf.sexprog;
         if (tf.sex && tf.sex.species === k) { diff.push({ path: 'tf.sex', from: tf.sex.to, to: 'as it was' }); sexUndone = true; delete tf.sex; }
         // The font slips off the kind's cursed pieces and lifts its curses; ordinary charms stay where they are.
         const cursedOf = (T.charms || []).filter((c) => c.cursed && c.species === k), cursesOf = (T.curses || []).filter((c) => c.species === k);
@@ -1466,12 +1472,15 @@
       if (gained[k] > 0) { tf.last[k] = now; delete tf.drifted[k]; continue; }
       if (!sc || !(tf.influence[k] > 0)) continue;
       if (tf.last[k] == null) { tf.last[k] = now; continue; }   // an older save: the quiet starts counting now
-      const r = tf.rungs[k] || 0, floor = r > 0 ? T.species[k].ladder[r - 1].at : 0; if (tf.influence[k] <= floor) continue;
+      // On tracks the line is where the latest part told began (its window's start); on a ladder, the last rung begun.
+      const r = tf.rungs[k] || 0, P = trackModel(k) && tf.prog && tf.prog[k];
+      const floor = P ? Math.max(0, ...Object.values(P.tracks || {}).filter((x) => x && x.told > 0).map((x) => x.s || 0)) : (r > 0 ? T.species[k].ladder[r - 1].at : 0); if (tf.influence[k] <= floor) continue;
       const quiet = now - tf.last[k] - Math.round(cfg.influenceAfterDays * 1440 * sc); if (quiet < 0) continue;
       const owed = Math.floor(quiet / Math.round(1440 * sc / Math.max(1, cfg.influencePerDay))) - (tf.drifted[k] || 0); if (owed <= 0) continue;
       const from = tf.influence[k], to = Math.max(floor, from - owed); tf.drifted[k] = (tf.drifted[k] || 0) + owed;
       if (to !== from) { tf.influence[k] = to; diff.push({ path: 'tf.influence.' + k, from, to }); notes.push(k + ' influence -' + (from - to) + ' (nothing of its kind for ' + Math.round((now - tf.last[k]) / 60) + ' h)'); }
     }
+    if (T.tracks) { for (const k of Object.keys(T.species)) if (trackModel(k) && (tf.influence[k] || 0) > 0) ensureTrackPath(state, k, notes); driveTracks(state); }
     manifestDue(state, diff, notes, next);
     return { notes, next };
   }
@@ -1480,6 +1489,7 @@
   function bodyNowLines(tf, who, compact) {
     const T = W.transformation; const out = [];
     for (const k of Object.keys(T.species)) {
+      if (trackModel(k)) continue;
       const sp = T.species[k]; const n = tf.traits.filter((t) => t.species === k && t.settled !== false).length;
       const parts = [];
       const path = (tf.paths || {})[k];
@@ -1518,9 +1528,37 @@
     if (tf.sex) out.push(who + '\'s body is ' + (tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, the whole of it, along the ' + T.species[tf.sex.species].name + ' path (since Day ' + tf.sex.day + '); what ' + who + ' is called is the player\'s.');
     return out;
   }
-  function transformationBlock(state, compact) {
+  // A change has begun once any part has been told a step, a settled trait stands, or the body's sex has moved.
+  function changeBegun(tf) {
+    if (!tf) return false;
+    if ((tf.traits || []).length || tf.sex || (tf.tracks || []).length) return true;
+    const told = (o) => Object.values((o && o.tracks) || {}).some((r) => r && r.told > 0);
+    return Object.values(tf.prog || {}).some(told) || told(tf.sexprog);
+  }
+  // The kinds a scene touches: any with influence or a path, the kind of each person present, and any whose name or lore keys are in
+  // the scene's text (the action, the director note, the recent turns, who is present).
+  function sceneKinds(state, text) {
+    const T = W.transformation; if (!T) return new Set(); const tf = state.tf || {}; const out = new Set();
+    for (const k of Object.keys(T.species)) {
+      if ((tf.influence && tf.influence[k] > 0) || (tf.prog && tf.prog[k]) || (tf.paths && tf.paths[k])) { out.add(k); continue; }
+      const words = [k, speciesRace(W, k), T.species[k].name, T.species[k].short].concat((W.lore || []).filter((e) => e.species === k).flatMap((e) => e.keys || []));
+      if (words.some((w) => { const s = String(w || '').toLowerCase(); return s.endsWith('*') ? s.length > 3 && new RegExp('(^|[^a-z])' + escRe(s.slice(0, -1)) + '[a-z]*').test(text) : wordIn(text, s); })) out.add(k);
+    }
+    const gen = adv && adv.cast && adv.cast.generated;
+    for (const c of activeCharacters().concat(gen ? (gen.minors || []) : [])) {
+      const k = speciesKeyOf(c); if (!k || !T.species[k] || out.has(k)) continue;
+      const hs = nameHandles(c).filter((n) => n.length > 2).map((n) => n.toLowerCase());
+      if (hs.some((n) => wordIn(text, n)) || (state.present || []).some((pp) => hs.some((n) => wordIn(String(pp).toLowerCase(), n)))) out.add(k);
+    }
+    return out;
+  }
+  // Rules go to the narrator when the scene needs them: how each kind's contacts count only for the kinds in the scene, the
+  // story-thread and waypoint rules once a change has begun, the charm and curse rules when a piece is in play or named, the
+  // elements once one is carried or magic is in the scene. Everything the narrator must keep true is always sent.
+  function transformationBlock(state, compact, sceneText) {
     const T = W.transformation; if (!T) return '';
     ensureTf(state); const tf = state.tf; const who = firstName();
+    const text = String(sceneText || '').toLowerCase(), begun = changeBegun(tf), inScene = sceneKinds(state, text);
     const lines = [];
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
     const kinds = Object.keys(T.species);
@@ -1530,18 +1568,22 @@
     const listed = kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ');
     const influenceNow = compact ? (listed || 'none yet') + (kinds.some((k) => !(tf.influence[k] || 0)) ? (listed ? ' (unlisted kinds 0)' : ' (every kind 0)') : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
-    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none') + '.');
-    const body = bodyNowLines(tf, who, compact); if (body.length) lines.push(body.join('\n'));
+    const underWay = T.tracks ? Object.keys(tf.prog || {}).map((k) => { const n = (trackModel(k) || []).filter((t) => { const r = tf.prog[k].tracks[t.key]; return r && r.told > 0 && r.told < t.stages.length; }).length; return n ? n + ' ' + T.species[k].short : ''; }).filter(Boolean) : [];
+    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none finished') + (underWay.length ? '; parts under way: ' + underWay.join(', ') : '') + '.');
+    const body = trackBodyLines(tf, who, compact).concat(bodyNowLines(tf, who, compact)); if (body.length) lines.push(body.join('\n'));
     lines.push('World-authored transformation traits, steps and habits are sensory references, not permission to make ' + who + ' perform voluntary actions or to assign desires, feelings, values, memories or identity. Recast such wording as a bodily sensation or reflex, or omit it; the player chooses what ' + who + ' does and feels.');
-    lines.push(compact
+    if (begun) lines.push(compact
       ? 'Story thread: keep established bodily changes and reflexes present in ordinary life, varied and proportionate. The player decides what changes mean; never invent a new change, memory, value, attraction or identity.'
       : 'Story thread: transformation is a continuing change in the body and in how ordinary life feels, not an isolated event. Once a change has begun, let its established physical details, new reflexes, habits, clothing or movement sometimes color later scenes; let the player notice that a once-familiar body or identity may feel unfamiliar, without deciding what that means to ' + who + '. Use only effects supported by the announced steps and established traits; never invent memories, values, attraction, identity, or a new bodily change. Keep this thread present but varied and proportionate, not a repeated checklist.');
     lines.push('Anatomy: use specific, neutral anatomical language for structures that the active species path actually establishes, including location, form and practical effects when relevant. Do not use human-body comparisons to dismiss a mythkin feature, imply that all members of a species share an unlisted trait, or invent reproductive anatomy or function that the world data does not establish. The player\'s name, pronouns and self-understanding remain their choice regardless of bodily changes.');
-    lines.push('Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
-    const methodKinds = kinds;
-    lines.push('What raises influence:\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n'));
-    if (T.elements) {
-      const carried = carriedElements(tf);
+    if (begun) lines.push(T.tracks
+      ? 'Each part changes on its own track of waypoints at even intervals: a waypoint\'s line is the fact, found by ' + who + ' in a way of your own each time; between waypoints the part keeps changing by degrees, and a finished part is rendered only at its last waypoint. A part at half or less can ease back after a long while with nothing of its kind; past half it stays. The body never takes an animal\'s shape. Progress numbers are internal only and never appear in the narration.'
+      : 'Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
+    const methodKinds = kinds.filter((k) => inScene.has(k)), restKinds = kinds.filter((k) => !inScene.has(k));
+    lines.push('What raises influence' + (methodKinds.length ? ':\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n') : ': no kind is in the scene yet.')
+      + (restKinds.length ? '\nOther kinds (' + restKinds.join(', ') + '): their contacts are listed here once one of them is in the scene.' : ''));
+    const carried = T.elements ? carriedElements(tf) : [];
+    if (T.elements && (carried.length || /\b(magic|spell|spells|cast|casting|sigil|ward|wardcraft|element|elements|school|glamour|enchant\w*|rune|ritual)\b/.test(text))) {
       lines.push('Elements: ' + kinds.filter((k) => T.species[k].element).map((k) => k + ' ' + T.species[k].element).join(', ') + '. ' + (carried.length
         ? who + ' carries ' + carried.map((c) => c.element + ' (' + c.kinds.join(', ') + ')').join(', ') + ': magic worked through ' + (carried.length > 1 ? 'these elements' : 'it') + ' comes easily and shows as ease; magic through any other element comes hard and shows as strain, still possible and more likely to fail; plain craft with no element is unchanged. The dice line in <action> gives the adjustment.'
         : who + ' carries no element yet: every school and element comes at the same slow human pace, with no ease and no bar.'));
@@ -1551,18 +1593,342 @@
       // pieces' names), so a prompt with nothing worn pays a sentence for it, not the list.
       const items = state.items || {}, wearing = Array.isArray(items.wearing) ? items.wearing : [], curses = Array.isArray(items.curses) ? items.curses : [];
       const worn = (T.charms || []).filter((c) => wearing.some((x) => matchesKeys(x, c.keys))), laid = (T.curses || []).filter((c) => curses.some((x) => matchesKeys(x, c.keys)));
+      const named = wearing.length || curses.length || /\b(charms?|curse[sd]?|cursed|unpriced|amulets?|talismans?|trinkets?|bracelets?|pendants?|necklaces?|feathers? on a cord|hex\w*|bargain|fairy ring)\b/.test(text);
       const inPlay = [];
       if (worn.length) inPlay.push('Worn now: ' + worn.map((c) => c.name + ' (' + c.species + (c.cursed ? ', cursed: will not come off by hand, bites deeper each day' : '') + ')').join('; ') + '.');
       if (laid.length) inPlay.push('Under: ' + laid.map((c) => c.name + ' (' + c.species + ', ' + c.days + ' days)').join('; ') + '.');
-      lines.push((compact
+      if (!named) lines.push('Traps (a closed place, the fairy ring at the wrong hour, a mis-drawn sigil, a bargain at the Unpriced Table): report one exposure, method "trap: what it was", intensity 3. The rules for charms and curses come here when one is in play or named.');
+      else lines.push((compact
         ? 'Charms and curses: a charm worn against the skin (items.wearing) or a curse laid (items.curses) is a daily contact with its kind that the engine counts itself; never also report it in exposures. Add and remove them by plain names that say what each is (material and kind); the pieces and their makers are in <lore> when they come up. Cursed pieces come off only by a level-3 unbinding or the Spa. Traps (a closed place, the ring at the wrong hour, a mis-drawn sigil): one exposure, method "trap: what it was", intensity 3.'
         : 'Charms and curses: a charm worn against the skin is a daily contact with its kind that the engine counts itself while the piece is in items.wearing, and a curse or mark the same while it is in items.curses; do not also report either in exposures. When ' + who + ' puts a piece on, add it to items.wearing by a plain name that says what it is (its material and its kind, as a goblin copper bracelet or a harpy feather on a cord); when ' + who + ' takes it off, remove it; lay a curse only when its cause happens in the story, by its name. The pieces, the Unpriced Table\'s cursed ones (which will not come off by hand: a wardcraft unbinding at level 3 or the Restoration Spa slips one off, and nothing else does, and each day worn it bites deeper), the curses and what causes them are in <lore> whenever charms, curses or the Table come up; ' + who + ' learns what a piece is only from someone who would know (its maker, a goblin, the Dean). Traps: a closed place, the fairy ring at the wrong hour, a mis-drawn sigil or a bargain at the Unpriced Table may touch ' + who + ' with a kind all at once: report it as an exposure with method "trap: what it was" at intensity 3, or lay one of the curses.')
         + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
     }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. Whole-animal shifts are voluntary. Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration. The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
+  }
+
+  // ---------- change tracks ----------
+  // The change-tracks model (the design document). A kind with track data (transformation.tracks.species[k]) changes on tracks, one
+  // per part of the body, the senses or the mind, each 0 to 100 with a weight; the kind's total is the weighted sum and the weights of
+  // a body sum to 100. Influence toward the kind drives the tracks: each track has a window of influence drawn once per path (so the
+  // tracks interleave in an order and at a pace of their own), and its progress is where the influence sits in that window, never
+  // falling while contact goes on (a part at half or less eases back slowly in a long quiet, see easeTracks; the Spa undoes any). A track's stages are waypoints at even intervals; the narrator is told the
+  // newest waypoint when a track reaches it, at most two a turn and story hours apart on one track, and the current line of every
+  // track under way. A track with needs waits for the named track's stage; a by-sex track opens only for the matching body. Two extent
+  // draws per path (the body's lean and the face) say how far each feature goes, in the words of the track's range.
+  const trackModel = (k) => { const T = W.transformation; return (T && T.tracks && T.tracks.species && T.tracks.species[k]) || null; };
+  const sexModel = (to) => { const T = W.transformation; return (T && T.tracks && T.tracks[to === 'female' ? 'woman' : 'man']) || null; };
+  const bondModel = () => { const T = W.transformation; return (T && T.tracks && T.tracks.bond) || null; };
+  const TRACK_WINDOW = { from: 12, spread: 38, lenMin: 35, lenMax: 65 }, SEX_WINDOW = { from: 12, spread: 33, lenMin: 30, lenMax: 60, end: 92 };
+  const drawWindow = (cfg) => { const s = cfg.from + Math.random() * cfg.spread; const e = Math.min(cfg.end || 100, s + cfg.lenMin + Math.random() * (cfg.lenMax - cfg.lenMin)); return { s: Math.round(s), e: Math.max(Math.round(s) + 10, Math.round(e)) }; };
+  // The body's lean: about two in three on the standard, the far ends rarer; a single feature may sit one step either side of it.
+  const drawLean = () => { const r = Math.random(); return r < 1 / 6 ? -1 : r < 5 / 6 ? 0 : 1; };
+  const drawExt = () => { const r = Math.random(); return r < 0.15 ? -1 : r < 0.85 ? 0 : 1; };
+  const stageOf = (p, n) => Math.max(0, Math.min(n, Math.floor((Number(p) || 0) * n / 100 + 1e-9)));
+  // The least whole progress at stage j: rounded up, so stageOf of it is j again (round would give 33 for 1 of 3, which is stage 0).
+  const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
+  const trackDrive = (D, w) => Math.max(0, Math.min(100, Math.round((D - w.s) * 100 / Math.max(1, w.e - w.s))));
+  // Progress and extent records for a kind's path, drawn once when influence first moves.
+  function ensureProg(tf, k) {
+    const M = trackModel(k); if (!M) return null;
+    tf.prog = tf.prog || {};
+    if (!tf.prog[k]) tf.prog[k] = { lean: drawLean(), face: Math.round(Math.random() * 30), tracks: {} };
+    const pr = tf.prog[k]; pr.tracks = pr.tracks || {};
+    for (const t of M) if (!pr.tracks[t.key]) pr.tracks[t.key] = Object.assign(drawWindow(TRACK_WINDOW), { p: 0, told: 0, ext: drawExt(), nextAt: 0 });
+    return pr;
+  }
+  function ensureSexProg(tf, k, to) {
+    const M = sexModel(to); if (!M) return null;
+    if (!tf.sexprog || tf.sexprog.species !== k) tf.sexprog = { species: k, to, tracks: {} };
+    const sx = tf.sexprog; sx.tracks = sx.tracks || {};
+    for (const t of M) if (!sx.tracks[t.key]) sx.tracks[t.key] = Object.assign(drawWindow(SEX_WINDOW), { p: 0, told: 0, nextAt: 0 });
+    return sx;
+  }
+  // The body's sex as the tracks see it: the player's own, or where a path has carried it (going over counts once it is over).
+  const bodySex = (tf, p) => (tf.sex ? tf.sex.to : (p || {}).gender === 'female' ? 'female' : (p || {}).gender === 'male' ? 'male' : 'other');
+  const sexStage = (tf, key) => { const sx = tf.sexprog; if (!sx) return null; const M = sexModel(sx.to); const t = M && M.find((x) => x.key === key); const r = sx.tracks && sx.tracks[key]; return t && r ? r.told : null; };
+  // Whether a by-sex track is open: a born body of that sex opens it; a body going over opens a woman's tracks once Chest is at
+  // stage 3 and a man's once Frame is at stage 2; a path rolled toward the other body never opens them.
+  function trackOpen(tf, k, t, p) {
+    if (!t.sex) return true;
+    const path = (tf.paths || {})[k], going = path && path.sex && !tf.sex ? path.sex : null, born = bodySex(tf, p);
+    const want = t.sex === 'women' ? 'female' : 'male';
+    if (going) { if (going !== want) return false; const st = sexStage(tf, want === 'female' ? 'chest' : 'frame'); return st != null && st >= (want === 'female' ? 3 : 2); }
+    if (path && path.sex && tf.sex && tf.sex.species === k) return tf.sex.to === want;
+    return born === want;
+  }
+  // A need: the named track (of the kind, else of the body's sex change) at the stage, or finished. A born body of the right sex
+  // counts a sex-change track as finished. A need with from binds only the stages from that one on.
+  function needMet(tf, k, M, need, p) {
+    // The kind's own tracks are read from its progress; a sex-change track (M is then the sex model) falls to the way over below.
+    const pr = tf.prog && tf.prog[k]; const t = (trackModel(k) || []).find((x) => x.key === need.track);
+    if (t) { const r = pr && pr.tracks[t.key]; const st = r ? r.told : 0; return need.stage === 'finished' ? st >= t.stages.length : st >= Number(need.stage); }
+    const sx = tf.sexprog, sm = sx && sexModel(sx.to), st = sm && sm.find((x) => x.key === need.track);
+    if (st && sx.tracks[st.key]) { const s = sx.tracks[st.key].told; return need.stage === 'finished' ? s >= st.stages.length : s >= Number(need.stage); }
+    const wm = sexModel('female'), mm = sexModel('male');
+    const inWoman = wm && wm.some((x) => x.key === need.track), inMan = mm && mm.some((x) => x.key === need.track), born = bodySex(tf, p);
+    if (inWoman && !inMan) return born === 'female'; if (inMan && !inWoman) return born === 'male';
+    return true;
+  }
+  // The ceiling a track's needs put on its progress: nothing until they are met, or the stage before the one a need binds from.
+  function needCap(tf, k, M, t, p) {
+    let cap = 100;
+    for (const need of (t.needs || [])) { if (needMet(tf, k, M, need, p)) continue; const n = t.stages.length; cap = Math.min(cap, need.from ? Math.max(0, stageAt(need.from - 1, n)) : 0); }
+    return cap;
+  }
+  const kindTotal = (tf, k) => { const M = trackModel(k), pr = tf.prog && tf.prog[k]; if (!M || !pr) return 0; return Math.round(M.reduce((a, t) => a + t.weight * ((pr.tracks[t.key] || {}).p || 0) / 100, 0)); };
+  const sexTotal = (tf) => { const sx = tf.sexprog, M = sx && sexModel(sx.to); if (!M) return 0; return Math.round(M.reduce((a, t) => a + t.weight * ((sx.tracks[t.key] || {}).p || 0) / 100, 0)); };
+  // The extent of a finished feature on this body, in the words of the track's range: the body's lean, a step either side for the
+  // feature, the face from its own draw (0 to 30: under 10 the least, over 20 the most).
+  function extentText(pr, t) {
+    if (!t.range) return '';
+    let lean = t.face ? (pr.face < 10 ? -1 : pr.face > 20 ? 1 : 0) : Math.max(-1, Math.min(1, pr.lean + ((pr.tracks[t.key] || {}).ext || 0)));
+    return t.range[lean < 0 ? 'least' : lean > 0 ? 'most' : 'standard'] || '';
+  }
+  // Moves every track of every kind with influence to where the influence sits in its window (never back), under its needs, only
+  // when open, and never past the next waypoint not yet told (the body goes as far as what has been lived through, so the influence
+  // may run ahead and the telling catch up at its own pace); the same for the body's sex. Called once per committed turn, after influence has moved.
+  function driveTracks(state) {
+    const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return;
+    const p = adv.player || defaultPlayer();
+    for (const k of Object.keys(T.species)) {
+      const M = trackModel(k), D = tf.influence[k] || 0; if (!M || !(D > 0)) continue;
+      const pr = ensureProg(tf, k);
+      const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) { const SM = sexModel(sx.to); for (const t of SM) { const r = sx.tracks[t.key]; if (heldBack(tf, k, r)) continue; const cap = needCap(tf, k, SM, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); } }
+      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
+    }
+  }
+  // A part the body has fought back stays where it eased to until something of its kind touches the player again.
+  function heldBack(tf, k, r) {
+    if (r.eased == null) return false;
+    if (tf.last[k] != null && tf.last[k] > r.eased) { delete r.eased; return false; }
+    return true;
+  }
+  // The body fighting off a small change: when nothing of a kind has touched the player for trackAfterHours, one part of that kind
+  // at half or less (its told waypoint at or under the line) eases back a waypoint, and another every trackEveryHours while the
+  // quiet lasts, the latest told first. A part past half has set and only goes on; a finished part stays. The way over to the
+  // other body eases the same way, with its kind. The pace setting scales the hours, and the unbounded pace turns it off.
+  function easeTracks(state, notes) {
+    const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return [];
+    const sc = fadeScale(); if (!sc) return [];
+    const cfg = fadeCfg(), now = storyMin(state), who = firstName(), out = [];
+    const after = Math.round(cfg.trackAfterHours * 60 * sc), every = Math.round(cfg.trackEveryHours * 60 * sc);
+    tf.ease = tf.ease || {};
+    for (const k of Object.keys(tf.prog || {})) {
+      const M = trackModel(k), pr = tf.prog[k]; if (!M || !pr) continue;
+      const last = tf.last[k]; if (last == null || now - last < after) { delete tf.ease[k]; continue; }
+      const cand = [];
+      for (const t of M) { const r = pr.tracks[t.key]; if (r) cand.push({ t, r, sex: false }); }
+      const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) for (const t of sexModel(sx.to) || []) { const r = sx.tracks[t.key]; if (r) cand.push({ t, r, sex: true }); }
+      const can = cand.filter(({ t, r }) => { const n = t.stages.length; return r.told > 0 && r.told < n && stageAt(r.told, n) <= cfg.line && stageOf(r.p, n) <= r.told; });
+      if (!can.length) { delete tf.ease[k]; continue; }
+      // The deadlines run from the last contact, so a long quiet turn eases one part and the rest follow a turn at a time.
+      if (tf.ease[k] == null || tf.ease[k] < last + after) tf.ease[k] = last + after;
+      if (now < tf.ease[k]) continue;
+      tf.ease[k] += every;
+      const { t, r, sex } = can.sort((a, b) => (b.r.nextAt || 0) - (a.r.nextAt || 0))[0];
+      const n = t.stages.length, was = pathFill(tf, k, t.stages[r.told - 1]).replace(/\.$/, '');
+      r.told -= 1; r.p = r.told ? stageAt(r.told, n) : 0; r.eased = now; r.nextAt = Math.max(r.nextAt || 0, now + stepGapMin());
+      const sp = T.species[k], what = sex ? 'the way toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body' : sp.name;
+      notes.push(k + (sex ? ' path: ' : ' change easing: ') + t.name + ' back to waypoint ' + r.told + ' of ' + n + ' (nothing of its kind for ' + Math.round((now - last) / 60) + ' h)');
+      out.push(r.told
+        ? 'The body is fighting off a change (' + what + '): ' + t.name + '. Nothing of its kind has touched ' + who + ' for a while, and this part is easing back a little toward how it was: ' + was + ' no longer, only ' + pathFill(tf, k, t.stages[r.told - 1]).replace(/\.$/, '') + '. One small thing this turn, in your own words, found in passing, the way an ache goes or a shoe fits again; then the scene goes on. Nobody remarks on it and nobody names it; whether ' + who + ' is relieved, sorry or unsure is the player\'s.'
+        : 'The body has fought off a change (' + what + '): ' + t.name + '. The last of it is gone (' + was + ' no longer), and this part is as it was before it began. Say so once, in passing, as ' + who + ' would notice an absence in a mirror, a shoe or a touch, without explanation; then the scene goes on. Nobody comments. How ' + who + ' takes it is the player\'s.');
+    }
+    return out;
+  }
+  // The note for a waypoint reached: the kind's first ever is a sensation small enough to forget; a track's last renders the part
+  // finished, with how far it goes on this body; the rest are one small thing each, found in passing.
+  function trackNote(tf, k, t, j, pr, firstEver) {
+    const sp = W.transformation.species[k]; const who = firstName(); const inf = tf.influence[k] || 0; const n = t.stages.length;
+    const line = pathFill(tf, k, t.stages[j - 1]); const ext = j === n ? extentText(pr, t) : '';
+    const fact = t.name + ' (' + sp.name + ', waypoint ' + j + ' of ' + n + '): ' + line + (ext ? ' How far it goes on this body: ' + fill(ext) + '.' : '');
+    if (j === n) return 'The change completes a part (' + sp.name + '): ' + fact + ' Render it once in full, plainly, as ' + who + ' would find it by looking and touching, and keep to it afterwards' + (sp.habits && sp.habits.length ? '; let it show in how ' + who + ' moves, eats, sleeps or reacts (' + fill(pick(sp.habits)) + ') without announcement' : '') + '. An animal or a keen-nosed mythkin may react without a word (' + fill(pick(sp.noticed || []) || 'a look, a sniff, room made') + '), never naming it. How ' + who + ' feels about it is the player\'s; do not presume a reaction in the suggested actions.';
+    if (firstEver) return 'A change is beginning (' + sp.name + ', influence ' + inf + ' of 100): ' + fact + ' Only one small thing this turn, in your own words: a first sensation, small enough to put down to tiredness, the cold or the food, and nothing shows. A sentence or two from inside ' + who + '\'s body, then the scene goes on and ' + who + ' may forget it. Do not name what it is becoming; nobody else notices. One suggested action may touch it; the others need not.';
+    return 'The change continues (' + sp.name + '): ' + fact + ' The line is the fact; how and when ' + who + ' finds it is yours, different every time (a shoe, a sock, a mirror, a sleeve, a task the body does differently), in a sentence or two with its practical consequence; the rest of the turn is the scene. Between waypoints the part keeps changing by degrees. Nobody remarks on it before ' + who + ' has found it, and nobody names or predicts it. What ' + who + ' makes of it is the player\'s.';
+  }
+  function sexTrackNote(tf, t, j) {
+    const sx = tf.sexprog; const sp = W.transformation.species[sx.species]; const who = firstName(); const n = t.stages.length; const what = sx.to === 'female' ? 'a woman\'s' : 'a man\'s';
+    let line = pathFill(tf, sx.species, t.stages[j - 1]);
+    // The chest ends as the size and shape drawn for this path; what is below is stated once, in the world's words, and not repeated.
+    if (t.key === 'chest' && j === n && sx.to === 'female') line += ' The size and shape drawn: ' + chestShape(pathFill(tf, sx.species, '{breasts}')) + '.';
+    if (t.key === 'below' && j === n && sx.to === 'female' && isSexStage('genitals')) line += ' ' + pathFill(tf, sx.species, '{genitals}');
+    return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). ' + t.name + ' (waypoint ' + j + ' of ' + n + '): ' + line + ' One small thing this turn, in your own words, found in passing (a mirror, a shirt, a strap, a voice), plain, with its practical consequence; then the scene goes on. Nobody remarks on it before ' + who + ' has found it, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
+  }
+  // Tells the waypoints reached and not yet told: at most one per track and two in a turn, the longest-waiting first, each track
+  // then waiting the story-hour gap. A track that finishes settles a change (the kind's element); the body's sex finished on every
+  // track makes the body a woman's or a man's.
+  function tellTracks(state, notes) {
+    const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return [];
+    const now = storyMin(state), gap = stepGapMin(), out = [], due = [];
+    for (const k of Object.keys(tf.prog || {})) {
+      const M = trackModel(k), pr = tf.prog[k]; if (!M || !pr) continue;
+      for (const t of M) { const r = pr.tracks[t.key]; if (!r) continue; const st = stageOf(r.p, t.stages.length); if (r.told < st && r.nextAt <= now) due.push({ kind: 'track', k, t, r, j: r.told + 1, at: r.nextAt }); }
+    }
+    const sx = tf.sexprog; if (sx && !tf.sex) { const SM = sexModel(sx.to) || []; for (const t of SM) { const r = sx.tracks[t.key]; if (!r) continue; const st = stageOf(r.p, t.stages.length); if (r.told < st && r.nextAt <= now) due.push({ kind: 'sex', k: sx.species, t, r, j: r.told + 1, at: r.nextAt }); } }
+    due.sort((a, b) => a.at - b.at || a.r.s - b.r.s || (a.kind === 'sex' ? 1 : 0) - (b.kind === 'sex' ? 1 : 0));
+    // The path's sex tracks wait for the kind's own change to begin (or for the way over to be under way already, as in an older
+    // save); a skipped one leaves its slot to the next due.
+    const begun = (k) => !!((tf.prog[k] && Object.values(tf.prog[k].tracks).some((r) => r.told > 0)) || (tf.traits || []).some((x) => x.species === k) || (sx && Object.values(sx.tracks || {}).some((r) => r.told > 0)));
+    let told = 0;
+    for (const d of due) {
+      if (told >= 2) break;
+      if (d.kind === 'sex' && !begun(d.k)) continue;
+      told += 1;
+      const sp = T.species[d.k], pr = tf.prog[d.k];
+      if (d.kind === 'track') {
+        const firstEver = !Object.values(pr.tracks).some((r) => r.told > 0);
+        out.push(trackNote(tf, d.k, d.t, d.j, pr, firstEver));
+        if (firstEver) { if (tf.last[d.k] == null || tf.last[d.k] < now) tf.last[d.k] = now; notes.push('change begins: ' + d.k + ' (' + d.t.name + ')'); }
+        d.r.told = d.j; d.r.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
+        if (d.j === d.t.stages.length) { tf.traits.push({ species: d.k, trait: d.t.name + ': ' + (d.t.endsAs || d.t.stages[d.t.stages.length - 1]), day: state.day, settled: true, track: d.t.key }); notes.push('change complete: ' + d.k + ' ' + d.t.name); }
+        else if (!firstEver) notes.push('change continues: ' + d.k + ' ' + d.t.name + ' waypoint ' + d.j + ' of ' + d.t.stages.length);
+      } else {
+        out.push(sexTrackNote(tf, d.t, d.j));
+        d.r.told = d.j; d.r.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
+        notes.push(d.k + ' path: ' + d.t.name + ' waypoint ' + d.j + ' of ' + d.t.stages.length + ' (toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body)');
+        const SM = sexModel(sx.to) || [];
+        if (SM.every((t) => sx.tracks[t.key] && sx.tracks[t.key].told >= t.stages.length)) {
+          tf.sex = { to: sx.to, species: sx.species, day: state.day };
+          const who = firstName(), what = sx.to === 'female' ? 'a woman\'s' : 'a man\'s';
+          out.push('The body has finished going over (' + sp.name + ' path): ' + who + '\'s body is ' + what + ' now, the whole of it. Say so once, plainly, as a fact found in the mirror or in clothes, without ceremony or explanation; then the scene goes on. What ' + who + ' is called and how ' + who + ' feels about it are the player\'s; people who know ' + who + ' go by whatever ' + who + ' has said, and otherwise by what they see.');
+          notes.push('the body is ' + what + ' now (' + sx.species + ' path)');
+        }
+      }
+    }
+    return out;
+  }
+  // The influence at which a kind's next waypoint would come, for the override panel: the least over every open track.
+  function nextWaypointInfluence(tf, k) {
+    const M = trackModel(k); const pr = ensureProg(tf, k); const p = adv.player || defaultPlayer(); let best = null;
+    for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || needCap(tf, k, M, t, p) <= r.p) continue; const st = stageOf(r.p, t.stages.length); if (st >= t.stages.length) continue; const need = stageAt(st + 1, t.stages.length); const D = r.s + Math.ceil(need * (r.e - r.s) / 100); if (best == null || D < best) best = D; }
+    return best;
+  }
+  // What the body is now on the tracks, for the narrator: per kind, the current line of every track under way or finished (the
+  // short form gives a finished track its one-line ending), then the body's sex on its way over.
+  function trackBodyLines(tf, who, compact) {
+    const T = W.transformation, out = []; const pf = (k, x) => pathFill(tf, k, x).replace(/\.$/, '');
+    for (const k of Object.keys(T.species)) {
+      const M = trackModel(k), pr = tf.prog && tf.prog[k]; if (!M || !pr) continue;
+      const parts = [];
+      for (const t of M) { const r = pr.tracks[t.key]; if (!r || !r.told) continue; const n = t.stages.length; const done = r.told >= n; parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + ': ' + (done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (done && t.range ? ' [' + fill(extentText(pr, t)) + ']' : '')); }
+      if (parts.length) out.push('Body now (' + T.species[k].name + ', ' + kindTotal(tf, k) + ' of 100): ' + parts.join('; ') + '.');
+    }
+    const sx = tf.sexprog;
+    if (sx && !tf.sex) { const SM = sexModel(sx.to) || []; const parts = SM.filter((t) => sx.tracks[t.key] && sx.tracks[t.key].told).map((t) => t.name + ' (' + sx.tracks[t.key].told + ' of ' + t.stages.length + '): ' + pf(sx.species, t.stages[sx.tracks[t.key].told - 1])); if (parts.length) out.push('Toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far (' + sexTotal(tf) + ' of 100, ' + T.species[sx.species].name + ' path): ' + (compact ? parts.slice(-3) : parts).join('; ') + '.'); }
+    if (sx && tf.sex && tf.sex.species === sx.species) { const SM = sexModel(sx.to) || []; const keep = SM.filter((t) => sx.tracks[t.key] && !/^(?:chest|below)$/.test(t.key)).map((t) => pf(sx.species, t.stages[t.stages.length - 1]).trim().replace(/([^.!?])$/, '$1.')); const chest = sx.to === 'female' ? ' The breasts grown on this path: ' + chestShape(pf(sx.species, '{breasts}')) + '.' : ''; if (keep.length) out.push('Settled on the way over (' + T.species[sx.species].name + ' path): ' + (compact ? keep.slice(-3) : keep).join(' ') + chest); }
+    return out;
+  }
+  // ---------- bonds ----------
+  // A bond with a person is nine facets, each 0 to 100 with a weight, their lines what the person does toward the player now; the
+  // attitude number the rest of the game reads moves with the bond's total, a tenth of it at a time. The narrator reports a facet
+  // moving in bond_shifts, one notch (half a stage) a turn each way; an attitude update from an older reply moves liking up or trust
+  // down the same way and sets the attitude it asked for.
+  const BOND_NOTCH = (t) => Math.round(100 / (2 * t.stages.length));
+  function ensureBonds(state) {
+    const B = bondModel(); if (!B || !state || !state.attitudes) return null;
+    state.bonds = state.bonds || {};
+    for (const key of Object.keys(state.attitudes)) {
+      // The attitude seeds the social facets only: ease and liking from it, trust and knowing at half; attraction, touch, intimacy,
+      // openness and standing start at nothing, so no one begins drawn to the player or close to them.
+      if (state.bonds[key]) continue; const a = Math.max(0, Math.min(10, Number(state.attitudes[key]) || 0));
+      const seed = { ease: Math.min(a * 10, 45), liking: Math.min(a * 10, 45), trust: Math.min(a * 5, 35), knowing: Math.min(a * 5, 25) };
+      state.bonds[key] = Object.fromEntries(B.map((t) => { const v = seed[t.key] || 0; return [t.key, { p: v, told: stageOf(v, t.stages.length) }]; }));
+    }
+    return state.bonds;
+  }
+  const bondTotal = (state, key) => { const B = bondModel(), b = state.bonds && state.bonds[key]; if (!B || !b) return null; return Math.round(B.reduce((a, t) => a + t.weight * ((b[t.key] || {}).p || 0) / 100, 0)); };
+  function shiftBond(state, key, facetKey, dir, diff, notes) {
+    const B = bondModel(); if (!B || !ensureBonds(state) || !state.bonds[key]) return false;
+    const t = B.find((x) => x.key === facetKey); if (!t) { notes.push('ignored unknown bond facet "' + facetKey + '"'); return false; }
+    const f = state.bonds[key][t.key] || (state.bonds[key][t.key] = { p: 0, told: 0 }); const from = f.p, before = bondTotal(state, key);
+    f.p = Math.max(0, Math.min(100, from + (dir === 'down' ? -1 : 1) * BOND_NOTCH(t)));
+    if (f.p !== from) { diff.push({ path: 'bonds.' + key + '.' + t.key, from, to: f.p }); notes.push('bond ' + key + ' ' + t.key + (dir === 'down' ? ' -' : ' +') + Math.abs(f.p - from)); }
+    // The attitude moves by the change in the bond's total, in tenths, so a bond seeded below the attitude never drags it down.
+    const total = bondTotal(state, key); if (key in state.attitudes && total != null && before != null) { const step = Math.round(total / 10) - Math.round(before / 10); const a = Math.max(0, Math.min(10, (Number(state.attitudes[key]) || 0) + step)); if (a !== state.attitudes[key]) { diff.push({ path: 'attitudes.' + key, from: state.attitudes[key], to: a }); state.attitudes[key] = a; } }
+    return f.p !== from;
+  }
+  function applyBondShifts(state, shifts, diff, notes) {
+    const B = bondModel(); if (!B || !shifts || !shifts.length || !ensureBonds(state)) return;
+    const seen = new Set();
+    for (const s of shifts.slice(0, 3)) {
+      const key = normaliseBondKey(state, s.who); if (!key) { notes.push('ignored bond shift for unknown person "' + s.who + '"'); continue; }
+      const id = key + '/' + s.facet; if (seen.has(id)) continue; seen.add(id);
+      shiftBond(state, key, String(s.facet || '').toLowerCase(), s.dir === 'down' ? 'down' : 'up', diff, notes);
+    }
+  }
+  function normaliseBondKey(state, who) {
+    const w = String(who || '').trim().toLowerCase().replace(/^(?:attitudes|bonds)\./, ''); if (!w) return null;
+    if (state.attitudes && w in state.attitudes) return w;
+    const c = activeCharacters().find((x) => x.key === w || nameHandles(x).some((h) => h.toLowerCase() === w)); return c && state.attitudes && c.key in state.attitudes ? c.key : null;
+  }
+  // The waypoints a bond crossed this turn, up or down, as notes for the narrator; then the told marks follow the facets.
+  function bondNotes(state) {
+    const B = bondModel(); if (!B || !state.bonds) return []; const out = [], who = firstName();
+    for (const key of Object.keys(state.bonds)) {
+      const c = charByKey(key); const name = c ? (c.first || c.name) : key;
+      for (const t of B) {
+        const f = state.bonds[key][t.key]; if (!f) continue; const st = stageOf(f.p, t.stages.length); if (st === f.told) continue;
+        if (st > f.told) out.push('Bond with ' + name + ': ' + t.name.toLowerCase() + ' reaches "' + fill(t.stages[st - 1]) + '" Show it through what ' + name + ' does, in ' + name + '\'s kind and temperament, in passing this turn or soon; never state it. What ' + who + ' feels stays the player\'s.');
+        else out.push('Bond with ' + name + ': ' + t.name.toLowerCase() + ' has fallen back to "' + fill(st > 0 ? t.stages[st - 1] : 'none of it yet') + '" Show the step back through what ' + name + ' does or no longer does; never state it.');
+        f.told = st;
+      }
+    }
+    return out;
+  }
+  // The bonds block for the prompt: each present person's facets as they stand (the short form keeps the facets that have moved).
+  function bondsBlock(state, compact) {
+    const B = bondModel(); if (!B || !ensureBonds(state)) return '';
+    const present = activeCharacters().filter((c) => state.bonds[c.key] && (state.present || []).some((pp) => nameHandles(c).filter((n) => n.length > 2).some((n) => wordIn(String(pp).toLowerCase(), n.toLowerCase()))));
+    const lines = present.map((c) => {
+      const b = state.bonds[c.key]; const facets = B.filter((t) => b[t.key] && stageOf(b[t.key].p, t.stages.length) > 0).map((t) => ({ t, st: stageOf(b[t.key].p, t.stages.length) }));
+      const shown = compact ? facets.filter((f) => f.st > 1).slice(0, 5) : facets;
+      return '- ' + (c.first || c.name) + ' [' + c.key + '] (bond ' + bondTotal(state, c.key) + ' of 100): ' + (shown.length ? shown.map((f) => f.t.name + ' ' + f.st + ' of ' + f.t.stages.length + ': ' + fill(f.t.stages[f.st - 1])).join(' ') : 'nothing yet beyond the kind\'s manners.');
+    });
+    const rule = compact
+      ? 'Each line is what the person does toward ' + firstName() + ' now: show it through their kind and temperament, never state it. Report a facet that moved this turn in bond_shifts (at most three, one notch each, with a cause in the narrative); facets fall as well as rise. The player\'s side stays the player\'s.'
+      : 'A bond is nine facets (ease, knowing, trust, liking, attraction, touch, intimacy, openness, standing), each at a stage whose line says what the other person does toward ' + firstName() + ' now. Show it through the person\'s kind and temperament (a wolf leans and scents, a cat rubs a cheek, a harpy preens) and never state it. A facet moves one notch a turn, up or down, only with a cause in the narrative: report each in bond_shifts (at most three a turn). A broken promise takes trust down; a deep friendship is a bond in the 70s with attraction and intimacy untouched. A person\'s private matter is told only at openness\'s last stage. What ' + firstName() + ' feels stays the player\'s.';
+    return lines.length ? lines.join('\n') + '\n' + rule : '';
+  }
+  // A path begins when influence toward a kind first moves: its draws (the eye colour, the body's lean and face, the tracks' windows)
+  // and the roll for the body's sex, once per game across every kind: toward the other body at the kind's chance; on an all-women
+  // kind a man always crosses and a woman never does.
+  function ensureTrackPath(state, k, notes) {
+    const T = W.transformation, tf = state.tf; if (tf.paths[k]) return tf.paths[k];
+    const p = adv.player || defaultPlayer(); const sc = (T.sexChange || {})[k] || {};
+    const taken = !!tf.sex || !!tf.sexprog || Object.values(tf.paths || {}).some((path) => path && path.sex);
+    const allWomen = sc.to === 'female' && (sc.chance == null ? 0.5 : sc.chance) >= 1;
+    let to = null;
+    if (!taken) {
+      if (allWomen) { if (p.gender !== 'female' && sexModel('female')) to = 'female'; }
+      else if (sc.to) { const other = p.gender === 'female' ? 'male' : 'female'; if (sexModel(other) && Math.random() < (sc.chance == null ? 0.5 : sc.chance)) to = other; }
+    }
+    tf.paths[k] = { sex: to, sexTold: [], formTold: [], day: state.day, order: [], eye: pathEye(k) };
+    if (to) { ensureSexProg(tf, k, to); notes.push(k + ' path drawn: the body will also go toward a ' + (to === 'female' ? 'woman' : 'man') + '\'s'); }
+    if (tf.paths[k].eye) notes.push(k + ' path drawn: the eyes will go ' + eyeColour(tf.paths[k].eye));
+    return tf.paths[k];
+  }
+  // A save from before the tracks (v77) carries ladder rungs: its progress is read from its influence and marked told, so nothing
+  // already lived through is announced again, and the ladder's running steps for a tracked kind are dropped.
+  function migrateTracks(state) {
+    const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf || tf.prog) return;
+    tf.prog = {}; const p = adv.player || defaultPlayer();
+    for (const k of Object.keys(T.species)) {
+      if (!trackModel(k) || !((tf.influence[k] || 0) > 0)) continue;
+      if (!tf.paths[k]) tf.paths[k] = { sex: null, sexTold: [], formTold: [], day: state.day, order: [], eye: pathEye(k) };
+      const path = tf.paths[k];
+      if (path.sex && !tf.sex && !tf.sexprog) ensureSexProg(tf, k, path.sex);
+      ensureProg(tf, k);
+    }
+    driveTracks(state);
+    for (const k of Object.keys(tf.prog)) for (const t of trackModel(k)) { const r = tf.prog[k].tracks[t.key]; r.told = stageOf(r.p, t.stages.length); }
+    if (tf.sexprog && !tf.sex) for (const t of sexModel(tf.sexprog.to)) { const r = tf.sexprog.tracks[t.key]; r.told = stageOf(r.p, t.stages.length); }
+    tf.tracks = (tf.tracks || []).filter((t) => !trackModel(t.species)); tf.arcs = (tf.arcs || []).filter((a) => !trackModel(a.species));
+    for (const t of tf.traits) if (trackModel(t.species) && t.settled === false) t.settled = true;
+    // Older builds' last rungs gave a whole animal at will; the body now never takes an animal's shape, so those traits go.
+    tf.traits = tf.traits.filter((t) => !(trackModel(t.species) && /\b(?:a whole \w+|an? (?:wolf|fox|cat|rabbit)) at will\b/i.test(String(t.trait || ''))));
   }
 
   // ---------- skills ----------
@@ -1608,12 +1974,14 @@
   function loreText(e) {
     let t = fill(e.text);
     const T = W.transformation; const sp = e.species && T && T.species[e.species];
+    const M = e.species && trackModel(e.species);
+    if (M) t += ' What changes (each part on its own track, in an order and at a pace of its own for each person): ' + M.filter((x) => !x.sex).map((x) => x.name.toLowerCase()).join(', ') + (M.some((x) => x.sex === 'women') ? '; on a woman\'s body also ' + M.filter((x) => x.sex === 'women').map((x) => x.name.toLowerCase()).join(', ') : '') + (M.some((x) => x.sex === 'men') ? '; on a man\'s body also ' + M.filter((x) => x.sex === 'men').map((x) => x.name.toLowerCase()).join(', ') : '') + '. No one takes an animal\'s shape.';
     if (sp && Array.isArray(sp.ladder) && sp.ladder.length) {
-      t += ' Ladder (the middle rungs come in an order of their own for each person): ' + sp.ladder.map((r) => fill(r.trait)).join('; ') + '.';
+      if (!M) t += ' Ladder (the middle rungs come in an order of their own for each person): ' + sp.ladder.map((r) => fill(r.trait)).join('; ') + '.';
       const sc = (T.sexChange || {})[e.species];
       if (sc && sc.to) {
         const them = sc.to === 'female' ? 'women' : 'men', other = sc.to === 'female' ? 'man' : 'woman', toward = sc.to === 'female' ? 'a woman\'s' : 'a man\'s';
-        t += (sc.chance == null ? 0.5 : sc.chance) >= 1 ? ' ' + cap(sp.name) + ' are all ' + them + '; a human ' + other + ' who goes far down this path becomes one along the way, and the ' + sp.name + ' think nothing of it.' : ' Some who go this way find the body going toward ' + toward + ' as well.';
+        t += (sc.chance == null ? 0.5 : sc.chance) >= 1 ? ' ' + cap(sp.name) + ' are all ' + them + '; a human ' + other + ' who goes far down this path becomes one along the way, and the ' + sp.name + ' think nothing of it.' : (M && sexModel('male') ? ' Some who go this way find the body going toward a woman\'s or a man\'s as well, whichever it was not.' : ' Some who go this way find the body going toward ' + toward + ' as well.');
       }
     }
     return t;
@@ -1680,7 +2048,7 @@
   // (a track waiting for its next step) does not make every quiet turn a rich, top-tier one.
   function transformationSceneActive() {
     return arcActive() ||
-      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over/i.test(n));
+      (adv.pendingNotes || []).some((n) => /change (?:is beginning|continues|completes|has settled)|body has finished going over|body (?:is fighting|has fought) off a change/i.test(n));
   }
   function isTransition(input) {
     const a = String(input.action || '').trim();
@@ -1826,14 +2194,14 @@
   // Hidden lore for worlds that have it: released a piece at a time as the flags say the player has found and passed the closed places.
   const dungeonsFound = (S) => (W.dungeons || []).filter((d) => S.flags && S.flags['dungeon_' + d.key + '_found']);
   const dungeonsCleared = (S) => (W.dungeons || []).filter((d) => S.flags && S.flags['dungeon_' + d.key + '_cleared']);
-  // What is still human: each settled change takes fifteen points; the trials answer only above the line. The Spa gives it back.
+  // What is still human: on tracks, 100 less every kind's body total; on a ladder, fifteen points a settled change; the trials answer only above the line. The Spa gives it back.
   const HUMANITY_LINE = 40;
-  function humanity(S) { const settled = ((S.tf && S.tf.traits) || []).filter((t) => t.settled !== false).length; return Math.max(0, 100 - 15 * settled); }
+  function humanity(S) { if (W.transformation && W.transformation.tracks && S.tf) return Math.max(0, 100 - Object.keys(W.transformation.species).reduce((a, k) => a + kindTotal(S.tf, k), 0)); const settled = ((S.tf && S.tf.traits) || []).filter((t) => t.settled !== false).length; return Math.max(0, 100 - 15 * settled); }
   // lean (near the prompt cap): the passing oddities are left out, and partial knowledge is kept only for people in the scene.
   function gmBlock(S, first, lean) {
     const out = []; const sec = W.secrets || {}; const found = dungeonsFound(S), cleared = dungeonsCleared(S);
     const inScene = (k) => { const c = charByKey(k); return !!c && S.present.some((pn) => String(pn).toLowerCase().includes(String(givenName(c)).toLowerCase())); };
-    if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (each settled change takes fifteen; the Spa restores it). ' + (h >= HUMANITY_LINE ? 'Above the line of ' + HUMANITY_LINE + ': the closed places will answer.' : 'Below the line of ' + HUMANITY_LINE + ': no closed place will open and no guardian can be faced until the Spa has given enough back; the doors simply stay shut, and nobody says why.')); }
+    if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (' + (W.transformation.tracks ? 'each kind\'s changes take what that body has gone toward it' : 'each settled change takes fifteen') + '; the Spa restores it). ' + (h >= HUMANITY_LINE ? 'Above the line of ' + HUMANITY_LINE + ': the closed places will answer.' : 'Below the line of ' + HUMANITY_LINE + ': no closed place will open and no guardian can be faced until the Spa has given enough back; the doors simply stay shut, and nobody says why.')); }
     if (sec.rule) out.push(fill(sec.rule));
     if (!lean && sec.hints && sec.hints.length) out.push('Oddities that may surface in passing, at most one every few turns, never explained:\n' + sec.hints.map((h) => '- ' + fill(h)).join('\n'));
     if (sec.keeper) { const c = charByKey(sec.keeper.key); out.push('The keeper: ' + (c ? c.name : sec.keeper.key) + ' ' + fill(sec.keeper.text)); }
@@ -1896,7 +2264,7 @@
     parts.push(x('rules', CORE_RULES.concat(W.rules).map((r) => '- ' + fill(r)).join('\n')));
     parts.push(x('world', [fill(W.premise || '')].concat(W.world.map((w) => fill(w))).filter(Boolean).join('\n\n')));
     if (P) parts.push(x('progression', P.name + ' stages:\n' + P.stages.map((s) => (s.n === stageN ? '> ' : '  ') + 'Stage ' + s.n + ', ' + s.name + ': ' + s.text).join('\n') + '\n' + p.first + ' is at Stage ' + stageN + ' with progress ' + (S.items[P.progressKey] || 0) + ' of 100.\n' + P.advanceText, 'name="' + esc(P.name) + '"'));
-    if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation)));
+    if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation, mentioned + ' ' + (turnInput.director || ''))));
     if (W.skills) parts.push(x('skills', skillsBlock(S)));
     const metLine = W.transformation ? '\nKinds of mythkin ' + p.first + ' has been near at close range so far: ' + (ensureMet(S).length ? ensureMet(S).map(kindLabel).join(', ') : 'none') + '. Any other kind is new to ' + p.first + ' the first time it comes within arm\'s reach, and is met as new.' : '';
     const sexLine = (W.transformation && S.tf && S.tf.sex) ? ' The body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now, along the ' + W.transformation.species[S.tf.sex.species].name + ' path (see <transformation>); the name and pronouns above are the player\'s choice and stand until the player changes them.' : '';
@@ -1917,6 +2285,8 @@
       return '- ' + nameWithRace(c) + ' [key: ' + c.key + ']' + (genderDefn ? ' (gender: ' + genderDefn.label + ')' : '') + (c.pronouns ? ' (' + c.pronouns.they + '/' + c.pronouns.them + ')' : '') + '. ' + sheet + looks + senses + ' Now: ' + fill(where) + '. Aim now: ' + fill(aim) + (att != null ? ' Attitude to ' + p.first + ': ' + att + ' of 10.' : '');
     }).join('\n');
     parts.push(x('characters', chars + '\n\n' + minorCharactersText(mentioned), 'note="name (race) [key]; use the key in state_updates"'));
+    const bondsText = bondModel() ? bondsBlock(S, L.compactTransformation) : '';
+    if (bondsText) parts.push(x('bonds', bondsText, 'note="what each person does toward the player now; show it, never state it"'));
     if (lore.length) parts.push(x('lore', lore.map((e) => '<entry name="' + esc(e.name) + '">' + loreText(e) + '</entry>').join('\n')));
     if (W.secrets || W.dungeons) {
       parts.push(x('gm_only', gmBlock(S, p.first, L.gmLevel === 'lean'), 'note="for the narrator alone; no character knows this unless it says so; never stated in narration"'));
@@ -1985,7 +2355,7 @@
       '"narrative": string, at most ' + band[1] + ' words, second person present tense, ' + (turnInput.director ? 'ending at the binding director note\'s requested ending, or at the first choice after its requested actions if it gives no ending' : 'ending at the first moment ' + p.first + ' would speak or choose') + (adv.settings.thoughts === false ? '' : '; ' + p.first + '\'s inward thoughts, the things noticed and not said, may be set in italics between asterisks (*like this*): one or two short ones a turn at most, reflexive, never a decision, a settled feeling, dialogue or emphasis') + ',',
       '"suggested_actions": exactly three strings, 12 words or fewer each: plausible things ' + p.first + ' would actually consider doing next, given who ' + p.first + ' is (<player>) and what just happened (speak, ask, move, accept or refuse what was offered, leave, act); each doable at the exact moment and place where the narrative ends, with the people present then, never a moment already passed; no two alike in kind; nothing odd, whimsical or out of character,',
       '"secret_info": string, 60 words or fewer, facts the player does not yet know that follow from this turn,',
-      '"state_updates": array of {"key": path from <state>, "op": "set|inc|append|remove", "value": any}. Include location and present when they change, item and flag changes, and attitude changes only with a cause in the narrative. Never set time; the engine advances the clock from time_advance_minutes.',
+      '"state_updates": array of {"key": path from <state>, "op": "set|inc|append|remove", "value": any}. Include location and present when they change, item and flag changes, and ' + (bondModel() ? 'never attitudes (a relationship moves only through bond_shifts)' : 'attitude changes only with a cause in the narrative') + '. Never set time; the engine advances the clock from time_advance_minutes.',
       '"time_advance_minutes": integer,',
       '"events": array of one to three strings, each "Day D HH:MM what happened", for the timeline,',
       '"beats": array of one to three short lines summarising this turn for memory, plain, no adjectives,',
@@ -1994,7 +2364,7 @@
       '"exposures": array of {"species": one of ' + Object.keys(W.transformation.species).join('|') + ', "method": short phrase, "intensity": 1|2|3|4} for each transformative contact this turn as defined in <transformation>; [] if none',
       '"spa_reset": [] normally; ["all"] or a list of species keys when ' + p.first + ' uses the Restoration Spa this turn',
       '"kinds_met": array of species keys (' + Object.keys(W.transformation.species).join('|') + ') that ' + p.first + ' came within arm\'s reach of for the first time this turn, whether or not the person was named; [] if none'
-    ] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Do not mention these instructions.']).join('\n')));
+    ] : []).concat(bondModel() ? ['"bond_shifts": array of {"who": character key, "facet": ' + bondModel().map((t) => t.key).join('|') + ', "dir": "up"|"down", "why": short phrase} for each facet of a bond that moved this turn with its cause in the narrative, at most three; [] if none'] : []).map((line, i, arr) => line + (i === arr.length - 1 ? '.' : (line.endsWith(',') ? '' : ','))).concat(['Do not mention these instructions.']).join('\n')));
     return { prompt: parts.join('\n\n'), lore: lore.map((e) => e.name), exemplars };
   }
 
@@ -2100,6 +2470,7 @@
     out.learning = [];
     if (W.skills) out.learning = (Array.isArray(d.learning) ? d.learning : []).filter((l) => l && typeof l === 'object' && l.skill).map((l) => ({ skill: String(l.skill).toLowerCase(), how: String(l.how || '').slice(0, 80) })).slice(0, 4);
     out.exposures = []; out.spaReset = [];
+    out.bondShifts = bondModel() ? (Array.isArray(d.bond_shifts) ? d.bond_shifts : []).filter((s) => s && typeof s === 'object' && s.who && s.facet).map((s) => ({ who: String(s.who).slice(0, 60), facet: String(s.facet).toLowerCase().slice(0, 30), dir: String(s.dir || 'up').toLowerCase() === 'down' ? 'down' : 'up', why: String(s.why || '').slice(0, 80) })).slice(0, 3) : [];
     if (W.transformation) {
       const keys = W.transformation.species;
       out.exposures = (Array.isArray(d.exposures) ? d.exposures : []).filter((e) => e && typeof e === 'object').map((e) => ({ species: String(e.species || '').toLowerCase(), method: String(e.method || '').slice(0, 80), intensity: Math.max(1, Math.min(4, Math.round(Number(e.intensity) || 1))) })).filter((e) => { if (keys[e.species]) return true; if (e.species) notes.push('ignored exposure to unknown species "' + e.species + '"'); return false; }).slice(0, 6);
@@ -2249,7 +2620,12 @@
     else if (words < band[0]) notes.push('length ' + words + ' under the band ' + band.join('–') + ' (stopped at a choice)');
     if (ctx.mine && adv !== ctx.mine) throw { code: 'stale', message: 'A different adventure was loaded while this turn was running; the reply was discarded.' };
     const state = clone(adv.state);
-    const applied = applyUpdates(state, out.updates, stateBefore); notes.push(...applied.notes);
+    // A reply that reports bond shifts for someone moves that bond through them alone; an attitude update for the same person would
+    // move it a second time for the same cause.
+    const bonded = bondModel() ? new Set((out.bondShifts || []).map((b) => normaliseBondKey(state, b.who)).filter(Boolean)) : null;
+    const updates = bonded && bonded.size ? out.updates.filter((u) => { const p = normaliseKey(u.key); if (p && p.startsWith('attitudes.') && bonded.has(p.slice(10))) { notes.push('attitude ' + p.slice(10) + ' left to its bond shifts'); return false; } return true; }) : out.updates;
+    const applied = applyUpdates(state, updates, stateBefore); notes.push(...applied.notes);
+    applyBondShifts(state, out.bondShifts, applied.diff, notes);
     const metNow = recordMet(state, out.kindsMet); if (metNow.length) { notes.push('kinds met: ' + metNow.join(', ')); applied.diff.push({ path: 'met', from: '', to: metNow.map(kindLabel).join(', ') }); }
     const days = advanceClock(state, out.timeAdvance);
     const prog = runProgression(state, days, applied.diff); notes.push(...prog.notes);
@@ -2258,7 +2634,7 @@
     const arcNotes = advanceArcs(state, notes).concat(advanceTracks(state, notes));
     applied.diff.unshift({ path: 'time', from: stateBefore.day + ' ' + stateBefore.time, to: state.day + ' ' + state.time });
     adv.state = state;
-    adv.pendingNotes = prog.next.concat(tfr.next, arcNotes);
+    adv.pendingNotes = prog.next.concat(tfr.next, arcNotes, bondNotes(state));
     const M = adv.memory; M.facts = M.facts || [];
     M.events.push(...out.events); if (M.events.length > 600) M.events = M.events.slice(-600);
     M.beats.push(...out.beats); M.facts.push(...out.facts);
@@ -2267,7 +2643,7 @@
       action: input.action, director: input.director || '', rewrite: input.rewrite || '', roll: rr.roll,
       tierAsked: ctx.tierAsked, tierApplied: tierApplied || '',
       evaluation: out.evaluation, narrative: out.narrative, suggestions: out.suggestions, secret: out.secret,
-      events: out.events, beats: out.beats, facts: out.facts, exposures: out.exposures, spaReset: out.spaReset, updates: out.updates, diff: applied.diff,
+      events: out.events, beats: out.beats, facts: out.facts, exposures: out.exposures, spaReset: out.spaReset, bondShifts: out.bondShifts || [], updates: out.updates, diff: applied.diff,
       stateBefore, stateAfter: clone(state), memBefore, pendingBefore, pendingAfter: clone(adv.pendingNotes),
       words, band, timing: timing || { first: 0, total: 0 }, notes, alts: []
     };
@@ -3646,10 +4022,13 @@
     if (T && showHidden) {
       ensureTf(S);
       const keys = Object.keys(T.species).sort((a, b) => (S.tf.influence[b] || 0) - (S.tf.influence[a] || 0));
-      $('#influence').innerHTML = keys.map((k) => { const v = num(S.tf.influence[k]); return '<div class="bar"><span>' + esc(T.species[k].short) + '</span><div class="track"><div class="fill" style="width:' + v + '%"></div></div><span class="num">' + v + '</span></div>'; }).join('');
+      $('#influence').innerHTML = keys.map((k) => { const v = num(S.tf.influence[k]); const tot = trackModel(k) ? kindTotal(S.tf, k) : 0; return '<div class="bar"><span>' + esc(T.species[k].short) + '</span><div class="track"><div class="fill" style="width:' + v + '%"></div></div><span class="num">' + v + (tot ? ' · body ' + tot : '') + '</span></div>'; }).join('');
       $('#tfNote').textContent = T.thresholdsNote || '';
       const trackLabel = (t) => { const bt = (S.tf.tracks || []).find((x) => x.species === t.species && x.kind === 'body' && x.trait === t.trait); return bt ? ' · ' + (bt.fadeAt != null ? 'fading' : 'under way') + ', step ' + num(bt.i) + ' of ' + num(bt.steps && bt.steps.length) : ' · beginning'; };
-      $('#traits').innerHTML = (S.tf.traits.length ? S.tf.traits.slice().reverse().map((t) => '<li><span>Day ' + num(t.day) + ' · ' + esc(T.species[t.species].short) + (t.settled === false ? trackLabel(t) : '') + '</span>' + esc(t.trait) + '</li>').join('') : '<li class="small">None yet.</li>') + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '') + Object.keys(S.tf.paths || {}).filter((k) => S.tf.paths[k] && S.tf.paths[k].sex && !(S.tf.sex && S.tf.sex.species === k)).map((k) => '<li class="small"><span>' + esc(T.species[k].short) + ' path</span>also going toward ' + (S.tf.paths[k].sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body</li>').join('');
+      const trackItems = Object.keys(S.tf.prog || {}).flatMap((k) => (trackModel(k) || []).filter((t) => (S.tf.prog[k].tracks[t.key] || {}).told > 0).map((t) => { const r = S.tf.prog[k].tracks[t.key]; const n = t.stages.length; return { k, t, r, n }; })).sort((a, b) => b.r.nextAt - a.r.nextAt).map((o) => '<li><span>' + esc(T.species[o.k].short) + ' · ' + esc(o.t.name) + (o.r.told >= o.n ? ' · finished' : ' · ' + o.r.told + ' of ' + o.n) + '</span>' + esc(pathFill(S.tf, o.k, o.t.stages[o.r.told - 1])) + '</li>').join('');
+      const sexItems = (S.tf.sexprog && !S.tf.sex) ? (sexModel(S.tf.sexprog.to) || []).filter((t) => (S.tf.sexprog.tracks[t.key] || {}).told > 0).map((t) => '<li class="small"><span>' + esc(T.species[S.tf.sexprog.species].short) + ' path · ' + esc(t.name) + ' ' + S.tf.sexprog.tracks[t.key].told + ' of ' + t.stages.length + '</span>' + esc(pathFill(S.tf, S.tf.sexprog.species, t.stages[S.tf.sexprog.tracks[t.key].told - 1])) + '</li>').join('') : '';
+      const pendingPaths = Object.keys(S.tf.paths || {}).filter((k) => S.tf.paths[k] && S.tf.paths[k].sex && !(S.tf.sex && S.tf.sex.species === k) && !(S.tf.sexprog && S.tf.sexprog.species === k && sexItems)).map((k) => '<li class="small"><span>' + esc(T.species[k].short) + ' path</span>also going toward ' + (S.tf.paths[k].sex === 'female' ? 'a woman\'s' : 'a man\'s') + ' body</li>').join('');
+      $('#traits').innerHTML = ((trackItems || sexItems) ? trackItems + sexItems + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '') : (S.tf.traits.length ? S.tf.traits.slice().reverse().map((t) => '<li><span>Day ' + num(t.day) + ' · ' + esc(T.species[t.species].short) + (t.settled === false ? trackLabel(t) : '') + '</span>' + esc(t.trait) + '</li>').join('') : '<li class="small">None yet.</li>') + (S.tf.sex ? '<li><span>Day ' + num(S.tf.sex.day) + ' · ' + esc(T.species[S.tf.sex.species].short) + ' path</span>the body is ' + (S.tf.sex.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' now</li>' : '')) + pendingPaths;
     }
     const items = $('#items'); items.innerHTML = '';
     const rows = [['Location', S.location, false], ['Present', S.present.map(presentLabel).join(', '), false]];
@@ -3935,8 +4314,8 @@
   $('#ovrTestSet').onclick = async () => { adv.settings.testNote = $('#ovrTestNote').value.trim(); renderTestBanner(); if (await persist()) setStatus(adv.settings.testNote ? 'Test instruction set.' : 'Test instruction cleared.'); };
   $('#ovrTestClear').onclick = async () => { adv.settings.testNote = ''; $('#ovrTestNote').value = ''; renderTestBanner(); if (await persist()) setStatus('Test instruction cleared.'); };
   $('#ovrInfluence').addEventListener('change', (e) => { const inp = e.target; if (!inp.dataset.sp) return; overrideApply((s) => { s.tf.influence[inp.dataset.sp] = Math.max(0, Math.min(100, Math.round(Number(inp.value) || 0))); }, 'influence ' + inp.dataset.sp + ' = ' + inp.value); });
-  $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-unmake]'); if (!b) return; const k = b.dataset.unmake; overrideApply((st) => { const sp = W.transformation.species[k]; ensureTf(st); const r = st.tf.rungs[k] || 0; if (!r) throw new Error('no ' + sp.short + ' change to take back'); st.tf.rungs[k] = r - 1; const idx = st.tf.traits.map((t, i) => t.species === k ? i : -1).filter((i) => i >= 0).pop(); if (idx != null) st.tf.traits.splice(idx, 1); st.tf.arcs = (st.tf.arcs || []).filter((a) => a.species !== k); st.tf.tracks = (st.tf.tracks || []).filter((t) => t.species !== k); if (r === 1 && st.tf.paths) delete st.tf.paths[k]; if (st.tf.sex && st.tf.sex.species === k && st.tf.sex.rung >= r) delete st.tf.sex; st.tf.influence[k] = Math.max(0, sp.ladder[r - 1].at - 1); if (st.tf.dayGain && st.tf.dayGain.by) st.tf.dayGain.by[k] = 0; adv.pendingNotes = (adv.pendingNotes || []).filter((n) => !n.includes('(' + sp.name)); }, 'took back the last ' + k + ' change; influence set just under its threshold. The story already told it, so say in a director note how the body reads now').then(() => openOverride()); });
-  $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-manifest]'); if (!b) return; const k = b.dataset.manifest; overrideApply((s) => { const sp = W.transformation.species[k]; ensureTf(s); const r = s.tf.rungs[k] || 0; if (r >= sp.ladder.length) throw new Error('no more changes on that ladder'); if (trackBusy(s.tf, k)) throw new Error('a ' + sp.short + ' change is already under way'); s.tf.influence[k] = Math.max(s.tf.influence[k] || 0, sp.ladder[r].at); const diff = [], notes = [], next = []; manifestDue(s, diff, notes, next); const a = s.tf.arcs.find((x) => x.species === k); if (a) { adv.pendingNotes = (adv.pendingNotes || []).concat([arcNote(a, s.tf)]); a.phase = 1; } else { const stepNotes = advanceTracks(s, notes); adv.pendingNotes = (adv.pendingNotes || []).concat(stepNotes); } }, 'forced next ' + k + ' change; its first note is queued for the next turn').then(() => openOverride()); });
+  $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-unmake]'); if (!b) return; const k = b.dataset.unmake; overrideApply((st) => { const sp = W.transformation.species[k]; ensureTf(st); if (trackModel(k)) throw new Error('on the tracks a ' + sp.short + ' change is undone only by the Spa'); const r = st.tf.rungs[k] || 0; if (!r) throw new Error('no ' + sp.short + ' change to take back'); st.tf.rungs[k] = r - 1; const idx = st.tf.traits.map((t, i) => t.species === k ? i : -1).filter((i) => i >= 0).pop(); if (idx != null) st.tf.traits.splice(idx, 1); st.tf.arcs = (st.tf.arcs || []).filter((a) => a.species !== k); st.tf.tracks = (st.tf.tracks || []).filter((t) => t.species !== k); if (r === 1 && st.tf.paths) delete st.tf.paths[k]; if (st.tf.sex && st.tf.sex.species === k && st.tf.sex.rung >= r) delete st.tf.sex; st.tf.influence[k] = Math.max(0, sp.ladder[r - 1].at - 1); if (st.tf.dayGain && st.tf.dayGain.by) st.tf.dayGain.by[k] = 0; adv.pendingNotes = (adv.pendingNotes || []).filter((n) => !n.includes('(' + sp.name)); }, 'took back the last ' + k + ' change; influence set just under its threshold. The story already told it, so say in a director note how the body reads now').then(() => openOverride()); });
+  $('#ovrInfluence').addEventListener('click', (e) => { const b = e.target.closest('[data-manifest]'); if (!b) return; const k = b.dataset.manifest; overrideApply((s) => { const sp = W.transformation.species[k]; ensureTf(s); if (trackModel(k)) { const notes = []; s.tf.influence[k] = Math.max(1, s.tf.influence[k] || 0); ensureTrackPath(s, k, notes); const D = nextWaypointInfluence(s.tf, k); if (D == null) throw new Error('nothing more comes on the ' + sp.short + ' path at any influence'); s.tf.influence[k] = Math.max(s.tf.influence[k], Math.min(100, D)); driveTracks(s); adv.pendingNotes = (adv.pendingNotes || []).concat(tellTracks(s, notes)); return; } const r = s.tf.rungs[k] || 0; if (r >= sp.ladder.length) throw new Error('no more changes on that ladder'); if (trackBusy(s.tf, k)) throw new Error('a ' + sp.short + ' change is already under way'); s.tf.influence[k] = Math.max(s.tf.influence[k] || 0, sp.ladder[r].at); const diff = [], notes = [], next = []; manifestDue(s, diff, notes, next); const a = s.tf.arcs.find((x) => x.species === k); if (a) { adv.pendingNotes = (adv.pendingNotes || []).concat([arcNote(a, s.tf)]); a.phase = 1; } else { const stepNotes = advanceTracks(s, notes); adv.pendingNotes = (adv.pendingNotes || []).concat(stepNotes); } }, 'forced next ' + k + ' change; its first note is queued for the next turn').then(() => openOverride()); });
   $('#ovrClockSet').onclick = () => overrideApply((s) => { const d = Math.max(1, Math.round(Number($('#ovrDay').value) || s.day)); const t = $('#ovrTime').value.trim(); if (!/^\d{1,2}:\d{2}$/.test(t)) throw new Error('time must be HH:MM'); const wd = W.calendar.weekdays; const startIdx = wd.indexOf(W.initialState.weekday); s.day = d; s.weekday = wd[(startIdx + (d - W.initialState.day)) % wd.length]; s.time = minToTime(timeToMin(t)); const loc = $('#ovrLocation').value.trim(); if (loc) s.location = loc; }, 'clock set');
   $('#ovrAttitudes').addEventListener('change', (e) => { const inp = e.target; if (inp.dataset.att) overrideApply((s) => { s.attitudes[inp.dataset.att] = Math.max(0, Math.min(10, Math.round(Number(inp.value) || 0))); }, 'attitude ' + inp.dataset.att + ' = ' + inp.value); else if (inp.dataset.skill) overrideApply((s) => { ensureSkills(s); s.skills[inp.dataset.skill] = Math.max(0, Math.min(15, Math.round(Number(inp.value) || 0))); }, 'skill ' + inp.dataset.skill + ' = ' + inp.value); });
   $('#ovrFactAdd').onclick = async () => { const f = $('#ovrFact').value.trim(); if (!f) return; adv.memory.facts = adv.memory.facts || []; adv.memory.facts.push(f); $('#ovrFact').value = ''; renderRail(); if (await persist()) setStatus('Fact added.'); };
