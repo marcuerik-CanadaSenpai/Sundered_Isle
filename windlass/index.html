@@ -1351,12 +1351,15 @@
     return out.join('; ');
   }
   // The way over's own draws, made once when it is rolled so the result is one particular woman or man (W.transformation.sexDraws
-  // and genPools.looks.build): a woman's face type, figure and height; a man's look, build, height, beard and body hair. Each sex
+  // and genPools.looks.build, the kind's own pools over them): a woman's face type, figure and height; a man's look, build, height, beard and body hair. Each sex
   // track names the ones its lines lean on (SEX_DRAWN). A save from before them draws them when first asked.
   const SEX_DRAWN = { female: { face: ['face'], frame: ['height', 'figure'], waist_and_hips: ['figure'] }, male: { face: ['look', 'beard'], skin_and_hair: ['beard', 'bodyHair'], frame: ['height', 'build'], waist_and_hips: ['build'], chest: ['build'] } };
   function drawSex(k, to) {
-    const L = looksSpec(W) || {}, K = looksKind(W, k) || {}, D = ((W.transformation || {}).sexDraws || {})[to === 'female' ? 'woman' : 'man'] || {};
-    const parts = (L.build || {})[to] || {}, words = Object.keys(parts).map((part) => (parts[part] && parts[part].length ? pick(parts[part]) : '')).filter(Boolean);
+    const L = looksSpec(W) || {}, K = looksKind(W, k) || {}, side = to === 'female' ? 'woman' : 'man';
+    // The kind's own pools stand over the shared ones, part by part, as composeLooks reads them for a person born to it.
+    const D = Object.assign({}, ((W.transformation || {}).sexDraws || {})[side] || {}, (K.sexDraws || {})[side] || {});
+    const base = (L.build || {})[to] || {}, parts = Object.assign({}, base, (K.build || {})[to] || {});
+    const words = Object.keys(base).map((part) => (parts[part] && parts[part].length ? pick(parts[part]) : '')).filter(Boolean);
     if (to === 'female' && D.rear && D.rear.length) words.push(pick(D.rear));
     const joined = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words[0] || '';
     const hr = !K.heightTrack && K.height && K.height[to], out = {}, one = (pool) => (pool && pool.length ? pick(pool) : '');
@@ -1852,14 +1855,17 @@
   // The body's sex as the tracks see it: the player's own, or where a path has carried it (going over counts once it is over).
   const bodySex = (tf, p) => (tf.sex ? tf.sex.to : tf.sexprog && tf.sexprog.from ? tf.sexprog.from.to : (p || {}).gender === 'female' ? 'female' : (p || {}).gender === 'male' ? 'male' : 'other');
   const sexStage = (tf, key) => { const sx = tf.sexprog; if (!sx) return null; const M = sexModel(sx.to); const t = M && M.find((x) => x.key === key); const r = sx.tracks && sx.tracks[key]; return t && r ? r.told : null; };
-  // Whether a by-sex track is open: the body's own sex opens it (born, or gone over on any path); a body going over, on whichever
+  // Whether a by-sex track is open: the body's own sex opens it (born, or gone over on any path). A body going over, on whichever
   // path carries it, opens the tracks of the body it is going toward at the track's crossAt on the way over (a season or a man's
-  // own trait at Rhythms 3), else a woman's once Chest is at stage 3 and a man's once Frame is at stage 2, and never the other's.
+  // own trait at Rhythms 3), else a woman's once Chest is at stage 3 and a man's once Frame is at stage 2. The body it is leaving
+  // keeps its tracks on the other kinds' paths until the way over has begun (or after it is healed back to nothing), and never
+  // on the path that carries it.
   const crossPoint = (t) => t.crossAt || (t.sex === 'women' ? { track: 'chest', stage: 3 } : { track: 'frame', stage: 2 });
   function trackOpen(tf, k, t, p) {
     if (!t.sex) return true;
-    const want = t.sex === 'women' ? 'female' : 'male', going = tf.sexprog && !tf.sex ? tf.sexprog.to : null;
-    if (going) { if (going !== want) return false; const at = crossPoint(t), st = sexStage(tf, at.track); return st != null && st >= at.stage; }
+    const want = t.sex === 'women' ? 'female' : 'male', sx = tf.sexprog, going = sx && !tf.sex ? sx.to : null;
+    if (going === want) { const at = crossPoint(t), st = sexStage(tf, at.track); return st != null && st >= at.stage; }
+    if (going) return k !== sx.species && bodySex(tf, p) === want && !Object.values(sx.tracks || {}).some((r) => r.told > 0);
     return bodySex(tf, p) === want;
   }
   // A need: the named track (of the kind, else of the body's sex change) at the stage, or finished. A born body of the right sex
@@ -1972,8 +1978,10 @@
       line += own.length ? ' What starts here, as the kind gives it: ' + own.join(', ') + '.' : sx.to === 'female' ? ' No kind on this body has a season of its own, so the monthly cycle is the body\'s.' : ' No kind on this body gives its men a trait of their own.';
     }
     const drawn = /\bdraw/i.test(line) || j === n ? sexDrawn(tf, t.key) : '';
-    const how = t.tell ? lowerFirst(String(t.tell).replace(/\.$/, '')) + ' (washing or dressing alone)' : 'found in passing (a mirror, a shirt, a strap, a voice), plain';
-    return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). ' + t.name + ' (waypoint ' + j + ' of ' + n + '): ' + line + (drawn ? ' Drawn for this body: ' + drawn + '.' : '') + ' One small thing this turn, in your own words, ' + how + ', with its practical consequence; then the scene goes on. Nobody remarks on it before ' + who + ' has found it, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
+    const how = t.tell
+      ? ' One small thing, in your own words, ' + lowerFirst(String(t.tell).replace(/\.$/, '')) + ': found when ' + who + ' is next alone (washing or dressing, say), never in front of anyone and never by cutting away from the scene in play, with its practical consequence.'
+      : ' One small thing this turn, in your own words, found in passing (a mirror, a shirt, a strap, a voice), plain, with its practical consequence; then the scene goes on.';
+    return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). ' + t.name + ' (waypoint ' + j + ' of ' + n + '): ' + line + (drawn ? ' Drawn for this body: ' + drawn + '.' : '') + how + ' Nobody remarks on it before ' + who + ' has found it, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
   }
   // Tells the waypoints reached and not yet told: one small thing a turn, the longest-waiting first, each track
   // then waiting the story-hour gap. A track that finishes settles a change (the kind's element); the body's sex finished on every
@@ -1990,10 +1998,14 @@
     // The path's sex tracks wait for the kind's own change to begin (or for the way over to be under way already, as in an older
     // save); a skipped one leaves its slot to the next due.
     const begun = (k) => !!((tf.prog[k] && Object.values(tf.prog[k].tracks).some((r) => r.told > 0)) || (tf.traits || []).some((x) => x.species === k) || (sx && Object.values(sx.tracks || {}).some((r) => r.told > 0)));
+    // A track told in private (Below) waits while anyone else is in the scene, at most a story day, and its slot goes to the next.
+    const me = String(firstName()).toLowerCase(), alone = (state.present || []).every((pn) => { const n = String(pn).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase(); return !n || n === me || n.split(/\s+/)[0] === me; });
     let told = 0;
     for (const d of due) {
       if (told >= 1) break;
       if (d.kind === 'sex' && !begun(d.k)) continue;
+      if (d.t.tell && !alone) { if (d.r.heldSince == null) d.r.heldSince = now; if (now - d.r.heldSince < 1440) continue; }
+      delete d.r.heldSince;
       told += 1;
       const sp = T.species[d.k], pr = tf.prog[d.k];
       if (d.kind === 'track') {

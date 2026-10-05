@@ -197,6 +197,7 @@ window.WINDLASS_WORLDS.sundered = {
     // its pads and claws), each with the words of a line that brings it up (when). bustShape tells only the chest's shape as Bust,
     // the part before the draw's ';', where a track's range sets the rest (a bovine woman's nipples, by Teats and udder). born gives a
     // person born to the kind the words of a range column that a path tells relative to the body before (a goblin's least height).
+    // sexDraws narrow transformation.sexDraws for a way over carried by this kind's path (a fairy man is beardless and smooth).
     looks: {
       build: {
         female: { waist: ['a narrow waist', 'a slim waist', 'a soft waist', 'a thick waist', 'a firm waist', 'a long waist'], hips: ['wide hips', 'full hips', 'narrow hips', 'slim hips', 'broad hips', 'generous hips'], thighs: ['strong thighs', 'full thighs', 'long thighs', 'slim thighs', 'heavy thighs', 'soft thighs'] },
@@ -242,6 +243,7 @@ window.WINDLASS_WORLDS.sundered = {
           dress: { all: ['a tail needs an opening or a low waist', 'tall ears rule out hats and anything pulled over the head', 'a coated kind runs warm and dresses lightly'] } },
         harpy: { colour: 'Plumage', height: { female: [58, 65] },
           ways: ['voice_and_song', 'preening', 'appetite', 'heights_and_flock', 'own_scent', 'laying', 'brooding_and_moult'],
+          sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear', 'a round rear'] } },
           build: { female: { waist: ['a narrow waist', 'a slim waist', 'a long waist'], hips: ['narrow hips', 'slim hips', 'full hips'], thighs: ['strong thighs', 'long thighs', 'slim thighs'] } },
           labels: { wings: 'Arms as wings' },
           parts: ['arm_feathers', 'wings', 'hands', 'leg_and_hip_feathers', 'talons', 'tail_fan', 'crest_and_ears', 'face', 'light_bones'],
@@ -249,18 +251,21 @@ window.WINDLASS_WORLDS.sundered = {
           dress: { all: ['wing-arms need open backs or no sleeves', 'talons rule out closed shoes', 'a tail fan needs an opening or a low waist'] } },
         mer: { colour: 'Scales', height: { female: [62, 70], male: [69, 76] },
           ways: ['voice', 'water_need', 'cool_blood', 'appetite', 'own_scent', 'spring_tides', 'display'],
+          sexDraws: { man: { bodyHair: ['smooth, with almost none'] } },
           bustAvoid: ['soft', 'heavy', 'sway', 'swing'],
           parts: ['webbed_hands', 'arm_scales', 'leg_and_hip_scales', 'webbed_feet', 'water_tail', 'gills', 'spine_ridge', 'sheen_and_skin', 'finned_ears', 'face', 'breasts', 'colours'],
           absent: { female: ['the taller back fin of a mer man', 'the brighter male colours'], all: ['a fish tail more than an hour out of the water'] },
           dress: { all: ['merfolk wear what survives water'] } },
         dryad: { colour: 'Bark', height: { female: [63, 72], male: [70, 78] },
           ways: ['sun_and_water', 'stillness', 'the_year', 'the_tree', 'voice', 'own_scent'],
+          sexDraws: { man: { bodyHair: ['smooth, with almost none'] } },
           labels: { hands: 'Fingers and toes' },
           parts: ['hands', 'arm_bark', 'leg_and_hip_bark', 'feet_and_roots', 'spine_ridge', 'grain', 'leaves', 'ears', 'face', 'breasts', 'flowering', 'bark', 'catkins'],
           absent: { female: ['heavy shoulder bark', 'catkins'], male: ['flowers or fruit'], all: ['a tail'] } },
         goblin: { colour: 'Skin', colourTrack: 'green_skin', heightTrack: 'height',
           born: { height: { least: 'About four and a half feet' } },
           ways: ['stomach', 'collecting_and_the_deal', 'tinkering', 'heap', 'wiry_strength', 'voice', 'own_scent'],
+          sexDraws: { woman: { rear: ['a round rear', 'a full rear', 'a heavy rear'] }, man: { beard: ['no beard'], bodyHair: ['smooth, with almost none'] } },
           bustAvoid: ['A cup', 'a small A', 'small B', 'slightest'],
           build: { female: { hips: ['wide hips', 'broad hips', 'full hips'] }, male: { shoulders: ['wiry shoulders', 'narrow shoulders', 'bony shoulders'], chest: ['a lean chest', 'a narrow chest'], waist: ['a lean waist', 'a narrow waist'] } },
           parts: ['hands', 'feet', 'ears', 'nose_and_face', 'teeth', 'figure', 'build'],
@@ -268,6 +273,7 @@ window.WINDLASS_WORLDS.sundered = {
           dress: { all: ['goblins wear small sizes, cut for adults'] } },
         fairy: { colour: { male: 'Wing tint' }, colourSkip: 'clear', heightTrack: 'height',
           ways: ['lightness', 'sweet_tooth', 'warmth', 'promises', 'iron', 'voice', 'own_scent'],
+          sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear'] }, man: { beard: ['no beard'], bodyHair: ['smooth, with almost none'] } },
           build: { female: { waist: ['a slight waist', 'a slim waist', 'a narrow waist'], hips: ['slight hips', 'slim hips', 'narrow hips'], thighs: ['slight thighs', 'slim thighs', 'long thighs'] }, male: { shoulders: ['slight shoulders', 'slim shoulders', 'narrow shoulders'], chest: ['a slight chest', 'a slim chest', 'a narrow chest'], waist: ['a slight waist', 'a slim waist', 'a narrow waist'] } },
           parts: ['wings', 'sheen', 'hands_and_feet', 'ears', 'face', 'glow_and_dust', 'figure', 'build'],
           swap: { male: { wings: [['clear', 'tinted']] } },
@@ -500,8 +506,8 @@ window.WINDLASS_WORLDS.sundered = {
     // body's Rhythms reaches stage 3), else at Chest 3 (a woman's) or Frame 2 (a man's). tell says how a sex track's waypoints are
     // told, and paceWith runs a sex track alongside another (the woman's waist and hips with Chest stages 2 to 4).
     // sexDraws are the words drawn once when the way over is rolled, so the result is one particular woman or man: a woman's face
-    // type and rear (her waist, hips and thighs come from genPools.looks.build, her height from the kind's), a man's look, beard and
-    // body hair (his build from genPools.looks.build).
+    // type and rear (her waist, hips and thighs come from genPools.looks.build with the kind's build over it, her height from the
+    // kind's), a man's look, beard and body hair (his build the same way). A kind's looks.sexDraws narrows these pools.
     sexDraws: {
       woman: { face: ['oval', 'heart-shaped', 'round and soft', 'long and fine-boned', 'high-cheekboned', 'square-jawed and striking'], rear: ['a round rear', 'a full rear', 'a small high rear', 'a heavy rear', 'a narrow rear'] },
       man: { look: ['handsome', 'beautiful'], beard: ['a full beard', 'a short beard', 'a light beard', 'no beard'], bodyHair: ['heavy chest and leg hair', 'light chest and leg hair', 'smooth, with almost none'] }
