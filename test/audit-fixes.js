@@ -1122,6 +1122,8 @@ const S = {
     }
     for (const t of Wd.genPools.breasts) { if (LECTURE.test(t)) bad.push('breasts: ' + t.slice(0, 90)); if (/\.$/.test(t)) bad.push('breasts ends with a full stop: ' + t.slice(0, 60)); }
     for (const [k, sp] of Object.entries(Wd.transformation.species)) for (const r of sp.ladder) for (const t of [r.trait, r.anatomy].concat(r.steps || [], r.sex || [], r.women || [])) if (t && LECTURE.test(t)) bad.push(k + ' rung ' + r.at + ': ' + t.slice(0, 90));
+    // The narrator's own rules keep a bovine woman's milk a look, never a fact to state ("they lactate", "as ordinary as the Creamery").
+    for (const t of Wd.rules) if (/\blactat|as ordinary on the Isle as/i.test(t)) bad.push('rule: ' + t.slice(0, 90));
     assert.deepEqual(bad, [], 'a look or a step explains instead of showing: ' + bad.join(' | '));
     const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
     try {
