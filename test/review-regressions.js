@@ -92,8 +92,9 @@ async function checkInferenceAndCompaction() {
     assert(compacted && compacted._trimmed && compacted.memBefore === null, 'turn 9 should be compacted in its completed chunk');
     assert(!Object.hasOwn(compacted.stateBefore, 'items'), 'the compacted snapshot should not retain full state');
     const worlds = h.window.WINDLASS_WORLDS;
-    const wolfBody = worlds.sundered.genPools.species.wolf.bodyByGender.female[0];
-    assert.match(wolfBody, /Two rows of small nipples run down the abdomen, dark against the pelt/, 'the wolf\'s established anatomy stays in her first body line');
+    const wolfPairs = worlds.sundered.transformation.tracks.species.wolf.find((t) => t.key === 'further_pairs');
+    assert.equal(wolfPairs.sex, 'women', 'further pairs of nipples are a wolf woman\'s feature only');
+    assert.match(wolfPairs.endsAs, /two more pairs of small nipples down the belly below the breasts/, 'the wolf\'s established anatomy stays in her finished track line, which her looks are composed from');
     const diagnostics = h.diagnostics();
     assert.equal(diagnostics.errors.length, 0, 'page errors: ' + JSON.stringify(diagnostics.errors));
     assert.equal(diagnostics.violations.length, 0, 'runtime violations: ' + JSON.stringify(diagnostics.violations));

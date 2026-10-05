@@ -177,10 +177,15 @@ async function main() {
     assert.doesNotMatch(prompts[1], /Each part changes on its own track/,
       'the waypoint rule is sent only once a change has begun');
 
-    const sunderedCow = worlds.sundered.genPools.species.cow.bodyByGender.female.join(' ');
-    assert.match(sunderedCow, /udder.*four teats/i, 'Sundered must retain its established bovine anatomy');
-    const sunderedWolf = worlds.sundered.genPools.species.wolf.bodyByGender.female.join(' ');
-    assert.match(sunderedWolf, /two rows of small nipples run down the abdomen/i, 'Sundered must retain its established wolf anatomy');
+    // Looks are composed from the tracks' own lines, so the established anatomy lives there.
+    const trackOf = (k, key) => worlds.sundered.transformation.tracks.species[k].find((t) => t.key === key);
+    const sunderedCow = trackOf('cow', 'teats_and_udder');
+    assert.equal(sunderedCow.sex, 'women', 'the udder is a bovine woman\'s feature only');
+    assert.match(sunderedCow.endsAs, /long thick nipples like teats and a small four-teated udder low on the belly/i, 'Sundered must retain its established bovine anatomy');
+    assert.match(sunderedRules, /a bovine woman's udder low on the belly with four teats/i, 'the anatomy rule must keep the bovine udder');
+    const sunderedWolf = trackOf('wolf', 'further_pairs');
+    assert.equal(sunderedWolf.sex, 'women', 'further pairs of nipples are a wolf woman\'s feature only');
+    assert.match(sunderedWolf.endsAs, /two more pairs of small nipples down the belly below the breasts/i, 'Sundered must retain its established wolf anatomy');
     const wolfTeeth = worlds.sundered.transformation.species.wolf.ladder.find((step) => step.at === 30).steps;
     assert.equal(wolfTeeth.length, 10, 'wolf canine progression must have ten incremental steps');
     assert.match(wolfTeeth[0], /canine catches.*looks unchanged/i, 'the first canine stage must remain subtle');
