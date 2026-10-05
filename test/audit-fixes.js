@@ -1075,7 +1075,8 @@ const S = {
     } finally { h.close(); }
     // Once the body has gone over, what lasts of the way stays in the summary: the shared stages and the kind's complete shape,
     // not the breast stages (the grown chest carries those) and not the genitals, stated once.
-    const summary = cow.ladder.find((r) => r.at === 85).sex[2];
+    // The save completed its last sex rung on an earlier build, whose complete-shape line is worded differently from today's world text.
+    const summary = 'the bovine woman\'s shape, complete, in the words of an earlier build: full at the hip, the udder low with its four teats, the breasts full above it';
     const first2 = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi', gender: 'male' });
     let seeded2; try { seeded2 = new Map([...first2.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first2.close(); }
     const doc2 = seeded2.get([...seeded2.keys()].find((k) => /^adventures\/[^/]+$/.test(k))).data;
@@ -1103,7 +1104,7 @@ const S = {
       const short = /^Influence now[^\n]*\((?:unlisted kinds|every kind) 0\)\.$/m.test(p);
       const lasting = [/thinning and lightening/, /finer and softer all over/, /tears and laughter both arriving sooner/, /the stride shortening/, /sweat milder/, /a tenth stage, its key a word and two digits/];
       for (const re of (short ? lasting.slice(-1) : lasting)) assert.match(settled, re, 'a shared stage lasts ' + re + (short ? ' (short block)' : ''));
-      assert.match(settled, /the bovine woman's shape, complete: full at the hip/, 'and the kind\'s complete shape: ' + settled);
+      assert.match(settled, /complete, in the words of an earlier build: full at the hip/, 'and the kind\'s complete shape in the save\'s own words: ' + settled);
       assert.doesNotMatch(settled, /\{first\}/, 'filled: ' + settled);
       assert.doesNotMatch(settled, /first breast buds|penis|soreness behind each nipple/, 'without the breast stages, the genitals or the passing aches: ' + settled);
       assert.doesNotMatch(p, /\{skin1\}|\{skin2\}|\{rhythms1\}|\{gait1\}|\{scent1\}|\{stage10\}/, 'and no stage placeholder reaches the narrator');
@@ -1169,6 +1170,11 @@ const S = {
       assert(await h.turn('I had the milk in my bag the whole time.'));
       t = storedTurns(h.mock.store, id).at(-1);
       assert(!contact(t.notes), 'milk in the bag is not drinking: ' + JSON.stringify(t.notes));
+      for (const carried of ['I had milk in my bag the whole time, I tell Daisy at the Creamery.', 'I had cheese in my bag for later when I left the Creamery.', 'I have a cup of cocoa in my bag from the Creamery stand.', 'I had some cream with me on the walk to the Creamery.']) {
+        assert(await h.turn(carried));
+        t = storedTurns(h.mock.store, id).at(-1);
+        assert(!contact(t.notes), 'dairy carried is not dairy taken: ' + carried + ' ' + JSON.stringify(t.notes));
+      }
       const p1 = promptOf(lastTurn(h));
       assert.doesNotMatch(p1, /[^\n ]  +\S/, 'no doubled space in the prompt: ' + (p1.match(/.{0,60}[^\n ]  +\S.{0,20}/) || [''])[0]);
       assert(await h.turn('I kiss Daisy.'));

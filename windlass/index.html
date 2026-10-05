@@ -1500,7 +1500,10 @@
       // The breast stages are in the grown chest above, and the genitals were stated once and are not repeated.
       if (path && path.sex && tf.sex && tf.sex.species === k) {
         const told = Array.isArray(path.sexTold) ? path.sexTold : [], lastRung = sp.ladder[lastSexRung(sp) - 1], shape = (lastRung && lastRung.sex) || [];
-        const kept = told.filter((x) => { const m = /^\{([^{}\s]+)\}$/.exec(x); return m ? (isSexStage(m[1]) && !/^(?:tanner\d+|genitals)$/.test(m[1])) : shape.includes(x); });
+        // A save completed on an earlier build carries the complete shape in that build's words: when none of its lines is in the rung's
+        // current text, the last line told is the shape.
+        const isTok = (x) => /^\{[^{}\s]+\}$/.test(x), inShape = told.some((x) => !isTok(x) && shape.includes(x)), lastLine = told.filter((x) => !isTok(x)).pop();
+        const kept = told.filter((x) => { const m = /^\{([^{}\s]+)\}$/.exec(x); return m ? (isSexStage(m[1]) && !/^(?:tanner\d+|genitals)$/.test(m[1])) : (shape.includes(x) || (!inShape && x === lastLine)); });
         if (kept.length) parts.push('Settled on the way over: ' + (compact ? kept.slice(-2) : kept).map(pf).join('; ') + '.');
       }
       // The kind's form on a woman's body, every step told.
@@ -2113,8 +2116,10 @@
     if (!W.transformation || !text) return [];
     const namedAfter = (phrase, name) => !!name && new RegExp('^[\\s]*[Ii]\\s+' + phrase + escRe(String(name)) + '(?=$|[^A-Za-z])').test(text);
     // "I have" counts only with a measure of it ("I have a cup of cocoa"): a bare "I have the milk" or "I have a milk allergy" is not drinking.
-    // "I had" is the meal told after: "I had some milk" and "I had cheese" count, "I had the milk in my bag" does not.
-    const DAIRY = '(?:cocoa|milk|cream|cheese|butter|dairy)\\b', MEASURE = '(?:(?:a|some|the|another|my)\\s+)?(?:sip|taste|cup|mug|glass|bowl|serving|plate)s?\\s+of\\s+';
+    // "I had" is the meal told after: "I had some milk" and "I had cheese" count; "I had the milk in my bag", "I had cheese in my bag for later"
+    // and "I have a cup of cocoa with me" do not, the dairy being carried, not taken (KEPT).
+    const KEPT = '(?!\\s+(?:in|inside|within)\\s+(?:my|the|a|an|his|her|their|our|[A-Za-z]+\u2019s|[A-Za-z]+\'s)\\s+(?:[a-z]+\\s+)?(?:bag|pack|backpack|pocket|satchel|basket|bottle|flask|canteen|jar|tin|box|hands?|locker|cupboard|fridge|pantry|coat|jacket|room)s?\\b)(?!\\s+(?:with|on)\\s+me\\b)(?!\\s+for\\s+later\\b)';
+    const DAIRY = '(?:cocoa|milk|cream|cheese|butter|dairy)\\b' + KEPT, MEASURE = '(?:(?:a|some|the|another|my)\\s+)?(?:sip|taste|cup|mug|glass|bowl|serving|plate)s?\\s+of\\s+';
     const dairy = new RegExp('^[\\s]*[Ii]\\s+(?:(?:drink|drank|sip|sipped|taste|tasted|eat|ate|consume|consumed)\\s+(?:(?:a|some|the|another|my)\\s+)?(?:' + MEASURE + ')?|have\\s+' + MEASURE + '|had\\s+(?:' + MEASURE + '|(?:some\\s+)?))' + DAIRY, 'i').test(text);
     const exposures = new Map();
     const add = (species, intensity) => {
