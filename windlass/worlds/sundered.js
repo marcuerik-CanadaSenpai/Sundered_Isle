@@ -155,7 +155,7 @@ window.WINDLASS_WORLDS.sundered = {
       { club: 'the warren allotments', where: { default: 'the allotments', evening: 'the allotments until dark' } },
       { club: 'the arcade', where: { default: 'the arcade', evening: 'the arcade on Mondays; otherwise wherever a game is being played' } },
       { club: 'the Mews volunteers', where: { default: 'the Mews', evening: 'the Mews at feeding time' } },
-      { club: 'the Human Society tea', where: { default: 'the library', evening: 'the Human Society tea on Thursdays; otherwise the library' } },
+      { club: 'the Human Society tea', kinds: ['human'], where: { default: 'the library', evening: 'the Human Society tea on Thursdays; otherwise the library' } },
       { club: 'the fairy ring dance', where: { default: 'the Greenhouse Quarter', evening: 'the fairy ring on Fridays; otherwise the Greenhouse Quarter' } }
     ],
     courses: ['Glamour', 'Applied Alchemy', 'Artificing', 'Wardcraft and Sigils', 'Beastcraft', 'Comparative Mythkin Anatomy', 'music', 'botany', 'engineering', 'geography', 'law', 'dairy science', 'history', 'literature', 'astronomy', 'illusion studies', 'cartography', 'medicine'],

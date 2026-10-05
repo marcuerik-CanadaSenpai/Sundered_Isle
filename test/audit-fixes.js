@@ -1385,6 +1385,22 @@ const S = {
   // world no longer in the game (Mythaven) is passed over quietly at boot, also when this device's pointer names it: the
   // older Sundered save opens with a plain welcome, and Adventures lists the Mythaven save as no longer in this game, with
   // Continue disabled.
+  // 9q. A roommate's "not where their kind are expected" club is never the kind's own: with the Creamery as the only haunt on
+  // offer and every roll landing low, a bovine roommate keeps her own day and her sheet does not call the Creamery unexpected.
+  async hauntNotOwnClub() {
+    const setup = (w) => {
+      w.Math.random = () => 0.1;
+      const store = {};
+      w.WINDLASS_WORLDS = new w.Proxy(store, { set(t, k, v) { if (v && v.genPools) v.genPools.haunts = v.genPools.haunts.filter((h) => /Creamery/.test(h.club)); t[k] = v; return true; } });
+    };
+    const h = await begin({ setup, rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
+    try {
+      const rm = onlyAdv(h.mock.store).data.roommate; const text = JSON.stringify(rm);
+      assert.doesNotMatch(text, /Creamery regulars, which is not where/, 'a bovine roommate\'s own club is not an unexpected one: ' + text.slice(0, 300));
+      assert.doesNotMatch(text, /not where (?:her|his|their) kind are expected/, 'with only her own club on offer she keeps her kind\'s day');
+      clean(h);
+    } finally { h.close(); }
+  },
   async sunderedOnly() {
     // (a) No picker; the new adventure is a Sundered one.
     const a = await boot({});

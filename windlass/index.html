@@ -751,7 +751,10 @@
     const aims = Object.assign({ default: 'get to know {first} and find out what kind of roommate {they} will be; hopes, in time, for ' + hope + ', and does not push' }, sp ? sp.aims : {});
     // Half of roommates spend their free hours with a club that is not their kind's expected one; the kind's night place (a roost, a pool, a tree) is kept.
     const haunts = (W.genPools && Array.isArray(W.genPools.haunts)) ? W.genPools.haunts : [];
-    const haunt = sp && haunts.length && Math.random() < 0.5 ? pick(haunts) : null;
+    // A haunt that is the kind's own (its place named in the kind's day, or a club for that kind) is not an unexpected one.
+    const ownDay = sp && sp.where ? Object.values(sp.where).join(' | ').toLowerCase() : '';
+    const strange = haunts.filter((h) => !(h.kinds || []).includes(species) && !ownDay.includes(String(h.where && h.where.default || '').toLowerCase()) && !ownDay.includes(String(h.club || '').replace(/^the /i, '').toLowerCase()));
+    const haunt = sp && strange.length && Math.random() < 0.5 ? pick(strange) : null;
     const where = haunt ? Object.assign({}, haunt.where, sp.where && sp.where.night ? { night: sp.where.night } : {}) : (sp && sp.where && sp.where.default ? sp.where : { default: 'room 4B, Kettle Hall, or wherever ' + p.pronouns.their + ' kind gather', evening: 'wherever the evening is', night: 'room 4B' });
     const hauntBit = haunt ? ' Spends free hours with ' + haunt.club + ', which is not where ' + p.pronouns.their + ' kind are expected.' : '';
     const brief = 'Roommate. ' + race + ', second-year, ' + p.course + '. ' + cap(p.temperament) + '; ' + p.quirk + '.' + hauntBit;
