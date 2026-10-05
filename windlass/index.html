@@ -604,12 +604,14 @@
   const sexKey = (gender) => (gender === 'female' || gender === 'male' ? gender : 'nonbinary');
   const genderOf = (c) => c && (c.gender || (c.pronouns && c.pronouns.they === 'she' ? 'female' : c.pronouns && c.pronouns.they === 'he' ? 'male' : 'nonbinary'));
   const lowerFirst = (t) => String(t || '').replace(/^[A-Z](?![A-Z])/, (ch) => ch.toLowerCase());
+  // The face's own draw, 0 to 30: two in three on the standard (10 to 20), a sixth under it and a sixth over.
+  const drawFace = () => { const r = Math.random(); return r < 1 / 6 ? Math.floor(Math.random() * 10) : r < 5 / 6 ? 10 + Math.floor(Math.random() * 11) : 21 + Math.floor(Math.random() * 10); };
   function composeLooks(Wc, k, p, opts) {
     opts = opts || {};
     const L = looksSpec(Wc) || {}, K = looksKind(Wc, k) || {}, sp = speciesPool(Wc, k);
     const sx = sexKey(p.gender), forced = [-1, 0, 1].includes(opts.extent);
     const roll = (a, b) => { const r = Math.random(); return r < a ? -1 : r < b ? 0 : 1; };
-    const lean = forced ? opts.extent : roll(1 / 6, 5 / 6), face = forced ? 15 + 10 * opts.extent : Math.round(Math.random() * 30);
+    const lean = forced ? opts.extent : roll(1 / 6, 5 / 6), face = forced ? 15 + 10 * opts.extent : drawFace();
     const T = Wc.transformation && Wc.transformation.tracks && Wc.transformation.tracks.species;
     const M = (T && T[k]) || [], track = (key) => M.find((t) => t.key === key);
     const cols = {}, column = (t) => {
@@ -1348,6 +1350,28 @@
     for (const d of path.draws || []) if (line == null || (d.when && new RegExp('\\b(?:' + d.when + ')\\b', 'i').test(line))) out.push(d.label + ' ' + d.value);
     return out.join('; ');
   }
+  // The way over's own draws, made once when it is rolled so the result is one particular woman or man (W.transformation.sexDraws
+  // and genPools.looks.build): a woman's face type, figure and height; a man's look, build, height, beard and body hair. Each sex
+  // track names the ones its lines lean on (SEX_DRAWN). A save from before them draws them when first asked.
+  const SEX_DRAWN = { female: { face: ['face'], frame: ['height', 'figure'], waist_and_hips: ['figure'] }, male: { face: ['look', 'beard'], skin_and_hair: ['beard', 'bodyHair'], frame: ['height', 'build'], waist_and_hips: ['build'], chest: ['build'] } };
+  function drawSex(k, to) {
+    const L = looksSpec(W) || {}, K = looksKind(W, k) || {}, D = ((W.transformation || {}).sexDraws || {})[to === 'female' ? 'woman' : 'man'] || {};
+    const parts = (L.build || {})[to] || {}, words = Object.keys(parts).map((part) => (parts[part] && parts[part].length ? pick(parts[part]) : '')).filter(Boolean);
+    if (to === 'female' && D.rear && D.rear.length) words.push(pick(D.rear));
+    const joined = words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words[0] || '';
+    const hr = !K.heightTrack && K.height && K.height[to], out = {}, one = (pool) => (pool && pool.length ? pick(pool) : '');
+    if (to === 'female') { const face = one(D.face); if (face) out.face = 'face type ' + face; if (joined) out.figure = 'figure ' + joined; }
+    else { const look = one(D.look), beard = one(D.beard), hair = one(D.bodyHair); if (look) out.look = 'looks ' + look; if (joined) out.build = 'build ' + joined; if (beard) out.beard = beard; if (hair) out.bodyHair = hair; }
+    if (hr) out.height = 'height ' + heightWords(hr[0] + Math.floor(Math.random() * (hr[1] - hr[0] + 1)));
+    return out;
+  }
+  // The draws a sex track's line leans on (all of them with no key), drawn first if the save has none.
+  function sexDrawn(tf, key) {
+    const sx = tf && tf.sexprog; if (!sx || !sx.to) return '';
+    if (!sx.draws) sx.draws = drawSex(sx.species, sx.to);
+    const keys = key == null ? Object.keys(sx.draws) : ((SEX_DRAWN[sx.to] || {})[key] || []);
+    return keys.filter((x) => sx.draws[x]).map((x) => sx.draws[x]).join('; ');
+  }
   // A step, an anatomy or a sex line of the player's path, with the kind's facts filled: the path's eye colour, the kind's teats phrase.
   const isSexStage = (key) => { const st = W.transformation && W.transformation.sexStages; return !!st && Object.prototype.hasOwnProperty.call(st, key) && st[key] != null; };
   function pathFill(tf, k, text) {
@@ -1506,7 +1530,9 @@
       else notes.push(t.species + ' path: sex steps of rung ' + t.rung + ' told');
     }
     tf.tracks = tf.tracks.filter((t) => t.i < t.steps.length);
-    return out.concat(fadeTracks(state, notes), easeTracks(state, notes), tellTracks(state, notes));
+    // One small thing a turn: a part easing back takes the turn, and the next waypoint waits for the one after.
+    const faded = fadeTracks(state, notes), eased = easeTracks(state, notes);
+    return out.concat(faded, eased, eased.length ? [] : tellTracks(state, notes));
   }
   // The fading itself: one step back per held change per turn, on its own clock (the first when the quiet reaches afterHours, then
   // every everyHours), told to the narrator as the step easing. At nothing told the change is gone, with its sex steps.
@@ -1727,13 +1753,15 @@
     lines.push('Only humans change, and ' + who + ' is human' + (tf.traits.length ? ' by origin' : '') + '. Influence toward a kind rises only through the contacts listed below; the engine keeps the numbers and says in <action> when a change begins, continues and completes, one small step at a time. Describe a change only when it is announced, and only the step announced; what earlier steps established stays true.');
     const kinds = Object.keys(T.species);
     // Every change stays listed in the short form too: the body summary names only each kind's latest settled shape, so a trait
-    // dropped here (cow horns once the hooves have come) would leave the prompt altogether.
-    const visibleTraits = tf.traits;
+    // dropped here (cow horns once the hooves have come) would leave the prompt altogether. A finished track is the exception: the
+    // body lines below carry it in both forms, so it is counted here and not said twice.
+    const visibleTraits = tf.traits.filter((t) => !(t.track && trackModel(t.species))), trackedDone = tf.traits.length - visibleTraits.length;
     const listed = kinds.filter((k) => (tf.influence[k] || 0) > 0).map((k) => k + ' ' + tf.influence[k]).join(', ');
     const influenceNow = compact ? (listed || 'none yet') + (kinds.some((k) => !(tf.influence[k] || 0)) ? (listed ? ' (unlisted kinds 0)' : ' (every kind 0)') : '') : kinds.map((k) => k + ' ' + (tf.influence[k] || 0)).join(', ');
     lines.push('Influence now (0 to 100; ' + (T.thresholdsNote || 'changes at set thresholds') + '): ' + influenceNow + '.');
     const underWay = T.tracks ? Object.keys(tf.prog || {}).map((k) => { const n = (trackModel(k) || []).filter((t) => { const r = tf.prog[k].tracks[t.key]; return r && r.told > 0 && r.told < t.stages.length; }).length; return n ? n + ' ' + T.species[k].short : ''; }).filter(Boolean) : [];
-    lines.push('Changes so far: ' + (visibleTraits.length ? visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').join('; ') : 'none finished') + (underWay.length ? '; parts under way: ' + underWay.join(', ') : '') + '.');
+    const doneList = visibleTraits.map((t) => T.species[t.species].short + ': ' + t.trait + ' (Day ' + t.day + (t.settled === false ? ', under way' : '') + ')').concat(trackedDone ? [trackedDone + ' finished part' + (trackedDone > 1 ? 's' : '') + ', given in the body lines below'] : []);
+    lines.push('Changes so far: ' + (doneList.length ? doneList.join('; ') : 'none finished') + (underWay.length ? '; parts under way: ' + underWay.join(', ') : '') + '.');
     const body = trackBodyLines(tf, who, compact).concat(bodyNowLines(tf, who, compact)); if (body.length) lines.push(body.join('\n'));
     // At the Spa, what the healer tells before a bath: the changes that stand on others and go back with them.
     if (T.tracks && /\b(?:spa|restoration)\b/i.test(text + ' ' + (state.location || ''))) { const links = healLinks(tf); if (links.length) lines.push('Healing links (the Spa\'s healer says these before the bath, plainly): ' + links.slice(0, 6).join('; ') + '.'); }
@@ -1770,8 +1798,8 @@
         + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
     }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape. The body never reverts by itself; the Spa heals on purpose, one step a visit.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + (T.tracks ? ' The body never changes back by itself, but any change can be healed on purpose at the Restoration Spa, at any time, however old, at ' + who + '\'s asking: one change, a kind\'s whole set, the body\'s sex or everything, each taken back one step a visit, the same slow morph in reverse. Bonds with people are not the Spa\'s to heal. Report what ' + who + ' asks it to heal in "spa_reset".' : ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset".') + ' Ladders of change for active kinds are in <lore>.');
+      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape. A part past half never reverts by itself (a small one may ease back after a long quiet with nothing of its kind); the Spa heals any on purpose, one step a visit.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + (T.tracks ? ' A part past half never changes back by itself (a small change may ease back after a long quiet with nothing of its kind, as the engine says), but any change can be healed on purpose at the Restoration Spa, at any time, however old, at ' + who + '\'s asking: one change, a kind\'s whole set, the body\'s sex or everything, each taken back one step a visit, the same slow morph in reverse. Bonds with people are not the Spa\'s to heal. Report what ' + who + ' asks it to heal in "spa_reset".' : ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset".') + ' Ladders of change for active kinds are in <lore>.');
     return lines.join('\n');
   }
 
@@ -1780,10 +1808,11 @@
   // per part of the body, the senses or the mind, each 0 to 100 with a weight; the kind's total is the weighted sum and the weights of
   // a body sum to 100. Influence toward the kind drives the tracks: each track has a window of influence drawn once per path (so the
   // tracks interleave in an order and at a pace of their own), and its progress is where the influence sits in that window, never
-  // falling while contact goes on (a part at half or less eases back slowly in a long quiet, see easeTracks; the Spa undoes any). A track's stages are waypoints at even intervals; the narrator is told the
-  // newest waypoint when a track reaches it, at most two a turn and story hours apart on one track, and the current line of every
-  // track under way. A track with needs waits for the named track's stage; a by-sex track opens only for the matching body. Two extent
-  // draws per path (the body's lean and the face) say how far each feature goes, in the words of the track's range.
+  // falling while contact goes on (a part at half or less eases back slowly in a long quiet, see easeTracks; the Spa undoes any).
+  // A track's stages are waypoints at even intervals; the narrator is told the newest waypoint when a track reaches it, one a turn
+  // and story hours apart on one track, and the current line of every track under way. A track with needs waits for the named
+  // track's stage; a by-sex track opens only for the matching body. Two extent draws per path (the body's lean and the face) say
+  // how far each feature goes, in the words of the track's range.
   const trackModel = (k) => { const T = W.transformation; return (T && T.tracks && T.tracks.species && T.tracks.species[k]) || null; };
   const sexModel = (to) => { const T = W.transformation; return (T && T.tracks && T.tracks[to === 'female' ? 'woman' : 'man']) || null; };
   const bondModel = () => { const T = W.transformation; return (T && T.tracks && T.tracks.bond) || null; };
@@ -1800,30 +1829,38 @@
   function ensureProg(tf, k) {
     const M = trackModel(k); if (!M) return null;
     tf.prog = tf.prog || {};
-    if (!tf.prog[k]) tf.prog[k] = { lean: drawLean(), face: Math.round(Math.random() * 30), tracks: {} };
+    if (!tf.prog[k]) tf.prog[k] = { lean: drawLean(), face: drawFace(), tracks: {} };
     const pr = tf.prog[k]; pr.tracks = pr.tracks || {};
     for (const t of M) if (!pr.tracks[t.key]) pr.tracks[t.key] = Object.assign(drawWindow(TRACK_WINDOW), { p: 0, told: 0, ext: drawExt(), nextAt: 0 });
     return pr;
   }
+  // The way over's windows and draws. A track paced with another (the woman's waist and hips with Chest) takes its window from that
+  // one's, so its waypoints fall between the other's second and fourth.
   function ensureSexProg(tf, k, to) {
     const M = sexModel(to); if (!M) return null;
     if (!tf.sexprog || tf.sexprog.species !== k) tf.sexprog = { species: k, to, tracks: {} };
     const sx = tf.sexprog; sx.tracks = sx.tracks || {};
-    for (const t of M) if (!sx.tracks[t.key]) sx.tracks[t.key] = Object.assign(drawWindow(SEX_WINDOW), { p: 0, told: 0, nextAt: 0 });
+    for (const t of M.filter((x) => !x.paceWith).concat(M.filter((x) => x.paceWith))) {
+      if (sx.tracks[t.key]) continue;
+      const w = drawWindow(SEX_WINDOW), c = t.paceWith && sx.tracks[t.paceWith];
+      if (c) { const C = c.e - c.s; w.s = Math.round(c.s + 0.3 * C); w.e = Math.max(w.s + 10, Math.round(c.s + 0.8 * C)); }
+      sx.tracks[t.key] = Object.assign(w, { p: 0, told: 0, nextAt: 0 });
+    }
+    if (!sx.draws) sx.draws = drawSex(k, to);
     return sx;
   }
   // The body's sex as the tracks see it: the player's own, or where a path has carried it (going over counts once it is over).
   const bodySex = (tf, p) => (tf.sex ? tf.sex.to : tf.sexprog && tf.sexprog.from ? tf.sexprog.from.to : (p || {}).gender === 'female' ? 'female' : (p || {}).gender === 'male' ? 'male' : 'other');
   const sexStage = (tf, key) => { const sx = tf.sexprog; if (!sx) return null; const M = sexModel(sx.to); const t = M && M.find((x) => x.key === key); const r = sx.tracks && sx.tracks[key]; return t && r ? r.told : null; };
-  // Whether a by-sex track is open: a born body of that sex opens it; a body going over opens a woman's tracks once Chest is at
-  // stage 3 and a man's once Frame is at stage 2; a path rolled toward the other body never opens them.
+  // Whether a by-sex track is open: the body's own sex opens it (born, or gone over on any path); a body going over, on whichever
+  // path carries it, opens the tracks of the body it is going toward at the track's crossAt on the way over (a season or a man's
+  // own trait at Rhythms 3), else a woman's once Chest is at stage 3 and a man's once Frame is at stage 2, and never the other's.
+  const crossPoint = (t) => t.crossAt || (t.sex === 'women' ? { track: 'chest', stage: 3 } : { track: 'frame', stage: 2 });
   function trackOpen(tf, k, t, p) {
     if (!t.sex) return true;
-    const path = (tf.paths || {})[k], going = path && path.sex && !tf.sex ? path.sex : null, born = bodySex(tf, p);
-    const want = t.sex === 'women' ? 'female' : 'male';
-    if (going) { if (going !== want) return false; const st = sexStage(tf, want === 'female' ? 'chest' : 'frame'); return st != null && st >= (want === 'female' ? 3 : 2); }
-    if (path && path.sex && tf.sex && tf.sex.species === k) return tf.sex.to === want;
-    return born === want;
+    const want = t.sex === 'women' ? 'female' : 'male', going = tf.sexprog && !tf.sex ? tf.sexprog.to : null;
+    if (going) { if (going !== want) return false; const at = crossPoint(t), st = sexStage(tf, at.track); return st != null && st >= at.stage; }
+    return bodySex(tf, p) === want;
   }
   // A need: the named track (of the kind, else of the body's sex change) at the stage, or finished. A born body of the right sex
   // counts a sex-change track as finished. A need with from binds only the stages from that one on.
@@ -1854,6 +1891,9 @@
     return t.range[lean < 0 ? 'least' : lean > 0 ? 'most' : 'standard'] || '';
   }
   const noneHere = (pr, t) => /^none$/i.test(extentText(pr, t));
+  // A finished part whose range row also covers a later part of the kind (a fox's tails, a rabbit's coat to the belly) keeps that
+  // extent back until the later part has finished, or is none on this body, so no second tail is told before it grows.
+  const extentHeld = (k, pr, t) => { const own = extentText(pr, t).toLowerCase(); return (trackModel(k) || []).some((d) => { if (d.extentWith !== t.key) return false; const de = extentText(pr, d), r = pr.tracks[d.key]; return !!de && !/^none$/i.test(de) && own.includes(de.toLowerCase()) && !(r && r.told >= d.stages.length); }); };
   // Moves every track of every kind with influence to where the influence sits in its window (never back), under its needs, only
   // when open, and never past the next waypoint not yet told (the body goes as far as what has been lived through, so the influence
   // may run ahead and the telling catch up at its own pace); the same for the body's sex. Called once per committed turn, after influence has moved.
@@ -1910,7 +1950,7 @@
   // finished, with how far it goes on this body; the rest are one small thing each, found in passing.
   function trackNote(tf, k, t, j, pr, firstEver) {
     const sp = W.transformation.species[k]; const who = firstName(); const inf = tf.influence[k] || 0; const n = t.stages.length;
-    const line = pathFill(tf, k, t.stages[j - 1]); const ext = j === n ? extentText(pr, t) : '';
+    const line = pathFill(tf, k, t.stages[j - 1]); const ext = j === n && !extentHeld(k, pr, t) ? extentText(pr, t) : '';
     const drawn = pathDrawn(tf, k, line);
     const fact = t.name + ' (' + sp.name + ', waypoint ' + j + ' of ' + n + '): ' + line + (ext ? ' How far it goes on this body: ' + fill(ext) + '.' : '') + (drawn ? ' Drawn for this body: ' + drawn + '.' : '');
     const ways = (looksKind(W, k) || {}).ways, own = ways && (trackModel(k) || []).filter((x) => ways.includes(x.key) && (x.key === t.key || (pr.tracks[x.key] && pr.tracks[x.key].told >= x.stages.length)));
@@ -1926,9 +1966,16 @@
     // The chest ends as the size and shape drawn for this path; what is below is stated once, in the world's words, and not repeated.
     if (t.key === 'chest' && j === n && sx.to === 'female') line += ' The size and shape drawn: ' + chestShape(pathFill(tf, sx.species, '{breasts}')) + '.';
     if (t.key === 'below' && j === n && sx.to === 'female' && isSexStage('genitals')) line += ' ' + pathFill(tf, sx.species, '{genitals}');
-    return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). ' + t.name + ' (waypoint ' + j + ' of ' + n + '): ' + line + ' One small thing this turn, in your own words, found in passing (a mirror, a shirt, a strap, a voice), plain, with its practical consequence; then the scene goes on. Nobody remarks on it before ' + who + ' has found it, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
+    // Rhythms at its third waypoint says what of the kinds takes the cycle's place, or starts there for a man.
+    if (t.key === 'rhythms' && j === 3) {
+      const want = sx.to === 'female' ? 'women' : 'men', own = Object.keys(tf.prog || {}).flatMap((k) => (trackModel(k) || []).filter((x) => x.sex === want && x.crossAt && x.crossAt.track === 'rhythms').map((x) => x.name + ' (' + W.transformation.species[k].name + ')'));
+      line += own.length ? ' What starts here, as the kind gives it: ' + own.join(', ') + '.' : sx.to === 'female' ? ' No kind on this body has a season of its own, so the monthly cycle is the body\'s.' : ' No kind on this body gives its men a trait of their own.';
+    }
+    const drawn = /\bdraw/i.test(line) || j === n ? sexDrawn(tf, t.key) : '';
+    const how = t.tell ? lowerFirst(String(t.tell).replace(/\.$/, '')) + ' (washing or dressing alone)' : 'found in passing (a mirror, a shirt, a strap, a voice), plain';
+    return 'Alongside the ' + sp.name + ' change, the body is going toward ' + what + ' (' + sp.name + ' path). ' + t.name + ' (waypoint ' + j + ' of ' + n + '): ' + line + (drawn ? ' Drawn for this body: ' + drawn + '.' : '') + ' One small thing this turn, in your own words, ' + how + ', with its practical consequence; then the scene goes on. Nobody remarks on it before ' + who + ' has found it, and nobody names what is happening. How ' + who + ' takes it is the player\'s.';
   }
-  // Tells the waypoints reached and not yet told: at most one per track and two in a turn, the longest-waiting first, each track
+  // Tells the waypoints reached and not yet told: one small thing a turn, the longest-waiting first, each track
   // then waiting the story-hour gap. A track that finishes settles a change (the kind's element); the body's sex finished on every
   // track makes the body a woman's or a man's.
   function tellTracks(state, notes) {
@@ -1945,7 +1992,7 @@
     const begun = (k) => !!((tf.prog[k] && Object.values(tf.prog[k].tracks).some((r) => r.told > 0)) || (tf.traits || []).some((x) => x.species === k) || (sx && Object.values(sx.tracks || {}).some((r) => r.told > 0)));
     let told = 0;
     for (const d of due) {
-      if (told >= 2) break;
+      if (told >= 1) break;
       if (d.kind === 'sex' && !begun(d.k)) continue;
       told += 1;
       const sp = T.species[d.k], pr = tf.prog[d.k];
@@ -1985,18 +2032,24 @@
     for (const k of Object.keys(T.species)) {
       const M = trackModel(k), pr = tf.prog && tf.prog[k]; if (!M || !pr) continue;
       const parts = [];
-      for (const t of M) { const r = pr.tracks[t.key]; if (!r || !r.told) continue; const n = t.stages.length; const done = r.told >= n; parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + ': ' + (done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (done && t.range ? ' [' + fill(extentText(pr, t)) + ']' : '')); }
+      for (const t of M) { const r = pr.tracks[t.key]; if (!r || !r.told) continue; const n = t.stages.length; const done = r.told >= n; parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + ': ' + (done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (done && t.range && !extentHeld(k, pr, t) ? ' [' + fill(extentText(pr, t)) + ']' : '')); }
       const drawn = pathDrawn(tf, k);
       if (parts.length) out.push('Body now (' + T.species[k].name + ', ' + kindTotal(tf, k) + ' of 100): ' + parts.join('; ') + '.' + (drawn ? ' Drawn for this body, for when it shows: ' + drawn + '.' : ''));
     }
-    const sx = tf.sexprog;
-    if (sx && !tf.sex) { const SM = sexModel(sx.to) || []; const parts = SM.filter((t) => sx.tracks[t.key] && sx.tracks[t.key].told).map((t) => t.name + ' (' + sx.tracks[t.key].told + ' of ' + t.stages.length + '): ' + pf(sx.species, t.stages[sx.tracks[t.key].told - 1])); if (parts.length) out.push('Toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far (' + sexTotal(tf) + ' of 100, ' + T.species[sx.species].name + ' path): ' + (compact ? parts.slice(-3) : parts).join('; ') + '.'); }
-    if (sx && tf.sex && tf.sex.species === sx.species) { const SM = sexModel(sx.to) || []; const keep = SM.filter((t) => sx.tracks[t.key] && !/^(?:chest|below)$/.test(t.key)).map((t) => pf(sx.species, t.stages[t.stages.length - 1]).trim().replace(/([^.!?])$/, '$1.')); const chest = sx.to === 'female' ? ' The breasts grown on this path: ' + chestShape(pf(sx.species, '{breasts}')) + '.' : ''; if (keep.length) out.push('Settled on the way over (' + T.species[sx.species].name + ' path): ' + (compact ? keep.slice(-3) : keep).join(' ') + chest); }
+    // The way over: every track under way keeps a line; the short form gives the three told most recently in full and the rest by
+    // name and waypoint, and a settled body its tracks' one-line endings. The draws for it are said with it.
+    const sx = tf.sexprog, drawnSex = sx ? sexDrawn(tf) : '', drawnNote = drawnSex ? ' Drawn for this body: ' + drawnSex + '.' : '';
+    if (sx && !tf.sex) {
+      const SM = sexModel(sx.to) || [], under = SM.filter((t) => sx.tracks[t.key] && sx.tracks[t.key].told), recent = new Set(under.slice().sort((a, b) => (sx.tracks[b.key].nextAt || 0) - (sx.tracks[a.key].nextAt || 0)).slice(0, 3).map((t) => t.key));
+      const parts = under.map((t) => { const r = sx.tracks[t.key]; return compact && !recent.has(t.key) ? t.name + ' ' + r.told + '/' + t.stages.length : t.name + ' (' + r.told + ' of ' + t.stages.length + '): ' + pf(sx.species, t.stages[r.told - 1]); });
+      if (parts.length) out.push('Toward ' + (sx.to === 'female' ? 'a woman\'s' : 'a man\'s') + ' body so far (' + sexTotal(tf) + ' of 100, ' + T.species[sx.species].name + ' path): ' + parts.join('; ') + '.' + drawnNote);
+    }
+    if (sx && tf.sex && tf.sex.species === sx.species) { const SM = sexModel(sx.to) || []; const keep = SM.filter((t) => sx.tracks[t.key] && !/^(?:chest|below)$/.test(t.key)).map((t) => (compact ? fill(t.endsAs || t.stages[t.stages.length - 1]) : pf(sx.species, t.stages[t.stages.length - 1])).trim().replace(/([^.!?])$/, '$1.')); const chest = sx.to === 'female' ? ' The breasts grown on this path: ' + chestShape(pf(sx.species, '{breasts}')) + '.' : ''; if (keep.length) out.push('Settled on the way over (' + T.species[sx.species].name + ' path): ' + keep.join(' ') + chest + drawnNote); }
     return out;
   }
   // ---------- healing ----------
-  // The body never changes back by itself, but the Spa heals on purpose: one change (a track of a kind, or of the body's sex), one
-  // kind's whole set, the body's sex, or everything. A Spa target is "all", a kind ("cow"), "<kind>.<track>", "sex" or
+  // A part past half never changes back by itself (a small one may ease back, see easeTracks), but the Spa heals on purpose: one
+  // change (a track of a kind, or of the body's sex), one kind's whole set, the body's sex, or everything. A Spa target is "all", a kind ("cow"), "<kind>.<track>", "sex" or
   // "sex.<track>", read from the narrator's words (a kind or track by its key or its name). An older world heals kinds only.
   function spaTarget(s) {
     const T = W.transformation; if (!T) return '';
@@ -2027,13 +2080,14 @@
     // A need points at the kind's own track first, else at the way over (as needMet reads it).
     const needs = (d, need, s) => { const own = (trackModel(d.k) || []).some((t) => t.key === need.track); return own ? s.dom === 'kind' && s.k === d.k && s.t.key === need.track : s.dom === 'sex' && s.t.key === need.track; };
     // The most d may keep once s is at stage j: under a need on s that j does not meet, the stage before the one it binds from; a
-    // by-sex track of a body going over closes again with Chest under 3 (a woman's) or Frame under 2 (a man's).
+    // by-sex track of a body going over, of any kind, closes again under the point on the way over where it opened (crossPoint).
     const keepWith = (d, s, j) => {
       let max = d.t.stages.length;
       for (const need of d.t.needs || []) { if (!needs(d, need, s)) continue; const st = need.stage === 'finished' ? s.t.stages.length : Number(need.stage); if (j < st) max = Math.min(max, need.from ? need.from - 1 : 0); }
-      if (s.dom === 'sex' && d.dom === 'kind' && d.k === s.k && d.t.sex) {
-        const want = d.t.sex === 'women' ? 'female' : 'male', born = p.gender === 'female' ? 'female' : p.gender === 'male' ? 'male' : 'other';
-        if (born !== want && sx.to === want && s.t.key === (want === 'female' ? 'chest' : 'frame') && j < (want === 'female' ? 3 : 2)) max = 0;
+      if (s.dom === 'sex' && d.dom === 'kind' && d.t.sex) {
+        const want = d.t.sex === 'women' ? 'female' : 'male', at = crossPoint(d.t);
+        const born = sx.from ? sx.from.to : p.gender === 'female' ? 'female' : p.gender === 'male' ? 'male' : 'other';
+        if (born !== want && sx.to === want && s.t.key === at.track && j < at.stage) max = 0;
       }
       return max;
     };

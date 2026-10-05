@@ -42,7 +42,7 @@ window.WINDLASS_WORLDS.sundered = {
     'Setting texture: everyone dresses, each by their own Dress line, in what their body allows (a tail, hooves, wings or horns shape what can be worn), the coated kinds lightly, and nobody remarks on it. The Isle is real ground with an edge: a rail on the cliff path, cloud instead of sea below, weather of its own, a ferry out of the cloud twice a day. The university is strange in its details (the Aerie, the lakeshore pools, the fairy rings, the goblin arcade, the sigil-scarred yard, the old wall with its bricked doors), not a human college with magic painted on. Magic runs through ordinary life (a glamour left on the porridge, a corridor shorter on the way back, a familiar asleep on a radiator, wards humming in a doorway), shown in passing, never explained or made a spectacle of.',
     'Outcomes: follow <action> for rolls; failure has a visible cost. Without a roll, narrate the natural consequence.',
     'Time and timetable: classes and events happen as <clock> says; from Day 2 {first} has one to three classes a day.',
-    'Consistency: contradict nothing in <state>, <clock>, <facts>, <timeline> or <recent_turns>. If the action assumes something false, the narrative corrects it in-world.', 'Closeness grows in facets, a step at a time, each shown by what the other person does toward {first} and never stated: ease (sitting down unasked, silences left alone), knowing (how {first} takes tea, which chair is {first}\'s), trust (a favour asked, a worst day let be seen), liking (a seat saved, a running joke), attraction (a look held a moment long, more care taken, the kind\'s tells giving it away), touch (a nudge, a lean, a head on the shoulder), openness (fears and hopes before the private matter), standing (named to their friends, then plans made in the plural); all through that person\'s kind and temperament, and a facet can fall (a broken promise takes trust with it). What {first} feels is {first}\'s.',
+    'Consistency: contradict nothing in <state>, <clock>, <facts>, <timeline> or <recent_turns>. If the action assumes something false, the narrative corrects it in-world.', 'Closeness grows in facets, a step at a time, each shown by what the other person does toward {first} and never stated: ease (sitting down unasked, silences left alone), knowing (how {first} takes tea, which chair is {first}\'s), trust (a favour asked, a worst day let be seen), liking (a seat saved, a running joke), attraction (a look held a moment long, more care taken, the kind\'s tells giving it away), touch (a nudge, a lean, a head on the shoulder), intimacy (a charged moment that passes, a first kiss, a shared bed), openness (fears and hopes before the private matter), standing (named to their friends, then plans made in the plural); all through that person\'s kind and temperament, and a facet can fall (a broken promise takes trust with it). What {first} feels is {first}\'s.',
   ],
 
   world: [
@@ -496,6 +496,16 @@ window.WINDLASS_WORLDS.sundered = {
     // (the weights of a body sum to 100 with its by-sex tracks) and its stages at even intervals. A track with needs holds until the
     // named track has reached that stage ("finished" is its last); a sex track opens only for the matching body. range gives how far
     // the feature may go on a given body (least, standard, most; a face track runs 0 to 30 only); endsAs is its one-line finished state.
+    // On a body going over, a kind's by-sex track opens at its crossAt on the way over (a season, or a man's own trait, where the
+    // body's Rhythms reaches stage 3), else at Chest 3 (a woman's) or Frame 2 (a man's). tell says how a sex track's waypoints are
+    // told, and paceWith runs a sex track alongside another (the woman's waist and hips with Chest stages 2 to 4).
+    // sexDraws are the words drawn once when the way over is rolled, so the result is one particular woman or man: a woman's face
+    // type and rear (her waist, hips and thighs come from genPools.looks.build, her height from the kind's), a man's look, beard and
+    // body hair (his build from genPools.looks.build).
+    sexDraws: {
+      woman: { face: ['oval', 'heart-shaped', 'round and soft', 'long and fine-boned', 'high-cheekboned', 'square-jawed and striking'], rear: ['a round rear', 'a full rear', 'a small high rear', 'a heavy rear', 'a narrow rear'] },
+      man: { look: ['handsome', 'beautiful'], beard: ['a full beard', 'a short beard', 'a light beard', 'no beard'], bodyHair: ['heavy chest and leg hair', 'light chest and leg hair', 'smooth, with almost none'] }
+    },
     tracks: {
       species: {
         wolf: [
@@ -646,19 +656,19 @@ window.WINDLASS_WORLDS.sundered = {
               'A mantle over the shoulders and upper back, joining the spine ruff; a line starting at the breastbone.',
               'A heavy neck, a mantle of longer fur across the shoulders that rises with the ruff, and a line of fur from chest to navel meeting the pelt.'
             ] },
-          { key: 'season', name: 'Season', weight: 5, sex: 'women', endsAs: 'a season about twice a year, lasting a week or so',
+          { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a season about twice a year, lasting a week or so',
             stages: [
               'A few days, months apart, of running too warm, short-tempered and easily moved, with no cause found.',
               'It has a shape now: warmth low in the belly, skin that wants contact, broken sleep, a stronger scent.',
               'A full season: days of running hot and restless, the skin answering every touch, sleep broken, temper on a hair. What is wanted of it stays the player\'s to say. Wolves nearby know by scent.',
               'It comes about twice a year for a week and is planned around. At its height wanting is most of thought; then it passes and leaves a clear head and a sharp appetite. What is done with it is for the one who carries it to decide.'
             ] },
-          { key: 'answering', name: 'Answering', weight: 5, sex: 'men', endsAs: 'a body that answers a woman\'s season by scent',
+          { key: 'answering', name: 'Answering', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a body that answers a woman\'s season by scent',
             stages: [
               'Some days one person smells sharper and warmer than anyone else in the room.',
               'Knows a season by scent before a word is said; runs warm and restless near it.',
               'The temper runs short and the skin runs hot. Sleep and appetite both go while it lasts.',
-              'Reads it across a room by scent, and the body answers with heat and restlessness. What is done with it stays the player\'s to say. It passes when hers does.'
+              'Reads it across a room by scent, and the body answers with heat and restlessness. What is done with it stays the player\'s to say. It passes when the season does.'
             ] }
         ],
         cow: [
@@ -797,7 +807,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Longer and thick at the base, with real weight; the head is carried lower on a neck heavy with muscle.',
               'Two horns curving out above the ears at the drawn length, a bull\'s neck and shoulders, and the spine strip risen to a crest at the nape. The horns feel touch at the base.'
             ] },
-          { key: 'the_bulls_ground', name: 'The bull\'s ground', weight: 8, sex: 'men', endsAs: 'placid until crossed, then immovable',
+          { key: 'the_bulls_ground', name: 'The bull\'s ground', weight: 8, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'placid until crossed, then immovable',
             stages: [
               'Less easily moved, in body and in argument.',
               'Steps between its own people and a threat without thinking. Dislikes being crowded by other men.',
@@ -898,19 +908,19 @@ window.WINDLASS_WORLDS.sundered = {
               'It spreads down the breastbone and thickens at the neck.',
               'A pale bib from the throat down the chest at the drawn reach, on a slight, fine-boned frame.'
             ] },
-          { key: 'season', name: 'Season', weight: 5, sex: 'women', endsAs: 'one season a year, at midwinter',
+          { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'one season a year, at midwinter',
             stages: [
               'A few restless nights in the dead of winter, with no cause to point to.',
               'It has a shape: wakeful after dark, warm, quick-tempered, the musk stronger.',
               'A full season: nights of wanting, calling and pacing, and days short on sleep and patience. Company quiets it and solitude sharpens it.',
-              'It comes once a year at midwinter for a few weeks and is planned around. At its height it is most of thought; then it lifts with the lengthening days. What she does with it is hers to decide.'
+              'It comes once a year at midwinter for a few weeks and is planned around. At its height it is most of thought; then it lifts with the lengthening days. What is done with it stays the player\'s to say.'
             ] },
-          { key: 'winter_roaming', name: 'Winter roaming', weight: 5, sex: 'men', endsAs: 'a loud, restless midwinter',
+          { key: 'winter_roaming', name: 'Winter roaming', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a loud, restless midwinter',
             stages: [
-              'Restless on winter nights; walks further than he meant to.',
-              'His musk strengthens with the cold, and he barks at night without quite choosing to.',
+              'Restless on winter nights; walks further than intended.',
+              'The musk strengthens with the cold, and a bark comes at night without quite being chosen.',
               'Restless enough to walk half the night; the temper runs short. Appetite drops.',
-              'Every midwinter he is loud and restless, his musk strong, and he knows any woman of his kind in season by scent. What is done with it stays the player\'s to say, and it passes with the season.'
+              'Every midwinter: loud and restless, the musk strong, and any woman of the kind in season known by scent. What is done with it stays the player\'s to say, and it passes with the season.'
             ] },
           { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with small claws', standard: 'Slim fingers, pads and small dark claws', most: 'Short quick fingers with full pads and furred backs; still hands' }, endsAs: 'Slim fingers, pads and small dark claws',
             stages: [
@@ -1064,19 +1074,19 @@ window.WINDLASS_WORLDS.sundered = {
               'Broad cheeks and a heavy neck; the forearms thicken.',
               'A broad-cheeked face, a thick neck and heavy forearms at the drawn weight, on a body otherwise as supple as any cat\'s.'
             ] },
-          { key: 'season', name: 'Season', weight: 5, sex: 'women', endsAs: 'seasons that return from spring to autumn',
+          { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'seasons that return from spring to autumn',
             stages: [
               'A few restless days in spring, warm and wanting contact.',
               'It returns every few weeks through spring and summer: restless, affectionate, rubbing against things and people.',
               'A full season: calling at night, rolling, unable to settle, skin alive to every touch. It lasts days and comes back within weeks.',
-              'Seasons come again and again from spring to autumn and are planned around. At the height it is most of thought; between, she is entirely her own. What she does with it is hers to decide.'
+              'Seasons come again and again from spring to autumn and are planned around. At the height it is most of thought; between, the body is entirely its own. What is done with it stays the player\'s to say.'
             ] },
-          { key: 'roaming', name: 'Roaming', weight: 5, sex: 'men', endsAs: 'a spring and summer of roaming',
+          { key: 'roaming', name: 'Roaming', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a spring and summer of roaming',
             stages: [
               'Wakeful on spring nights.',
-              'Walks at night, further each time, and leaves his scent where he goes.',
+              'Walks at night, further each time, leaving scent along the way.',
               'Hears a woman\'s calling from far off; bristles at other toms, and the voice yowls without leave.',
-              'Through spring and summer he is wakeful and restless, his scent strong, and he knows any season nearby by scent. What is done with it stays the player\'s to say.'
+              'Through spring and summer: wakeful and restless, the scent strong, and any season nearby known by scent. What is done with it stays the player\'s to say.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
@@ -1173,14 +1183,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The legs feel coiled; stairs go two at a time.',
               'Thighs and calves thicken with fast muscle. A standing jump goes waist high.',
               'Runs in bursts with sudden turns. A hind foot drums when impatient or alarmed.',
-              'Explosive legs: a leap higher than her own head, a zigzag sprint, and a twisting jump of joy that cannot be held in.'
+              'Explosive legs: a leap higher than head height, a zigzag sprint, and a twisting jump of joy that cannot be held in.'
             ] },
           { key: 'watchfulness', name: 'Watchfulness', weight: 8, endsAs: 'alert, quick to startle and quick to settle',
             stages: [
               'Jumpier, and aware of the exits.',
               'Freezes at a sudden noise, heart racing, before thought returns.',
               'Still, then gone: the body bolts before deciding. Open ground feels exposed, and a wall at the back is a comfort.',
-              'Alert, quick to startle and quick to settle. Reads a room for danger without knowing it, freezes, bolts, and trusts slowly; with those she trusts she goes entirely loose.'
+              'Alert, quick to startle and quick to settle. Reads a room for danger without knowing it, freezes, bolts, and trusts slowly; among the trusted the body goes entirely loose.'
             ] },
           { key: 'warren', name: 'Warren', weight: 7, endsAs: 'sociable, nesting and close',
             stages: [
@@ -1193,7 +1203,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Sweat is fainter and sweeter.',
               'Hay and clean fur.',
-              'Hay, clover and warm fur, faint and pleasant, with a mark under the chin for what is hers.'
+              'Hay, clover and warm fur, faint and pleasant, with a mark under the chin for what is claimed.'
             ] },
           { key: 'further_pairs', name: 'Further pairs', weight: 5, sex: 'women', needs: [{ track: 'belly_fur', stage: 2 }], range: { least: 'One more pair', standard: 'Two more pairs', most: 'Three more pairs' }, endsAs: 'Two more pairs of nipples in the belly fur',
             stages: [
@@ -1202,12 +1212,12 @@ window.WINDLASS_WORLDS.sundered = {
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
               'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, hidden in the belly fur, as many as the draw sets (two more pairs at the standard), each as sensitive as the first.'
             ] },
-          { key: 'year_round', name: 'Year-round', weight: 6, sex: 'women', endsAs: 'no season: a steady, ready warmth',
+          { key: 'year_round', name: 'Year-round', weight: 6, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'no season: a steady, ready warmth',
             stages: [
               'Warmer toward touch than before, on any day.',
               'Affection and wanting sit close to the surface all the time, easily roused by closeness.',
               'No rise and fall through the year: a steady warmth that a touch can turn into wanting.',
-              'Always a little in season and never overwhelmed by it: affectionate, easily roused, and at ease with it. What she does with it is hers to decide.'
+              'Always a little in season and never overwhelmed by it: affectionate, easily roused, and at ease with it. What is done with it stays the player\'s to say.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
@@ -1306,13 +1316,13 @@ window.WINDLASS_WORLDS.sundered = {
               'Humming without noticing.',
               'The voice clears and carries; whistles and trills come by themselves.',
               'Sings at first light before fully awake. Mimicry is easy.',
-              'A voice of great range and carrying power, a dawn song that will not be skipped, and calls to her own that cross the whole campus.'
+              'A voice of great range and carrying power, a dawn song that will not be skipped, and calls to the flock that cross the whole campus.'
             ] },
-          { key: 'preening', name: 'Preening', weight: 3, endsAs: 'preening daily, herself and those she loves',
+          { key: 'preening', name: 'Preening', weight: 3, endsAs: 'preening daily, self and loved ones',
             stages: [
               'Fusses with hair and feathers.',
               'Draws feathers through the fingers or lips to set them, every day.',
-              'Preens daily, oils her feathers from a gland at the tail\'s root, and preens those she loves.'
+              'Preens daily, oiling the feathers from a gland at the tail\'s root, and preens loved ones too.'
             ] },
           { key: 'appetite', name: 'Appetite', weight: 3, endsAs: 'eating little and often',
             stages: [
@@ -1320,12 +1330,12 @@ window.WINDLASS_WORLDS.sundered = {
               'Eats lightly through the day: seeds, fruit, fish.',
               'Eats little and often, and burns it fast.'
             ] },
-          { key: 'heights_and_flock', name: 'Heights and flock', weight: 7, endsAs: 'at home high up and among her own',
+          { key: 'heights_and_flock', name: 'Heights and flock', weight: 7, endsAs: 'at home high up and among the flock',
             stages: [
               'Seeks the upper floor and the window seat.',
-              'Sleeps better high up, and likes others of her kind within call.',
+              'Sleeps better high up, and likes others of the kind within call.',
               'Roosts by choice, feet locked; uneasy in low closed rooms. Restless when the season turns.',
-              'At home on heights and in a flock: roosts high, calls back and forth all day, and feels autumn pull at her to go somewhere.'
+              'At home on heights and in a flock: roosts high, calls back and forth all day, and feels the autumn pull to go somewhere.'
             ] },
           { key: 'own_scent', name: 'Own scent', weight: 3, endsAs: 'warm dry feathers',
             stages: [
@@ -1333,7 +1343,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Warm feathers and dust.',
               'Warm feathers, clean and dry, like a sun-warmed loft.'
             ] },
-          { key: 'laying', name: 'Laying', weight: 7, sex: 'women', endsAs: 'an unfertilised egg every few weeks',
+          { key: 'laying', name: 'Laying', weight: 7, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'an unfertilised egg every few weeks',
             stages: [
               'A dull ache low in the belly every few weeks.',
               'The ache comes with a heaviness and a wish to be somewhere quiet.',
@@ -1344,9 +1354,9 @@ window.WINDLASS_WORLDS.sundered = {
           { key: 'brooding_and_moult', name: 'Brooding and moult', weight: 5, sex: 'women', needs: [{ track: 'laying', stage: 3 }], endsAs: 'brooding after laying and a yearly moult',
             stages: [
               'Gathers soft things into one place.',
-              'Builds a nest and wants to sit on what she has laid. Short-tempered when disturbed.',
+              'Builds a nest and wants to sit on what has been laid. Short-tempered when disturbed.',
               'Broody for days at a time: guarding, warming, snapping at anyone near. It passes.',
-              'Broods a few days after laying unless she chooses not to, and once a year moults: grounded, itching, vain about it, and glad of help with the pin feathers.'
+              'Broods a few days after laying, unless choosing not to, and once a year moults: grounded, itching, vain about it, and glad of help with the pin feathers.'
             ] }
         ],
         mer: [
@@ -1470,19 +1480,19 @@ window.WINDLASS_WORLDS.sundered = {
               'The spine ridge grows taller, edged with colour.',
               'Brighter scales than any mer woman\'s, a taller back fin, a swimmer\'s shoulders and a smooth chest.'
             ] },
-          { key: 'spring_tides', name: 'Spring tides', weight: 7, sex: 'women', endsAs: 'a season at the spring tides',
+          { key: 'spring_tides', name: 'Spring tides', weight: 7, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a season at the spring tides',
             stages: [
               'Restless for a few days near the highest tides.',
               'At the spring tides: warm, wakeful, drawn to the water, the scales brighter.',
               'A full season at the spring tides: singing more, wanting, restless on land and easy only in the pools.',
-              'Her season comes with the spring tides and passes with them, planned around like weather. What she does with it is hers to decide.'
+              'The season comes with the spring tides and passes with them, planned around like weather. What is done with it stays the player\'s to say.'
             ] },
-          { key: 'display', name: 'Display', weight: 7, sex: 'men', endsAs: 'colour and song at the spring tides',
+          { key: 'display', name: 'Display', weight: 7, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'colour and song at the spring tides',
             stages: [
               'Livelier near the highest tides.',
-              'His colours flare at the spring tides, and he swims harder and sings louder.',
-              'His colours flare brightest near any woman of his kind in season, and the water will not let him keep still.',
-              'At the spring tides he is all colour and song. What is done with it stays the player\'s to say, and it passes with the tide.'
+              'The colours flare at the spring tides; the swimming is harder and the singing louder.',
+              'The colours flare brightest near any woman of the kind in season, and the water will not allow stillness.',
+              'At the spring tides: all colour and song. What is done with it stays the player\'s to say, and it passes with the tide.'
             ] }
         ],
         dryad: [
@@ -1607,18 +1617,18 @@ window.WINDLASS_WORLDS.sundered = {
               'Rougher, thicker bark over the shoulders and upper back, joining the spine ridge.',
               'Heavy bark across the shoulders and down the back, deeper-ridged than a woman\'s, on a long hard frame.'
             ] },
-          { key: 'flowering', name: 'Flowering', weight: 7, sex: 'women', needs: [{ track: 'leaves', stage: 'finished' }], endsAs: 'flowers every spring and fruit by late summer',
+          { key: 'flowering', name: 'Flowering', weight: 7, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, needs: [{ track: 'leaves', stage: 'finished' }], endsAs: 'flowers every spring and fruit by late summer',
             stages: [
               'Small buds among the leaves in spring.',
               'The buds open: flowers in the hair for a few weeks, scented, visited by bees.',
-              'In flower she is warm, bright and wanting, her scent carrying on the air. After it, small fruits set among the leaves.',
-              'Flowers every spring and fruits by late summer. The flowering is her season, felt as sweetness and wanting; what she does with it is hers to decide.'
+              'In flower: warm, bright and wanting, the scent carrying on the air. After it, small fruits set among the leaves.',
+              'Flowers every spring and fruits by late summer. The flowering is the season, felt as sweetness and wanting; what is done with it stays the player\'s to say.'
             ] },
-          { key: 'catkins', name: 'Catkins', weight: 7, sex: 'men', needs: [{ track: 'leaves', stage: 'finished' }], endsAs: 'catkins and pollen every spring',
+          { key: 'catkins', name: 'Catkins', weight: 7, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, needs: [{ track: 'leaves', stage: 'finished' }], endsAs: 'catkins and pollen every spring',
             stages: [
               'Tassels bud among the leaves in spring.',
               'Catkins hang in the hair and shed pollen when shaken.',
-              'In catkin he is restless and bright, his catkins opening near any dryad in flower, dusting everything near him gold.',
+              'In catkin: restless and bright, the catkins opening near any dryad in flower, dusting everything near gold.',
               'Catkins every spring, and clouds of pollen with them. What is done with the season stays the player\'s to say, and it passes with the blossom.'
             ] }
         ],
@@ -1723,12 +1733,12 @@ window.WINDLASS_WORLDS.sundered = {
               'Oil, metal and damp earth.',
               'Smells of a workshop: oil, hot metal and earth.'
             ] },
-          { key: 'figure', name: 'Figure', weight: 8, sex: 'women', endsAs: 'a compact, wide-hipped figure with breasts full for her height',
+          { key: 'figure', name: 'Figure', weight: 8, sex: 'women', endsAs: 'a compact, wide-hipped figure with breasts full for the height',
             stages: [
               'The hips widen under the shortening frame.',
               'Hips and thighs fill, and the breasts keep their size as the body shrinks around them.',
               'Wide hips, a small waist, breasts full for the frame, the nipples dark green.',
-              'A compact, wide-hipped grown woman\'s figure with breasts full for her height and dark green nipples, at the size the draw sets.'
+              'A compact, wide-hipped grown woman\'s figure with breasts full for the height and dark green nipples, at the size the draw sets.'
             ] },
           { key: 'build', name: 'Build', weight: 8, sex: 'men', range: { least: 'Wiry and long-armed, with big hands', standard: 'Wiry and long-armed, with big hands and lower canines a little long', most: 'Wiry and long-armed, with big hands and small tusks' }, endsAs: 'wiry and long-armed, with big hands and lower canines a little long',
             stages: [
@@ -1887,7 +1897,7 @@ window.WINDLASS_WORLDS.sundered = {
             'A little shorter and lighter. Less strength in the arms than before, unless the kind is adding its own.',
             'A woman\'s frame at the height and build drawn. Old clothes no longer fit anywhere.'
           ] },
-        { key: 'waist_and_hips', name: 'Waist and hips', weight: 12, endsAs: 'The figure drawn: waist, hips, thighs, rear',
+        { key: 'waist_and_hips', name: 'Waist and hips', weight: 12, paceWith: 'chest', endsAs: 'The figure drawn: waist, hips, thighs, rear',
           stages: [
             'The waist draws in a little.',
             'A softness at the hips and seat; clothes pull in new places.',
@@ -1895,7 +1905,7 @@ window.WINDLASS_WORLDS.sundered = {
             'Thighs fuller, the seat rounder, the belly softer below the navel; the weight sits lower.',
             'Waist, hips, thighs and rear in the figure drawn.'
           ] },
-        { key: 'chest', name: 'Chest', weight: 16, endsAs: 'breasts of the size and shape drawn',
+        { key: 'chest', name: 'Chest', weight: 16, endsAs: 'Breasts of the size and shape drawn',
           stages: [
             'Tanner 1, the start. The chest is still flat. The nipples are tender and stay raised, with a deep itch behind them.',
             'Tanner 2, the bud. A firm, tender disc of tissue forms directly beneath each areola and lifts nipple and areola together as one small mound. The areolae widen and darken. They ache when knocked or jolted.',
@@ -1915,7 +1925,7 @@ window.WINDLASS_WORLDS.sundered = {
             'The stride shortens and the hips move; the arms carry differently around the chest.',
             'Moves as the body it is, without thought.'
           ] },
-        { key: 'below', name: 'Below', weight: 14, endsAs: 'A woman\'s, complete',
+        { key: 'below', name: 'Below', weight: 14, tell: 'Told plainly, briefly and in private.', endsAs: 'A woman\'s, complete',
           stages: [
             'A drawing-in and a tightness; less weight there than before.',
             'Smaller and more sensitive by the day. The body\'s morning habit stops.',
@@ -1987,7 +1997,7 @@ window.WINDLASS_WORLDS.sundered = {
             'The stride lengthens and the weight carries high, in the shoulders.',
             'Moves as the body it is, without thought.'
           ] },
-        { key: 'below', name: 'Below', weight: 14, endsAs: 'A man\'s, complete',
+        { key: 'below', name: 'Below', weight: 14, tell: 'Told plainly, briefly and in private.', endsAs: 'A man\'s, complete',
           stages: [
             'A fullness and heat; more sensitive, and growing.',
             'The monthly bleed lightens, then stops.',
@@ -2209,9 +2219,9 @@ window.WINDLASS_WORLDS.sundered = {
             steps: ['the wings ache with growth and have lengthened past the waist; they buzz at an unguarded moment, a sound {they} feel{s} in the teeth, and beat in a blur when something startles', 'the trousers are long in the leg and were not, and the door handle is higher: shorter by a hand already and lighter with it, the proportions still an adult’s; the shoes are loose at the heel and a sock is stuffed in the toe', 'a light gathers at the fingertips when the hand is idle, the yellow-white of a match the instant it catches; it goes when {first} closes the hand and comes when it is called, and the face in the mirror needs a second look before it is {theirs}', 'the shoes are too long to walk in; barefoot, the feet are narrow, the toes long and seldom all on the cold floor at once, and the hands have gone slender and long in the finger, deft with small things', 'the wings are grown and work: a step off the bottom stair that does not quite end, {first} a foot off the floor and hanging there, wobbling, the wings a blur at the edge of sight and the back and chest aching with new muscle; what to do with that is {first}’s', '{first} is shorter by a head and still shrinking, and the voice has gone up with it, higher and clearer, the laugh ringing; the hems are turned up three times and then the fairies lend clothes', 'a small glamour can come when called, a light, a colour, a face in a mirror that lies', 'short flights, when {first} tries them: the corridor and a hard landing, then the quad and a soft one, darting, hovering, tiring fast; the wings ache in the evening like legs after a run, and a fingertip drawn along a wing vein is felt through the whole body'],
             anatomy: 'The wings: full-grown, working, folding flat against the back, clear or patterned. The height: a head shorter and falling. The feet: small, bare, long-toed, light on the floor. The fingertips: a light on call.',
             sex: ['the frame going slight, the waist coming in under the wings so that the belt is on its last hole and then a new one is made; the breasts small and high, tender where a strap crosses them', '{gait1}', '{scent1}', '{tanner4}'] },
-          { at: 85, trait: 'the body takes the fae form, delicate and bright; size shifts with mood',
+          { at: 85, trait: 'the body takes the fae form, delicate and bright, a grown adult\'s proportions in small',
             steps: ['the bones going fine and light, the wrists narrow enough to ring with finger and thumb, the face narrowing to the chin; a shell-sheen has climbed the forearms and shins and runs up the spine round the wing roots; the hair lifts and settles with no wind', 'dust on everything {first} touches, faintly luminous in the dark, and it is coming off {their} skin and wings, most when something is strongly felt; under it a glow rises and falls with the mood, bright in joy, dim in sorrow, flickering in anger, and the dark shows it', 'waist-high to most people now, slight and quick, and still going; a cup needs two hands, a chair is a climb, and the wings are the answer to a world gone oversized; a step off the table lands without a sound', 'a surprise: a shout of laughter and {first} is a foot taller; a bad mood and {they} could stand on the sill', 'in the mirror the face is {first}’s own, fine-drawn and bright-eyed, and the voice out of it is small and clear and carries across the quad; the fairies have started using {first}’s name as if it had always been one of theirs', 'the body has gone over to the fae shape, delicate and bright, glittering at the edges; {first} is knee-high at rest and human-sized when showing off, and has learned to watch the mood the way others watch the weather; the bower in the Greenhouse Quarter fits'],
-            anatomy: 'The finished shape: fine-boned and bright, knee-high to human as the mood goes; long pointed ears that lift at a laugh; eyes with no white, iridescent edge to edge; wings that fold flat along the back and buzz at an unguarded moment; small bare long-toed feet, light on the floor; hair that moves without wind; skin that sheds a faint luminous dust; a light at the fingertips on call; iron a nettle sting and a sneeze.',
+            anatomy: 'The finished shape: fine-boned and bright, about three feet tall and a grown adult in proportion; long pointed ears that lift at a laugh; eyes with no white, iridescent edge to edge; wings that fold flat along the back and buzz at an unguarded moment; small bare long-toed feet, light on the floor; hair that moves without wind; skin that sheds a faint luminous dust; a light at the fingertips on call; iron a nettle sting and a sneeze.',
             sex: ['{genitals}', '{tanner5}', 'a woman\'s body entire: fine in the bone and light on the floor, narrow at the waist under the wings, the breasts high and light with the shimmer strongest on them; in the mirror a face that is {first}\'s and a woman\'s'] },
           { at: 100, trait: 'fairy: fully fae, court-named',
             steps: ['the ring in the lawn is a door {first} can feel from across the quad; glamour as easy as breath, and a lie told outright sticks in the throat, a promise given has a weight {first} can feel', 'iron is the enemy for life: bare iron burns at a touch and its nearness is an ache, while brass and silver are no trouble, and {first} knows where every nail in Kettle Hall is', '{first} is fae, court-named in the Friday ring with the fairies singing it, upright and {first}-faced at whatever size the mood is'],

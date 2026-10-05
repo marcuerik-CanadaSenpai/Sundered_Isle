@@ -663,11 +663,11 @@ const S = {
       const { data } = onlyAdv(h.mock.store);
       const rm = data.roommate; assert.equal(rm.gender, 'female', 'the roommate is a woman'); const looks = rm.looks || (rm.gen && rm.gen.looks) || '';
       assert.match(looks, /\b(?:[D-H]|DD|DDD) cup\b|\ba (?:DD|DDD)\b/, 'the bovine roommate has a cup size, a D or more: ' + looks);
-      assert.match(looks, /nipple/, 'and nipples');
+      assert.match(looks, /nipple|teats/, 'and nipples, or the teats they have become: ' + looks);
       assert.match(looks, /vein/, 'and veins');
       assert.doesNotMatch(looks, /milk|lactat/, 'and no word on milk, which is not a look');
       assert.match(looks, /udder/, 'and the udder');
-      assert.match(looks, /Hair: [^.]*\bhair\b/i, 'and hair: ' + looks);
+      assert.match(looks, /Hair: [^.]*\b(?:hair|plaits?|braid|crop|fringe)\b/i, 'and hair: ' + looks);
       assert.doesNotMatch(looks, /\{|Small breasts/, 'no placeholder or stock chest: ' + looks);
       for (const c of data.cast.generated.characters) {
         if (!c.looks || c.looks.indexOf('{') >= 0) assert(!c.looks || c.looks.indexOf('{') < 0, c.name + ' leaks a placeholder: ' + c.looks);
@@ -831,7 +831,7 @@ const S = {
     }
   },
   // 8o. The change-tracks model: each kind changes on weighted tracks of evenly spaced waypoints, driven by influence through windows
-  // drawn once per path, never past the next waypoint not yet told; at most two waypoints a turn; needs and by-sex tracks gate; the
+  // drawn once per path, never past the next waypoint not yet told; one waypoint a turn; needs and by-sex tracks gate; the
   // body's sex goes over on its own ten tracks (Tanner chest stages, the drawn chest, the genitals stated once) and finishes the
   // body; a bond is nine facets that rise and fall and derive the attitude; the whole-animal rungs are gone; an older save migrates.
   // Fails on bef6c76 (no track data in the world, no tracks in the engine).
@@ -893,7 +893,7 @@ const S = {
         if (i === 24) preTotal = Math.round(M.reduce((a, t2) => a + t2.weight * pr.tracks[t2.key].p / 100, 0));
         if (i === 0) { const p0 = promptOf(lastTurn(h)); assert.doesNotMatch(p0, /Each part changes on its own track/, 'the waypoint rule waits for a change'); assert.doesNotMatch(p0, /Story thread:/, 'the story thread waits for a change'); assert.match(p0, /- cow \(bovine mythkin\): /, 'the roommate\'s kind has its contacts listed'); assert.doesNotMatch(p0, /- dryad \(/, 'a kind not in the scene is not'); assert.doesNotMatch(p0, /Charms and curses: a charm/, 'nor the charm rules with no charm in play'); }
         if (!b0) { b0 = JSON.parse(JSON.stringify(data().state.bonds.roommate)); for (const f of ['attraction', 'touch', 'intimacy', 'openness', 'standing']) assert.equal(b0[f].p, 0, 'a new bond starts with no ' + f); assert.equal(b0.ease.p, Math.min(a0 * 10, 45), 'ease is seeded from the attitude'); }
-        assert(notes.length <= 2, 'at most two waypoints a turn: ' + JSON.stringify(notes));
+        assert(notes.length <= 1, 'one waypoint a turn: ' + JSON.stringify(notes));
         if (!firstSeen && notes.length) { assert.match(notes[0], /^change begins: cow/, 'the kind\'s first waypoint is its beginning: ' + JSON.stringify(notes)); firstSeen = true; }
         if (i === 0) {
           assert(t.notes.some((n) => /^cow path drawn: the body will also go toward a woman's/.test(n)), 'a man on a bovine path at chance 1 goes toward a woman\'s body: ' + JSON.stringify(t.notes));
@@ -1084,7 +1084,7 @@ const S = {
       assert.match(p0, /Healing links \(the Spa's healer says these before the bath, plainly\): [^\n]*Toes and hooves cannot go back below stage 2 while Feet and stance stands; Feet and stance goes back with it/, 'the healer knows the toes wait on the stance: ' + (p0.match(/Healing links[^\n]*/) || ['none'])[0]);
       assert.match(p0, /Chest cannot go back below stage 3 while Teats and udder stands/, 'and that the udder stands on the chest');
       assert.match(p0, /"spa_reset": \[\] normally; when Tom uses the Restoration Spa this turn, what Tom asks it to heal: "all" \(everything\), a species key[^\n]*"sex\.<track>"; each visit takes each change named back one step/, 'the contract names the targets');
-      assert.match(p0, /any change can be healed on purpose at the Restoration Spa[^\n]*one step a visit|The body never reverts by itself; the Spa heals on purpose, one step a visit\./, 'and the narrator knows healing is on purpose, a step a visit');
+      assert.match(p0, /any change can be healed on purpose at the Restoration Spa[^\n]*one step a visit|the Spa heals any on purpose, one step a visit\./, 'and the narrator knows healing is on purpose, a step a visit');
       // One change, named as the narrator would name it: the tail goes back one waypoint, its earlier line returning; the rest stay.
       spa = ['bovine mythkin: Tail'];
       assert(await h.turn('I ask the healer to take the tail back.'));
@@ -1200,6 +1200,75 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // 8s. The doc's engine rules for the tracks: one waypoint a turn; the way over, on whichever path carries it, closes the other
+  // body's tracks of every kind and opens its own at their point (a season at Rhythms 3, the rest at Chest 3); its draws (face
+  // type, figure, height) are made once and said with it; Rhythms 3 names the season that takes the cycle's place; Below is told
+  // in private; a finished part whose range row covers a later one keeps that extent back; a finished track is said once; the
+  // contact rule agrees with the easing; the woman's waist and hips run with Chest 2 to 4. Fails on bf487f4.
+  async docFoldEngine() {
+    const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
+    const Wd = ctx.window.WINDLASS_WORLDS.sundered, T = Wd.transformation, TR = T.tracks, stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
+    assert(T.sexDraws && T.sexDraws.woman.face.length && T.sexDraws.man.beard.length, 'the world carries the draws for the way over');
+    for (const [k, key] of [['wolf', 'season'], ['fox', 'season'], ['cat', 'season'], ['mer', 'spring_tides'], ['harpy', 'laying'], ['rabbit', 'year_round'], ['dryad', 'flowering'], ['wolf', 'answering'], ['fox', 'winter_roaming'], ['cat', 'roaming'], ['cow', 'the_bulls_ground'], ['mer', 'display'], ['dryad', 'catkins']])
+      assert.deepEqual(JSON.parse(JSON.stringify(TR.species[k].find((t) => t.key === key).crossAt)), { track: 'rhythms', stage: 3 }, k + ' ' + key + ' opens at Rhythms 3 on a body going over');
+    // A man's body on the werewolf's path going toward a woman's, Chest at 4 and Rhythms at 2; the bovine and kitsune paths carry no
+    // way over of their own. Every part is held but the ones under test.
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+    let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data, id = advKey.split('/')[1];
+    const held = (M, set) => Object.fromEntries(M.map((t) => { const o = set[t.key] || {}, n = t.stages.length, told = o.told === 'done' ? n : o.told || 0; return [t.key, Object.assign({ s: o.s || 8, e: 30, p: o.p != null ? o.p : stageAt(told, n), told, ext: 0, nextAt: 0 }, o.open ? {} : { eased: 0 })]; }));
+    const W4 = TR.woman, n4 = (key) => W4.find((t) => t.key === key).stages.length;
+    doc.state.tf = { influence: { wolf: 90, cow: 90, fox: 60 }, rungs: {}, arcs: [], tracks: [], last: { wolf: 0, cow: 0, fox: 0 }, drifted: {},
+      traits: [{ species: 'wolf', trait: 'Smell: the world read by scent first', day: 1, settled: true, track: 'smell' }, { species: 'fox', trait: 'Tail: a thick tail', day: 1, settled: true, track: 'tail' }],
+      paths: { wolf: { sex: 'female', sexTold: [], formTold: [], day: 1, order: [], eye: 'amber eyes' }, cow: { sex: null, sexTold: [], formTold: [], day: 1, order: [], eye: 'brown eyes' }, fox: { sex: null, sexTold: [], formTold: [], day: 1, order: [], eye: 'yellow eyes' } },
+      prog: {
+        wolf: { lean: 0, face: 15, tracks: held(TR.species.wolf, { hands: { told: 1, open: true, s: 1 }, smell: { told: 'done' }, spine_ruff: { told: 'done' }, further_pairs: { open: true }, mantle: { open: true }, season: { open: true } }) },
+        cow: { lean: 0, face: 15, tracks: held(TR.species.cow, { tail: { told: 1, open: true }, teats_and_udder: { open: true }, horns_and_crest: { open: true } }) },
+        fox: { lean: 0, face: 15, tracks: held(TR.species.fox, { tail: { told: 'done' } }) }
+      },
+      sexprog: { species: 'wolf', to: 'female', tracks: held(W4, { chest: { told: 4 }, rhythms: { told: 2, p: stageAt(3, n4('rhythms')), open: true, s: 2 }, below: { told: 0, p: stageAt(1, n4('below')), open: true, s: 3 } }) } };
+    const toldSum = (tf) => Object.values(tf.prog).concat([tf.sexprog]).reduce((a, pr) => a + Object.values(pr.tracks).reduce((b, r) => b + r.told, 0), 0), before = toldSum(doc.state.tf);
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      patchTurns(h, (r) => { r.time_advance_minutes = 30; r.exposures = []; });
+      const tf = () => onlyAdv(h.mock.store).data.state.tf, prompts = [];
+      for (let i = 0; i < 4; i++) { assert(await h.turn('I look around the room.'), 'turn ' + (i + 1)); prompts.push(promptOf(lastTurn(h))); if (i === 0) {
+        assert.equal(toldSum(tf()) - before, 1, 'one waypoint a turn though six are due');
+        const w = tf().prog.wolf.tracks, c = tf().prog.cow.tracks;
+        assert(w.further_pairs.p > 0 && c.teats_and_udder.p > 0, 'a woman\'s tracks of every kind open at Chest 3 on the way over: ' + JSON.stringify([w.further_pairs.p, c.teats_and_udder.p]));
+        assert.equal(c.horns_and_crest.p, 0, 'a man\'s tracks of another kind close on a body going toward a woman\'s');
+        assert.equal(w.mantle.p, 0, 'and of its own');
+        assert.equal(w.season.p, 0, 'the season waits for Rhythms 3');
+      } }
+      assert(tf().prog.wolf.tracks.season.p > 0, 'and opens when Rhythms reaches 3');
+      const [p1, , p3, p4] = prompts, block = (p) => p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>'));
+      const so = (/Changes so far: ([^\n]*)/.exec(block(p1)) || [])[1] || '';
+      assert(!/Smell:/.test(so) && /2 finished parts, given in the body lines below/.test(so), 'a finished track is said in the body lines, not twice: ' + so);
+      assert.match(p1, /A part past half never (?:changes back|reverts) by itself/, 'the contact rule agrees with the easing');
+      assert.doesNotMatch(p1, /The body never (?:changes back|reverts) by itself/, 'and does not say no part ever eases');
+      const foxLine = (block(p1).split('\n').find((l) => l.startsWith('Body now (' + T.species.fox.name)) || '');
+      assert(/Tail \(finished\)/.test(foxLine) && !/a second with age/.test(foxLine), 'the first tail keeps the second back until it grows: ' + foxLine);
+      const drawn = (s) => ((/Toward a woman's body so far \([^)]*\): [^\n]*Drawn for this body: ([^\n]*)/.exec(s) || [])[1] || '');
+      assert.match(drawn(p1), /^face type [^;]+; figure [^;]*waist[^;]*hips[^;]*thighs[^;]*rear; height about \w+ foot/, 'the way over says its draws: ' + drawn(p1));
+      assert.equal(drawn(p4), drawn(p1), 'and they hold from turn to turn');
+      assert.match(p3, /Rhythms \(waypoint 3 of 4\): [^\n]*What starts here, as the kind gives it: [^.]*Season \(/, 'Rhythms 3 names the season that takes the cycle\'s place');
+      assert.match(p4, /Below \(waypoint 1 of 5\): [^\n]*told plainly, briefly and in private \(washing or dressing alone\)/, 'Below is told in private');
+      clean(h);
+    } finally { h.close(); }
+    // A new way over: the woman's waist and hips are paced with Chest from its second waypoint to its fourth, and the draws are made.
+    const g = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+    try {
+      g.window.WINDLASS_WORLDS.sundered.transformation.sexChange.cow.chance = 1;
+      patchTurns(g, (r) => { r.time_advance_minutes = 60; r.exposures = [{ species: 'cow', method: 'the evening with Daisy', intensity: 3 }]; });
+      assert(await g.turn('I spend the evening with Daisy.'));
+      const sx = onlyAdv(g.mock.store).data.state.tf.sexprog; assert(sx && sx.to === 'female', 'the way over is rolled');
+      const c = sx.tracks.chest, w = sx.tracks.waist_and_hips, C = c.e - c.s;
+      assert(Math.abs(w.s - (c.s + 0.3 * C)) <= 1 && w.e === Math.max(w.s + 10, Math.round(c.s + 0.8 * C)), 'waist and hips run with Chest 2 to 4: ' + JSON.stringify({ c, w }));
+      assert(sx.draws && sx.draws.face && sx.draws.figure && sx.draws.height, 'the way over\'s draws are made when it is rolled: ' + JSON.stringify(sx.draws));
+      clean(g);
+    } finally { g.close(); }
+  },
   // 8p. The PR #52 review fixes. The world data keeps to each kind's body: the bovine coat runs from hooves, the kitsune's stance waits
   // for its toes, the cat's claws sheathe and it carries three more pairs, the harpy's light bones name breasts only once a body's chest is a woman's
   // and only a woman lays, the mer's gills sit either side of the ribs as the doc gives them, and no rung gives a whole animal. A three-waypoint track reaches its first waypoint (stage 1
@@ -1266,7 +1335,11 @@ const S = {
     let seeded; try { assert(await first.turn('I unpack.')); seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
     const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
     const castKinds = new Set((doc.cast.generated.characters || []).map((c) => c.species).concat(['cow', 'human', 'wolf']));
-    const minor = (doc.cast.generated.minors || []).find((m) => T.species[m.species] && !castKinds.has(m.species)); assert(minor, 'a minor of a kind no cast member has');
+    // The draw can leave every minor of a cast member's kind; one of them then takes a kind nobody in the cast has.
+    const minors = doc.cast.generated.minors || [], spare = Object.keys(TR.species).find((k) => T.species[k] && !castKinds.has(k));
+    let minor = minors.find((m) => T.species[m.species] && !castKinds.has(m.species));
+    if (!minor && minors.length && spare) { minor = minors[0]; minor.species = spare; }
+    assert(minor, 'a minor of a kind no cast member has');
     // A wolf path with the eyes told and a woman's body still to come; the minor present.
     const eyes = TR.species.wolf.find((t) => t.key === 'eyes');
     const tracks = Object.fromEntries(TR.species.wolf.map((t) => [t.key, t.key === 'eyes' ? { s: 10, e: 40, p: 100, told: eyes.stages.length, nextAt: 0 } : { s: 95, e: 100, p: 0, told: 0, nextAt: 0 }]));

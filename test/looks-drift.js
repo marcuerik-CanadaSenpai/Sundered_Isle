@@ -127,6 +127,14 @@ for (const k of kinds) {
   }
 }
 
+// 2b. The face's own draw, at the doc's odds: about two in three faces sit at the standard and a sixth at either end, where a
+// uniform draw put a third at each.
+{
+  const t = TR.wolf.find((x) => x.face), std = norm(t.range.standard), M = 600; let n = 0;
+  for (let i = 0; i < M; i++) if (String(G.genPerson(W, { species: 'wolf', gender: 'female' }).looks || '').toLowerCase().includes(std)) n += 1;
+  if (n / M < 0.55 || n / M > 0.8) fail('the face lands on the standard ' + n + ' of ' + M + ' times, not about two in three');
+}
+
 // 3. The prompt side, on a real adventure: the roommate's first appearance and a scene carry the looks, what is not on the
 // body, the dress line and the rule that keeps the narrator to them; the cast's tastes are dealt round.
 (async () => {
