@@ -1047,6 +1047,28 @@ const S = {
     } finally { h.close(); }
   },
 
+  // 9c. Playtest findings: a present-tense dairy action ("I drink the cocoa") is a bovine contact like the past-tense one; the
+  // length line of a rich scene ends one sentence before starting the next (no ".."); the short transformation block says
+  // "none yet" instead of an empty list when no kind has influence, and no prompt line carries a doubled space.
+  async promptPlaytest() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
+    try {
+      assert(await h.turn('I drink the cocoa Daisy brings me from the Creamery stand.'));
+      const { id } = onlyAdv(h.mock.store);
+      let t = storedTurns(h.mock.store, id).at(-1);
+      assert(t.notes.some((n) => /transformation contact confirmed from the explicit player action \(cow, intensity 1\)/.test(n)), 'drinking Creamery cocoa in the present tense is a bovine contact: ' + JSON.stringify(t.notes));
+      assert.equal(t.stateAfter.tf.influence.cow, 4, 'and it counts');
+      const p1 = promptOf(lastTurn(h));
+      assert.doesNotMatch(p1, /[^\n ]  +\S/, 'no doubled space in the prompt: ' + (p1.match(/.{0,60}[^\n ]  +\S.{0,20}/) || [''])[0]);
+      assert(await h.turn('I kiss Daisy.'));
+      const p2 = promptOf(lastTurn(h));
+      assert.match(p2, /Romance scene pacing/, 'a kiss is a romance scene');
+      assert.doesNotMatch(p2, /\.\.(?!\.)/, 'no doubled full stop: ' + (p2.match(/.{0,80}\.\.(?!\.).{0,20}/) || [''])[0]);
+      assert.doesNotMatch(p2, /[^\n ]  +\S/, 'no doubled space in a romance prompt');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 9b. A woman's looks open with what is noticed first (her beauty, in her kind's way); the kind's anatomy follows as plain fact.
   // The Cast note is a live region so a screen reader hears the unsaved-edits question.
   async looksLeadFirst() {
