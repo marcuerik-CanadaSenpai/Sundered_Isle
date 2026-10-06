@@ -49,6 +49,44 @@ function patchTurns(h, patch) {
   };
 }
 
+const loadWorld = () => { const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx); return ctx.window.WINDLASS_WORLDS.sundered; };
+// A game whose transformation state is set by hand: one turn played to make the save, then tf replaced and the page booted on it.
+async function seededTf(o, makeTf, settings) {
+  const first = await begin(o); let store;
+  try { assert(await first.turn('I unpack.')); store = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+  const key = [...store.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = store.get(key).data;
+  doc.state.tf = makeTf(loadWorld()); Object.assign(doc.settings, settings || {});
+  const h = await boot({ setup(w, m) { m.store = store; } });
+  assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+  return { h, id: key.split('/')[1] };
+}
+const stageAt = (j, n) => Math.ceil(j * 100 / n - 1e-9);
+const emptyPath = () => ({ sex: null, sexTold: [], formTold: [], day: 1, order: [], eye: 'dark eyes, wide', breasts: 'heavy breasts', colour: 'red-and-white', draws: [] });
+const baseTf = (kind, influence, prog) => ({ influence: { [kind]: influence }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { [kind]: emptyPath() }, prog: { [kind]: prog }, last: { [kind]: 0 }, drifted: {} });
+// Every part held where it stands until contact, except the ones named with open: true; { told: 'done' } is a finished part.
+const heldParts = (M, set) => Object.fromEntries(M.map((t) => { const o = set[t.key] || {}, n = t.stages.length, told = o.told === 'done' ? n : o.told || 0; return [t.key, Object.assign({ s: o.s || 8, e: o.e || 30, p: o.p != null ? o.p : stageAt(told, n), told, ext: o.ext || 0, nextAt: o.nextAt || 0 }, o.open || o.told === 'done' ? {} : { eased: 0 })]; }));
+
+// A man with a bovine roommate at the unbounded pace, an hour of intimate contact every turn, the path kept a man's (no way over): the
+// waypoints told, one entry per turn that told one, and every turn prompt.
+async function tfGame(turnsToRun, patch) {
+  const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+  const store = h.mock.store, id = onlyAdv(store).id;
+  h.click('#btnSettings');
+  for (const [sel, v] of [['#setPace', 'unbounded'], ['#setDensity', 'rich']]) { h.$(sel).value = v; h.$(sel).dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000), 'the setting did not save'); }
+  h.click('[data-close="dlgSettings"]');
+  h.window.WINDLASS_WORLDS.sundered.transformation.sexChange.cow.chance = 0;
+  patchTurns(h, (r) => { r.time_advance_minutes = 60; r.exposures = [{ species: 'cow', method: 'the evening with Daisy', intensity: 4 }]; r.state_updates = (r.state_updates || []).concat([{ key: 'present', op: 'append', value: ['Daisy Holm'] }]); if (patch) patch(r); });
+  const prompts = [], told = [];
+  for (let i = 0; i < turnsToRun; i++) {
+    assert(await h.turn('I spend the evening with Daisy.'), 'turn ' + (i + 1));
+    prompts.push(promptOf(lastTurn(h)));
+    const t = storedTurns(store, id).at(-1);
+    const m = t.notes.map((n) => /^change (begins|continues|complete): cow (.*?)(?: waypoint (\d+) of (\d+))?$/.exec(n)).filter(Boolean)[0];
+    if (m) told.push({ turn: i + 1, kind: m[1], part: m[2].replace(/^\((.*)\)$/, '$1'), j: m[3] ? +m[3] : 1 });
+  }
+  return { h, store, id, prompts, told, tf: () => onlyAdv(store).data.state.tf };
+}
+
 const S = {
   // 1. Halloway Attunement: salt taken during a stage-crossing fever keeps that crossing's marks owed; no second crossing while
   // they are pending; a matched kin draws +1 a night from Stage 0. Halloway is no longer in the game, so its world file comes
@@ -364,8 +402,8 @@ const S = {
     } finally { h.close(); }
   },
 
-  // 8b. Presence entries in any case, by the surname's last word, or with a "(Race)" label follow a rename, and "Reset to the
-  // world's version" carries them back, so the roommate stays present through both.
+  // 8b. Presence entries in any case, by the surname's last word, or with a "(Race)" label follow a rename, and the reset to how
+  // the adventure first wrote the person carries them back, so the roommate stays present through both.
   async renameResetPresence() {
     const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holt Lane' });
     let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
@@ -429,7 +467,7 @@ const S = {
       assert(await h.turn('I ask ' + c.first + ' about the Sundering.'));
       const p = promptOf(lastTurn(h));
       const chars = (/<characters[^>]*>([\s\S]*?)<\/characters>/.exec(p) || [])[1] || '';
-      const line = chars.split('\n').find((l) => l.includes('[key: historian]')) || '';
+      const line = chars.split('\n').find((l) => l.includes('[historian]')) || '';
       assert(line, 'the historian must be in <characters>');
       const sheetOnly = /Teaches the Sundering \(history\)/;   // the sheet's sentence; the brief joins it with a semicolon
       assert.match(c.sheet, sheetOnly, 'the generated sheet changed shape: ' + c.sheet.slice(0, 120));
@@ -647,15 +685,23 @@ const S = {
       assert(last().notes.some((n) => /^curse lifted: the fairy-ring mark after 3 days/.test(n)), 'and noted: ' + JSON.stringify(last().notes));
       assert(await h.turn('I stretch.'));
       assert.match(promptOf(lastTurn(h)), /Note from the engine: The curse has run its course \(the fairy-ring mark, fairies\)/, 'the narrator is told the curse has lifted');
-      // The Spa, for the cat kind: the collar slips off and the cat influence is gone; the goblin bracelet stays where it is.
+      // The Spa, for the cat kind: the collar slips off and the cat influence is gone; the goblin bracelet stays where it is. A visit
+      // takes every part back one waypoint, so a part grown several waypoints deep needs as many visits; each one lowers the influence.
       spa = ['cat'];
+      let was = inf().cat;
       assert(await h.turn('I go to the Restoration Spa and ask for the cat to be washed out of me.'));
-      assert.equal(inf().cat, 0, 'the Spa clears the cat influence');
       assert.deepEqual(data().state.items.wearing, ['a goblin copper warming-bracelet'], 'the cursed collar has slipped off; the bracelet stays');
       assert(last().notes.some((n) => /^Spa: slipped off a tarnished silver collar/.test(n)), 'and it is noted: ' + JSON.stringify(last().notes));
+      advance = 15; let next = null;
+      for (let v = 1; inf().cat > 0 && v < 5; v++) {
+        assert(inf().cat < was, 'each Spa visit lowers the cat influence: ' + was + ' then ' + inf().cat); was = inf().cat;
+        assert(await h.turn('I go back to the Restoration Spa for the cat.'));
+        if (next == null) next = promptOf(lastTurn(h));
+      }
+      assert.equal(inf().cat, 0, 'the Spa clears the cat influence');
       spa = null; advance = 720;
       assert(await h.turn('I sleep.'));
-      assert.match(promptOf(lastTurn(h)), /slipped off a tarnished silver collar that closes by itself, which lies inert on the bath's edge/, 'the narrator is told so on the next turn');
+      assert.match(next == null ? promptOf(lastTurn(h)) : next, /slipped off a tarnished silver collar that closes by itself, which lies inert on the bath's edge/, 'the narrator is told so on the next turn');
       assert(await h.turn('I sleep on.'));
       assert.equal(inf().cat, 0, 'with the collar gone the cat kind no longer grows');
       assert.equal(inf().goblin, 24, 'the bracelet goes on counting (day six)');
@@ -947,10 +993,10 @@ const S = {
       assert.match(block, /Toward a woman's body so far \(\d+ of 100, bovine mythkin path\): /, 'the sex change is summarised by its tracks');
       if (tf().sexprog.tracks.chest.told > 1) assert(prompts.some((q) => /Tanner \d/.test(q.slice(q.indexOf('<transformation>'), q.indexOf('</transformation>')))), 'the chest lines are the Tanner stages');
       assert(!/\.\.|\.;/.test(block.split('\n').find((l) => /^Body now/.test(l)) || ''), 'no doubled stops in the body line');
-      assert(prompts.some((q) => /Note from the engine: The change (?:continues|completes a part|is beginning) \(bovine mythkin/.test(q)), 'a waypoint is announced to the narrator: ' + JSON.stringify(storedTurns(store, id).map((t) => stepNotes(t)).filter((x) => x.length)) + ' | ' + JSON.stringify(prompts.map((q) => (q.match(/Note from the engine: [^\n]{0,90}/g) || []).join(' / ')).filter(Boolean).slice(-6)));
+      assert(prompts.some((q) => /Note from the engine: (?:The change (?:continues|completes a part)|A (?:new part begins|change is beginning)) \(bovine mythkin/.test(q)), 'a waypoint is announced to the narrator: ' + JSON.stringify(storedTurns(store, id).map((t) => stepNotes(t)).filter((x) => x.length)) + ' | ' + JSON.stringify(prompts.map((q) => (q.match(/Note from the engine: [^\n]{0,90}/g) || []).join(' / ')).filter(Boolean).slice(-6)));
       assert.match(p, /<bonds note="[^"]*">\n- Daisy \[roommate\] \(bond \d+ of 100\): /, 'the bonds block lists the roommate\'s facets');
       assert.match(p, /"bond_shifts": array of \{"who": character key, "facet": ease\|knowing\|trust\|liking\|attraction\|touch\|intimacy\|openness\|standing/, 'the reply contract asks for bond shifts');
-      const turn4 = storedTurns(store, id).find((t) => t.n === 5), bondNote = (turn4 && turn4.pendingAfter || []).concat(storedTurns(store, id).flatMap((t) => t.pendingAfter || [])).find((n) => /^Bond with Daisy: trust reaches "/.test(n));
+      const turn4 = storedTurns(store, id).find((t) => t.n === 5), bondNote = (turn4 && turn4.pendingAfter || []).concat(storedTurns(store, id).flatMap((t) => t.pendingAfter || [])).find((n) => /^Bond with Daisy: trust reaches "/.test(n)) || prompts.find((q) => /Bond with Daisy: trust reaches "/.test(q));   // older turns keep no pending notes: the next turn's prompt carries it
       const trustStage = (v) => Math.floor(v * 5 / 100 + 1e-9);
       if (trustStage(b0.trust.p + 10) > trustStage(b0.trust.p)) assert(bondNote, 'a facet crossing a stage is announced to the narrator');
       // The character sheet lists the parts under way per track; the engine's humanity reads the totals.
@@ -984,7 +1030,7 @@ const S = {
       assert(await h2.settle(150, 8000)); await h2.idle(10000); await h2.settle(100, 4000);
       patchTurns(h2, (r) => { r.time_advance_minutes = 240; r.exposures = []; });
       const tf2 = () => onlyAdv(h2.mock.store).data.state.tf, turns = () => storedTurns(h2.mock.store, seedId);
-      for (let i = 0; i < 16 && !tf2().sex; i++) assert(await h2.turn('I get on with the day.'));
+      for (let i = 0; i < 24 && !tf2().sex; i++) assert(await h2.turn('I get on with the day.'));
       assert(tf2().sex && tf2().sex.to === 'female' && tf2().sex.species === 'cow', 'the body is a woman\'s once every track is told: ' + JSON.stringify(tf2().sexprog && tf2().sexprog.tracks) + ' ' + JSON.stringify(turns().flatMap((t) => t.notes).slice(-12)));
       const all = turns().flatMap((t) => t.notes); assert(all.some((n) => /^the body is a woman's now \(cow path\)/.test(n)), 'the engine notes the body going over');
       assert(await h2.turn('I get on with the day.'));
@@ -1147,9 +1193,13 @@ const S = {
       assert(await h.turn('I ask the Spa for everything.'));
       assert.deepEqual([sex('voice').told, sex('chest').told], [1, 1], 'the sex goes back a step with everything');
       assert.equal(JSON.stringify(data().state.bonds || {}), bonds0, 'bonds are never healed');
-      // New contact lets a healed part go on again, the same as it was.
+      // A single hug does not undo the visit; a night of new contact lets a healed part go on again, the same as it was.
       spa = null; contact = [{ species: 'cow', method: 'a hug', intensity: 1 }];
       assert(await h.turn('I hug Daisy.'));
+      assert(cow('tail').eased != null, 'one hug does not undo a Spa visit');
+      contact = [{ species: 'cow', method: 'a night sleeping against Daisy', intensity: 3 }];
+      patchTurns(h, (r) => { r.time_advance_minutes = 480; r.exposures = contact; r.spa_reset = []; });
+      assert(await h.turn('I sleep beside Daisy tonight.'));
       assert(cow('tail').eased == null, 'contact again lets a healed part go on');
       clean(h);
     } finally { h.close(); }
@@ -1176,7 +1226,7 @@ const S = {
     let seeded; try {
       assert(await first.turn('I unpack and say hello to Daisy.'));
       const p0 = promptOf(lastTurn(first)), daisy = (p0.split('\n').find((l) => /^- Daisy Holm/.test(l)) || '');
-      assert.match(daisy, /Ways, shown in what she does, never explained: weather, water and grass read by nose[^.]*; greens and grain, eaten slowly and chewed twice/, 'the roommate in the scene carries her kind\'s ways: ' + daisy.slice(0, 200));
+      assert.match(daisy, /Ways, shown in what she does, never explained: (weather, water and grass read by nose[^;.]*|greens and grain, eaten slowly and chewed twice|a heavy, warm body[^;.]*|placid[^;.]*|a low hum and a carrying low|warm hide, hay and milk)\./, 'the roommate in the scene carries one of her kind\'s ways a turn: ' + daisy.slice(0, 200));
       assert.doesNotMatch(daisy, /being in milk/, 'and not the milk');
       const bust = (/Bust: ([^.]*)\./.exec(daisy) || [])[1]; assert(bust && !/nipple/.test(bust), 'her Bust is the chest\'s shape: ' + bust);
       assert.match(daisy, /Teats and udder: [^.]*(?:nipples|teats)/, 'and Teats and udder tells the rest');
@@ -1448,7 +1498,8 @@ const S = {
 
   // 8n. The State panel's Transformation row lists a change from its first told waypoint. The track model keeps no trait for a
   // part under way, so a body with fourteen parts changing read "No engine-confirmed body changes yet" next to a Condition line
-  // full of them.
+  // full of them. The row is the engine's list, a turn ahead of what the story has shown, so it is a hidden item: it appears
+  // with spoilers on, and with them off the State panel names no part (ui-panels.js stateRowFollowsToggle).
   async stateShowsChangesUnderWay() {
     const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx);
     const T = ctx.window.WINDLASS_WORLDS.sundered.transformation, TR = T.tracks.species;
@@ -1459,18 +1510,19 @@ const S = {
     const tracks = (told) => Object.fromEntries(TR.cow.map((t) => [t.key, { s: 50, e: 100, p: told[t.key] ? 30 : 0, told: told[t.key] || 0, nextAt: 0 }]));
     const hands = TR.cow.find((t) => t.key === 'hands'), ears = TR.cow.find((t) => t.key === 'ears');
     doc.state.tf = Object.assign(doc.state.tf || {}, { influence: { cow: 30 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { cow: { sex: null, sexTold: [], formTold: [], day: 1, order: [] } }, prog: { cow: { lean: 0, face: 15, tracks: tracks({ hands: 1, ears: 1 }) } }, last: {}, drifted: {} });
-    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    const spoil = (w, m) => { m.store = seeded; w.localStorage.setItem('windlass.spoilers', '1'); };
+    const h = await boot({ setup: spoil });
     try {
       assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
-      assert.match(row(h), new RegExp('^' + T.species.cow.short + ': ' + hands.name.toLowerCase() + ', ' + ears.name.toLowerCase() + ' \\(in progress\\)$|^' + T.species.cow.short + ': ' + ears.name.toLowerCase() + ', ' + hands.name.toLowerCase() + ' \\(in progress\\)$'), 'parts told once show as in progress: ' + row(h));
+      assert.match(row(h), new RegExp('^' + T.species.cow.short + ': 2 parts under way \\((?:' + hands.name.toLowerCase() + ', ' + ears.name.toLowerCase() + '|' + ears.name.toLowerCase() + ', ' + hands.name.toLowerCase() + ')\\)$'), 'parts told once show as under way: ' + row(h));
       assert.doesNotMatch(row(h), /No engine-confirmed/, 'and the row no longer says none');
       clean(h);
     } finally { h.close(); }
     for (const k of Object.keys(doc.state.tf.prog.cow.tracks)) doc.state.tf.prog.cow.tracks[k].told = 0;
-    const h2 = await boot({ setup(w, m) { m.store = seeded; } });
+    const h2 = await boot({ setup: spoil });
     try {
       assert(await h2.settle(150, 8000)); await h2.idle(10000); await h2.settle(100, 4000);
-      assert.equal(row(h2), 'No engine-confirmed body changes yet', 'a body with nothing told still reads none: ' + row(h2));
+      assert.equal(row(h2), 'none told yet', 'a body with nothing told still reads none: ' + row(h2));
       clean(h2);
     } finally { h2.close(); }
   },
@@ -1527,8 +1579,8 @@ const S = {
     const h2 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
     try {
       patchTurns(h2, (r) => { r.exposures = []; });
-      // A few thousand characters of action are enough to push a prompt already near the cap into the short form, well short of the cap itself.
-      assert(await h2.turn('I walk the long way round. ' + 'The path winds past the Creamery and on along the old wall by the river, and I take it slowly. '.repeat(60)));
+      // Some twenty thousand characters of action push the prompt, which starts well under the cap, into the short form.
+      assert(await h2.turn('I walk the long way round. ' + 'The path winds past the Creamery and on along the old wall by the river, and I take it slowly. '.repeat(200)));
       const t = storedTurns(h2.mock.store, onlyAdv(h2.mock.store).id).at(-1);
       assert(t, 'the long turn was stored: ' + h2.$('#status').textContent);
       assert(t.notes.some((n) => /transformation block in its short form/.test(n)), 'the prompt was compacted: ' + JSON.stringify(t.notes.filter((n) => /size cap/.test(n))));
@@ -1553,6 +1605,179 @@ const S = {
       assert.match(looks, /\. No wings on the back apart from the arms, no beak\.$/, 'and close with what the body never has: ' + looks.slice(-120));
       assert.match(looks, /\b(A|B) cup\b|\bbreasts\b/, 'her chest is described, drawn from the harpy pool: ' + looks);
       assert.equal(h.$('#cfNote').getAttribute('role'), 'status'); assert.equal(h.$('#cfNote').getAttribute('aria-live'), 'polite');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 9d. The cast by distance from the scene. People present or named get the full sheet; people whose place now, or whose role's
+  // places, are in the scene text (the location, the action, the clock's slot, the latest narration) get the brief and the aim;
+  // everyone else gets a line of index (the role's tag, where they are now, the attitude in the head) with no aim and no
+  // temperament, which come back the turn the action reaches their place. The race is said once, in the name. Minor figures are
+  // listed when the scene could use them (their place, class or person is in the scene text) and left out otherwise. Two people of
+  // one kind and sex in the scene share the kind's ways, said once. Fails on 10ae2ee.
+  async castByDistance() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', rmGender: 'female', gender: 'female', name: 'Ana Reyes' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
+    const gen = doc.cast.generated, byKey = (k) => gen.characters.find((c) => c.key === k), minor = (k) => gen.minors.find((m) => m.key === k);
+    const physician = byKey('physician'), creamery = byKey('creamery'), ferry = minor('ferryman'), porter = minor('porter'), far = minor('far_human');
+    assert(physician && creamery && ferry && porter && far, 'the generated cast has the people the check reads');
+    assert.match(far.post || '', /^a fourth-year, born human, mostly \w+ now$/, 'the born-human fourth-year is generated with a post: ' + far.post);
+    Object.assign(far, { name: 'Ottoline Brack', first: 'Ottoline', last: 'Brack' });
+    // A drawn name can be a word of the opening ("Bell" by the bell tower, "Drew"), which would name the physician or the ferryman
+    // into the scene; both get names no text uses.
+    Object.assign(physician, { name: 'Dr Ione Vashti', first: 'Ione', last: 'Vashti', aliases: ['Ione', 'Vashti', 'Dr Vashti'] });
+    Object.assign(ferry, { name: 'Ysolt Penhallow', first: 'Ysolt', last: 'Penhallow' });
+    // The Creamery's bovine is a woman like Daisy, so the two share the kind's ways when both are in the room.
+    Object.assign(creamery, { gender: 'female', pronouns: { they: 'she', them: 'her', their: 'her', theirs: 'hers' } });
+    doc.state.present = ['Daisy Holm (roommate)'];
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      const block = () => { const p = promptOf(lastTurn(h)); return (/<characters[^>]*>([\s\S]*?)<\/characters>/.exec(p) || [])[1] || ''; };
+      const line = (key) => block().split('\n').find((l) => l.includes('[' + key + ']')) || '';
+      const minors = () => { const b = block(), i = b.indexOf('Minor figures'); return i < 0 ? '' : b.slice(i); };
+      const listedMinors = () => minors().split(' Others, by name: ')[0];   // the ones with a line; the rest are a name and a post
+      const re = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      patchTurns(h, (r) => { r.state_updates = []; r.time_advance_minutes = 5; });   // the room and its people stay as they are
+      assert(await h.turn('I look around the room.'));
+      let daisy = line('roommate'), who = line('physician');
+      assert.match(daisy, /^- Daisy Holm \(Bovine mythkin\) \[roommate\] \(Woman, she\/her; attitude \d+\/10\)\. Roommate in 4B\. Second-year, /, 'the roommate present: the race once, in the name; gender, pronouns and attitude in the head: ' + daisy.slice(0, 160));
+      assert.match(daisy, /Looks: Height: .* Not on this body: .* Dress: .* Close up: .* Ways, shown in what she does, never explained: .* Now: .* Aim now: .*\.$/, 'and the full sheet: ' + daisy.slice(-200));
+      assert.doesNotMatch(block(), /\bfor to\b/, 'a hope that is an infinitive takes no "for"');
+      assert.match(who, new RegExp('^- ' + re(physician.name) + ' \\(' + re(physician.race) + '\\) \\[physician\\] \\((?:Woman|Man|Non-binary), \\w+/\\w+; attitude \\d+/10\\)\\. Staff; runs the medical centre and the Restoration Spa\\. Now: the medical centre\\.$'), 'the physician, elsewhere, is a line of index: ' + who);
+      assert.doesNotMatch(who, /Aim now|asks no questions|Temperament/, 'with no aim; the role\'s detail and the temperament wait for the turn the story reaches her');
+      assert.match(block(), /\n\nMinor figures, a mention or a line at most, never a speech: /, 'the minors\' line');
+      assert(listedMinors().includes(porter.name + ' ('), 'the Kettle Hall porter is listed in Kettle Hall: ' + minors());
+      assert(!listedMinors().includes(ferry.name + ' ('), 'the ferryman has no line: nothing in the scene reaches the ferry: ' + minors());
+      // Out of the scene she is a name and her post; a word of her line in the scene text (the Aerie, Wednesdays) lists her as her race and her line instead. Either form keeps the change.
+      assert(minors().includes('Ottoline Brack (' + far.post + ')') || /Ottoline Brack \(human, [^,]+, a fourth-year, mostly \w+ now/.test(minors()), 'out of the scene, the born-human fourth-year\'s post keeps the change: ' + minors());
+      assert(await h.turn('I walk over to the medical centre.'));
+      who = line('physician');
+      assert.match(who, /\)\. Staff; runs the medical centre and the Restoration Spa; brisk, kind, asks no questions\. Temperament text for physician\. Now: the medical centre\. Aim now: restore anyone who asks and send them on their way\.$/, 'the action names her place: the brief and the aim come: ' + who);
+      assert.doesNotMatch(who, /Looks:|Wants /, 'but not the full sheet');
+      assert(await h.turn('I ask ' + physician.first + ' about the Spa.'));
+      who = line('physician');
+      assert.match(who, /Does not say: .* Knows [^.]*\. Looks: Height: /, 'named by the action: the full sheet, with looks: ' + who.slice(0, 300));
+      assert.doesNotMatch(who, /nobody else outside class, club or dorm/, 'who they know is listed; the rule that nobody knows anyone outside class, club or dorm is in <rules>');
+      assert(await h.turn('I take the cloud ferry down.'));
+      assert(listedMinors().includes(ferry.name + ' ('), 'the ferryman is listed when the action reaches the ferry: ' + minors());
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'present', op: 'set', value: ['Daisy Holm (roommate)', creamery.name] }]; r.time_advance_minutes = 5; });
+      assert(await h.turn('I sit down with Daisy and ' + creamery.first + '.'));
+      daisy = line('roommate'); const cow = line('creamery');
+      // The kind's ways go out one fragment a turn (the whole line every turn is what the narrator recites); the first fragment is this one.
+      const frags = loadWorld().transformation.tracks.species.cow.filter((x) => x.endsAs && (!x.sex || x.sex === 'women')).map((x) => String(x.endsAs).replace(/\.$/, '').toLowerCase());
+      const way = (/Ways, shown in what she does, never explained: ([^.]*)\./.exec(daisy) || [])[1] || '';
+      assert(way && frags.includes(way.toLowerCase()), 'the roommate carries one fragment of the kind\'s ways: ' + daisy);
+      assert.match(cow, /Ways, shown in what she does, never explained: those of Daisy above, the same kind\./, 'the second bovine woman in the room points to them: ' + cow.slice(-220));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 9e. The cast by distance keeps a person the player reaches for by role ("the doctor", "the Spa", "the captain of the running
+  // club") at the brief and the aim, not the index, and still drops them back the turn after. A save from before the index
+  // existed is sent the role's tag as the index, not the whole brief; a brief edited in the Cast editor is sent as written, with
+  // its full stop before "Now:". Minor figures left out of the scene are still a name and a post, so a teacher the roommate
+  // mentions has the name the story gives later. Fails on 10ae2ee and on the cast-by-distance commit before this.
+  async castByRole() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', rmGender: 'female', gender: 'female', name: 'Ana Reyes' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
+    const gen = doc.cast.generated, byKey = (k) => gen.characters.find((c) => c.key === k);
+    const physician = byKey('physician'), captain = byKey('moonrunners'), ferry = gen.minors.find((m) => m.key === 'ferryman'), far = gen.minors.find((m) => m.key === 'far_human');
+    assert(physician && captain && byKey('gardener') && ferry && far, 'the generated cast has the people the check reads');
+    const farKind = (/mostly (\w+) now/.exec(far.text) || [])[1];
+    assert(farKind, 'the born-human fourth-year\'s line names the kind: ' + far.text);
+    Object.assign(far, { name: 'Ottoline Brack', first: 'Ottoline', last: 'Brack' });
+    delete far.post;   // a save from before the post existed
+    // Names no text uses, so a drawn name cannot reach the scene by itself.
+    Object.assign(physician, { name: 'Dr Ione Vashti', first: 'Ione', last: 'Vashti', aliases: ['Ione', 'Vashti', 'Dr Vashti'] });
+    Object.assign(captain, { name: 'Rhea Quillon', first: 'Rhea', last: 'Quillon', aliases: ['Rhea', 'Quillon'] });
+    Object.assign(ferry, { name: 'Ysolt Penhallow', first: 'Ysolt', last: 'Penhallow' });
+    for (const c of gen.characters) delete c.index;   // a save from before the index existed
+    // The swimmer's sheet is edited and the brief left as generated: the brief is sent, not the generated index the edit may contradict.
+    const swim = byKey('swim'); assert(swim, 'the generated cast has the swimmer');
+    doc.cast.overrides = { gardener: { brief: 'Keeps the tree and pours the tea' }, swim: { brief: swim.brief, sheet: 'First-year now; rows for the lake crew.' } };
+    doc.state.present = ['Daisy Holm (roommate)'];
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      const block = () => { const p = promptOf(lastTurn(h)); return (/<characters[^>]*>([\s\S]*?)<\/characters>/.exec(p) || [])[1] || ''; };
+      const line = (key) => block().split('\n').find((l) => l.includes('[' + key + ']')) || '';
+      patchTurns(h, (r) => { r.state_updates = []; r.time_advance_minutes = 5; });
+      assert(await h.turn('I look around the room.'));
+      let who = line('physician');
+      assert.match(who, /\) \[physician\] \(.*\)\. Staff; runs the medical centre and the Restoration Spa\. Now: the medical centre\.$/, 'a save with no index sends the role\'s tag, not the brief: ' + who);
+      assert.match(line('gardener'), /\) \[gardener\] \(.*\)\. Keeps the tree and pours the tea\. Now: /, 'an edited brief is sent as written, with a full stop before Now: ' + line('gardener'));
+      assert.match(line('swim'), /\) \[swim\] \(.*\)\. Second-year, biology; swim team; never far from water\. Temperament text for swim\. Now: /, 'an edited sheet sends the brief, not the generated index: ' + line('swim'));
+      assert.match(block(), /Others, by name: .*Ysolt Penhallow \(runs the cloud ferry\)/, 'a minor figure out of the scene is a name and a post: ' + block().slice(-400));
+      assert.doesNotMatch(block(), /\{npc_/, 'no placeholder reaches the prompt');
+      // Out of the scene she is a name and a post. A word of her line in the scene text (the Aerie, Wednesdays) lists her instead,
+      // as her race and her line, and with her looks when she is named; each form carries the same fact.
+      const post = 'Ottoline Brack \\((a fourth-year, born human, mostly ' + farKind + ' now\\)|human, [^,]+, a fourth-year, mostly ' + farKind + ' now)', looks = 'Ottoline Brack[^\\n]*born human and mostly ' + farKind + ' now';
+      assert(new RegExp(post).test(block()) || new RegExp(looks).test(block()), 'an older save\'s born-human fourth-year keeps the change in the post: ' + block().slice(-400));
+      for (const [action, key, brief] of [['I want to see the doctor.', 'physician', /Staff; runs the medical centre and the Restoration Spa; brisk, kind/], ['I go to the Spa.', 'physician', /Staff; runs the medical centre/], ['I find the captain of the running club.', 'moonrunners', /Third-year, .*captain of the Moonrunners/]]) {
+        assert(await h.turn(action));
+        who = line(key);
+        assert.match(who, brief, action + ' reaches ' + key + ' by role: the brief: ' + who);
+        assert.match(who, /Aim now: /, action + ': and the aim: ' + who);
+        assert.doesNotMatch(who, /Looks:/, action + ': not the full sheet');
+        assert(await h.turn('I look around the room.'));
+        assert.doesNotMatch(line(key), /Aim now: /, 'back at the index the turn after: ' + line(key));
+      }
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 9f. A role is reached by the words people use for it, written in the world as the role's cues ("the nurse", "the infirmary"),
+  // by the place the story sets ("the infirmary") and by a person present by role ("the Dean"); ordinary words that happened to be
+  // in the role's tag ("about", "honey", "kinds") reach nobody. Fails on 18834a0.
+  async castByCue() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', rmGender: 'female', gender: 'female', name: 'Ana Reyes' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = seeded.get(advKey).data;
+    const gen = doc.cast.generated, byKey = (k) => gen.characters.find((c) => c.key === k);
+    const keys = ['physician', 'dean', 'gamer', 'warren', 'historian', 'library'];
+    assert(keys.every(byKey), 'the generated cast has the people the check reads');
+    // Names no text uses, so a drawn name cannot reach the scene by itself.
+    const names = { physician: ['Dr', 'Ione', 'Vashti'], dean: ['Dean', 'Odile', 'Marchetti'], gamer: ['', 'Tamsin', 'Okonkwo'], warren: ['', 'Brisa', 'Lindqvist'], historian: ['Professor', 'Hollis', 'Pemberton'], library: ['', 'Wren', 'Abernathy'] };
+    for (const k of keys) { const [t, f, l] = names[k]; Object.assign(byKey(k), { name: (t ? t + ' ' : '') + f + ' ' + l, first: f, last: l, aliases: [f, l].concat(t ? [t + ' ' + l] : []) }); }
+    // Free hours from 15:35, so the turns end before dinner puts the dining hall (the gamer's table) in the scene.
+    Object.assign(doc.state, { present: ['Daisy Holm (roommate)'], time: '15:35' });
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      const block = () => { const p = promptOf(lastTurn(h)); return (/<characters[^>]*>([\s\S]*?)<\/characters>/.exec(p) || [])[1] || ''; };
+      const line = (key) => block().split('\n').find((l) => l.includes('[' + key + ']')) || '';
+      const stay = (r) => { r.state_updates = []; r.time_advance_minutes = 5; };
+      patchTurns(h, stay);
+      assert(await h.turn('I look around the room.'));
+      for (const k of keys) assert.doesNotMatch(line(k), /Aim now: /, 'at the start ' + k + ' is a line of index: ' + line(k));
+      // Ordinary words that were in the tags reach nobody.
+      for (const [action, quiet] of [['I ask Daisy about her day.', ['gamer']], ['I call Daisy honey and kiss her.', ['warren']], ['I ask Daisy what kinds of mythkin live here.', ['dean', 'historian']], ['I tell Daisy what she wants to hear.', ['gamer']]]) {
+        assert(await h.turn(action));
+        for (const k of quiet) assert.doesNotMatch(line(k), /Aim now: /, action + ' must leave ' + k + ' at the index: ' + line(k));
+      }
+      // The words people use for a role reach that person: the brief and the aim.
+      for (const [action, key] of [['I go to the infirmary to get my hands looked at.', 'physician'], ['I go see the nurse.', 'physician'], ['I ask the librarian for a book on wings.', 'library'], ['I ask Daisy what the history lecture covers.', 'historian']]) {
+        assert(await h.turn(action));
+        assert.match(line(key), /Aim now: /, action + ' reaches ' + key + ' by role: ' + line(key));
+        assert.doesNotMatch(line(key), /Looks:/, action + ': not the full sheet');
+        assert(await h.turn('I look around the room.'));
+        assert.doesNotMatch(line(key), /Aim now: /, 'back at the index the turn after: ' + line(key));
+      }
+      // The place the story sets reaches the person whose role it names.
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'location', op: 'set', value: 'the infirmary' }]; r.time_advance_minutes = 5; });
+      assert(await h.turn('I follow Daisy.'));
+      patchTurns(h, stay);
+      assert(await h.turn('I sit on the bed.'));
+      assert.match(line('physician'), /brisk, kind, asks no questions.* Aim now: /, 'the infirmary, set as the place, reaches the physician: ' + line('physician'));
+      // A person present by role is near: the brief and the aim, with what she never says in public.
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'location', op: 'set', value: 'the quad' }, { key: 'present', op: 'set', value: ['Daisy Holm (roommate)', 'the Dean'] }]; r.time_advance_minutes = 5; });
+      assert(await h.turn('I walk out onto the quad.'));
+      patchTurns(h, stay);
+      assert(await h.turn('I listen to what she says.'));
+      assert.match(line('dean'), /never names transformation or the Spa in public.* Aim now: /, 'the Dean, present by role, gets the brief and the aim: ' + line('dean'));
       clean(h);
     } finally { h.close(); }
   },
@@ -1645,6 +1870,7 @@ const S = {
       assert.equal(t.action, 'I look around the room.');
       assert.match(JSON.stringify(t), /story story story/, 'the narrative is saved as written');
       assert.match(JSON.stringify(t.notes || t), /skipped/, 'a note says the fit was skipped');
+      assert.match(statusText(h), /^Stopped during the length fit; the finished scene is kept as written\./, 'the status says what was stopped: ' + statusText(h));
       clean(h);
     } finally { h.close(); }
   },
@@ -1678,6 +1904,240 @@ const S = {
       assert(after.memory.beats.length > 36, 'the beats stay unfolded for the next turn to fold');
       const t = storedTurns(h.mock.store, id).at(-1);
       assert.match(JSON.stringify(t.notes || t), /summary fold skipped/, 'a note says the fold was skipped: ' + JSON.stringify(t.notes));
+      assert.match(statusText(h), /^Stopped during the summary fold; it runs again next turn\./, 'the status says what was stopped: ' + statusText(h));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17a. A tap on Take turn or Undo that arrives while the background sync (focus, back to the tab) is still reading the store waits
+  // for it and goes ahead; it used to be told to stop, with no message and the action left in the box. Fails on 10ae2ee.
+  async syncDuringTurn() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const n0 = onlyAdv(h.mock.store).data.turnCount;
+      h.mock.dbLatency = 300;
+      h.window.dispatchEvent(new h.window.Event('focus')); await h.sleep(20);
+      h.$('#action').value = 'I look around the room.'; h.click('#send');
+      assert(await h.idle(20000), 'the turn did not finish');
+      assert.equal(turnCalls(h).length, 1, 'one tap on Take turn during a sync must give one turn (status: ' + statusText(h) + ')');
+      assert.equal(h.$('#action').value, '', 'the action box is cleared once the turn is taken');
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, n0 + 1, 'the turn is saved');
+      h.window.dispatchEvent(new h.window.Event('focus')); await h.sleep(20);
+      h.click('#undo'); assert(await h.idle(20000), 'the undo did not finish'); await h.settle(100, 4000);
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, n0, 'one tap on Undo during a sync undoes the turn (status: ' + statusText(h) + ')');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17b. A quote the narrator forgot to escape inside the narrative: the repair no longer reads it as the end of the string, so the
+  // turn is neither lost to a second call nor committed cut short (the narrative ending at the quote, its fields under a key of
+  // stray punctuation). Fails on 10ae2ee.
+  async quoteInNarrative() {
+    const src = fs.readFileSync(HTML, 'utf8');
+    const a = src.indexOf('  function repairJson'), b = src.indexOf('  // A reply that could not be used is kept for diagnosis');
+    assert(a > 0 && b > a, 'the JSON repair functions were not found in the page');
+    const TURN_KEYS = new Function('return ' + /const TURN_KEYS = (\[[^\]]*\]);/.exec(src)[1])();
+    const tolerantJson = new Function('TURN_KEYS', src.slice(a, b) + '\nreturn tolerantJson;')(TURN_KEYS);
+    const mk = (narr) => '{"evaluation":{"stat":"none","outcome":"none"},"narrative":' + narr + ',"suggested_actions":["a","b","c"],"secret_info":"x","state_updates":[],"time_advance_minutes":10,"events":["Day 1 18:00 e"],"beats":["b"],"facts":[],"exposures":[]}';
+    const cases = [
+      ['plain dialogue', mk('"She says "Come here," then waits."'), 'She says "Come here," then waits.'],
+      ['quoted words in a row', mk('"He answers "yes", "no", and "maybe" in turn."'), 'He answers "yes", "no", and "maybe" in turn.'],
+      ['quote then colon', mk('"The sign reads "Kettle Hall": a plain brass plate."'), 'The sign reads "Kettle Hall": a plain brass plate.'],
+      ['quote then bracket', mk('"You see ["a"] list."'), 'You see ["a"] list.'],
+      ['quote, comma, digit', mk('"She counts "one", 2 times."'), 'She counts "one", 2 times.'],
+      ['quote, comma, minus', mk('"She says "no", -1 for you."'), 'She says "no", -1 for you.'],
+      ['quote then brace', mk('"Her sign says "}" which you read."'), 'Her sign says "}" which you read.'],
+      ['quote at the end then comma', mk('"You whisper "stay","'), 'You whisper "stay",'],
+      ['prose with a brace before the object', 'Sure {as asked}: ' + mk('"ok"'), 'ok'],
+      ['fence', '```json\n' + mk('"ok"') + '\n```', 'ok'],
+      ['cut off mid narrative', '{"evaluation":{},"narrative":"The room is quiet and you', 'The room is quiet and you'],
+    ];
+    const bad = [];
+    for (const [name, text, want] of cases) {
+      let d = null; try { d = tolerantJson(text); } catch (e) { d = null; }
+      if (!(d && d.narrative === want)) bad.push(name + ' -> ' + JSON.stringify(d && d.narrative));
+      else if (name !== 'cut off mid narrative' && name !== 'fence' && Object.keys(d).some((k) => !/^[a-z_]+$/.test(k))) bad.push(name + ': a field was stored under a key of stray punctuation');
+    }
+    assert.deepEqual(bad, [], 'the repair got these wrong: ' + bad.join(' | '));
+    // Through the page: the turn is committed whole, from one call.
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store);
+      for (const [text, want] of [[cases[6][1], cases[6][2]], [cases[1][1], cases[1][2]]]) {
+        const before = turnCalls(h).length;
+        h.mock.sampleHandler = (input, o, call) => (/^turn/.test(call.label) ? text : h.mock.defaultHandler(input, o, call));
+        assert(await h.turn('I look around the room.'), 'the turn did not finish');
+        assert.equal(turnCalls(h).length - before, 1, 'one call, no second ask (status: ' + statusText(h) + ')');
+        assert.equal(storedTurns(h.mock.store, id).at(-1).narrative, want, 'the narrative is committed whole');
+      }
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17c. The length fit cannot gut a scene: a rewrite far below the band is refused and the original kept, and the fit's own prompt
+  // says to keep the wording of every physical act. Fails on 10ae2ee (an 800-word reply became 55 words).
+  async fitCannotGut() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store); let fitPrompt = '';
+      h.mock.sampleHandler = (input, o, call) => {
+        if (call.label === 'length fit') { fitPrompt = typeof input === 'string' ? input : input.map((m) => m.content).join('\n'); return Array(55).fill('crumb').join(' '); }
+        if (!/^turn/.test(call.label)) return h.mock.defaultHandler(input, o, call);
+        const r = JSON.parse(h.mock.defaultHandler(input, o, call)); r.narrative = Array(900).fill('story').join(' '); return JSON.stringify(r);
+      };
+      assert(await h.turn('I look around the room.'), 'the turn did not finish');
+      assert(fitPrompt, 'an 900-word reply must be sent to the length fit');
+      const t = storedTurns(h.mock.store, id).at(-1);
+      assert.equal(t.words, 900, 'the 55-word rewrite is refused and the original kept (words: ' + t.words + ')');
+      assert(t.notes.some((n) => /length fit returned unusable text; kept the original/.test(n)), 'a note says so: ' + JSON.stringify(t.notes));
+      assert.match(fitPrompt, /wording of every physical act, exactly as written; do not soften, summarise or skip any act/, 'the fit is told to keep every act as written');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17d. State updates from the reply: a missing or junk value never reaches the lists ("undefined" in present), an empty remove
+  // never empties the inventory, "False" reads false, an append to a text item adds to it, an inherited name such as "constructor"
+  // is no attitude, and a runaway fact is cut at a word. Fails on 10ae2ee.
+  async junkUpdates() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store); const state = () => onlyAdv(h.mock.store).data.state;
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'items.inventory', op: 'append', value: 'brass key' }, { key: 'items.condition', op: 'set', value: 'tired' }, { key: 'flags.met_dean', op: 'set', value: true }]; });
+      assert(await h.turn('I pick up the key.'));
+      const present = state().present.slice(), inventory = state().items.inventory.slice();
+      assert(inventory.includes('brass key')); assert.equal(state().flags.met_dean, true);
+      patchTurns(h, (r) => {
+        r.state_updates = [{ key: 'present', op: 'append' }, { key: 'present', op: 'append', value: null }, { key: 'present', op: 'append', value: { who: 'x' } }, { key: 'present', op: 'set', value: '' },
+          { key: 'items.inventory', op: 'remove', value: '' }, { key: 'items.inventory', op: 'append', value: [null, '', 'undefined'] },
+          { key: 'flags.met_dean', op: 'set', value: 'False' }, { key: 'items.condition', op: 'append', value: 'sore' }, { key: 'constructor', op: 'set', value: 3 }];
+        r.facts = ['A ' + 'very long durable fact '.repeat(100)];
+      });
+      assert(await h.turn('I look around.'));
+      const s = state(), t = storedTurns(h.mock.store, id).at(-1);
+      assert.deepEqual(s.present, present, 'present is untouched by values that are not names: ' + JSON.stringify(s.present));
+      assert.deepEqual(s.items.inventory, inventory, 'an empty remove and junk appends leave the inventory alone: ' + JSON.stringify(s.items.inventory));
+      assert.equal(s.flags.met_dean, false, '"False" turns the flag off');
+      assert.equal(s.items.condition, 'tired; sore', 'an append adds to a text item');
+      assert(!Object.keys(s.attitudes).includes('constructor'), 'an inherited name is not an attitude');
+      assert(t.facts[0].length <= 241 && /…$/.test(t.facts[0]), 'a runaway fact is cut at a word: ' + t.facts[0].length);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17e. The clock: a time_advance of null is no number (the default 15 minutes and a note, not 0), and the event stamps the
+  // narrator writes are held inside the minutes the turn covered. Fails on 10ae2ee.
+  async clockAndStamps() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store); const st = () => onlyAdv(h.mock.store).data.state;
+      const at = (d, hhmm) => (d - 1) * 1440 + (+hhmm.slice(0, 2)) * 60 + (+hhmm.slice(3, 5));
+      const b = st(), lo = at(b.day, b.time);
+      patchTurns(h, (r) => { r.time_advance_minutes = null; r.events = ['Day 1 00:05 far too early', 'Day 9 23:59 far too late', 'no stamp at all']; });
+      assert(await h.turn('I look around the room.'));
+      const a = st(), hi = at(a.day, a.time), t = storedTurns(h.mock.store, id).at(-1);
+      assert.equal(hi - lo, 15, 'a null time_advance advances the default 15 minutes, not 0');
+      assert(t.notes.some((n) => /time_advance missing; used 15/.test(n)), 'and says so');
+      const ev = onlyAdv(h.mock.store).data.memory.events.slice(-3);
+      for (const e of ev.slice(0, 2)) { const m = /^Day (\d+) (\d\d:\d\d) /.exec(e); assert(m, 'a stamped event keeps its stamp: ' + e); const x = at(+m[1], m[2]); assert(x >= lo && x <= hi, 'the stamp lies inside the minutes the turn covered (' + lo + ' to ' + hi + '): ' + e); }
+      assert.equal(ev[2], 'no stamp at all', 'an event with no stamp is left as written');
+      assert(t.notes.some((n) => /event times? moved/.test(n)), 'a note says the stamps were moved: ' + JSON.stringify(t.notes));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17f. A bond shift moves a facet only in a direction the narrator states: "decrease" or none is ignored with a note, not read as
+  // "up". Fails on 10ae2ee.
+  async bondDirection() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+    try {
+      const { id } = onlyAdv(h.mock.store); const trust = () => onlyAdv(h.mock.store).data.state.bonds.roommate.trust.p;
+      patchTurns(h, (r) => { r.exposures = []; r.bond_shifts = []; });
+      assert(await h.turn('I unpack.')); const t0 = trust();
+      patchTurns(h, (r) => { r.exposures = []; r.bond_shifts = [{ who: 'roommate', facet: 'trust', dir: 'decrease', why: 'a promise broken' }, { who: 'roommate', facet: 'trust', why: 'no direction' }]; });
+      assert(await h.turn('I break my promise.'));
+      assert.equal(trust(), t0, 'trust did not move on a "decrease" or on no direction');
+      assert(storedTurns(h.mock.store, id).at(-1).notes.some((n) => /ignored bond shift/.test(n)), 'and the note says why');
+      patchTurns(h, (r) => { r.exposures = []; r.bond_shifts = [{ who: ' roommate ', facet: ' Trust', dir: ' up ', why: 'kept a promise' }]; });
+      assert(await h.turn('I keep a promise.'));
+      assert(trust() > t0, 'a stated "up" still raises it, whatever the spacing and case');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17g. An engine step that throws on a damaged save does not cost the narrator's finished turn: the turn is kept without that
+  // step, the state as it was, with a note and a status. Fails on 10ae2ee (a page error, no turn).
+  async engineStepGuard() {
+    const h0 = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    let store;
+    try { await h0.settle(150, 6000); assert(await h0.turn('I look around.')); store = new Map([...h0.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { h0.close(); }
+    const { id, data } = onlyAdv(store); data.state.tf.last = 5;
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000);
+      const n0 = onlyAdv(h.mock.store).data.turnCount;
+      patchTurns(h, (r) => { r.exposures = [{ species: 'cow', method: 'hug', intensity: 3 }]; });
+      assert(await h.turn('I hug Daisy.'));
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, n0 + 1, 'the turn is kept (status: ' + statusText(h) + ')');
+      const t = storedTurns(h.mock.store, id).at(-1);
+      assert(t.notes.some((n) => /engine step "transformation" failed/.test(n)), 'a note names the step: ' + JSON.stringify(t.notes));
+      assert.match(statusText(h), /could not update its transformation/, 'the status says so');
+      assert.equal(t.narrative.length > 0, true);
+      assert(!h.errors.length, 'no page error: ' + JSON.stringify(h.errors).slice(0, 300));
+    } finally { h.close(); }
+  },
+
+  // 17h. Text typed while a turn is being written stays in its box when the turn finishes; a box still holding what was sent is
+  // cleared as before. Fails on 10ae2ee.
+  async typedWhileWriting() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      h.mock.sampleHandler = async (input, o, call) => { if (/^turn/.test(call.label)) await h.sleep(500); return h.mock.defaultHandler(input, o, call); };
+      h.$('#action').value = 'First action'; h.$('#director').value = 'keep the scene slow'; h.click('#send'); await h.sleep(150);
+      h.$('#action').value = 'My next idea, typed while waiting'; h.$('#director').value = 'a note typed while waiting';
+      assert(await h.idle(20000));
+      assert.equal(h.$('#action').value, 'My next idea, typed while waiting', 'the next action is kept');
+      assert.equal(h.$('#director').value, 'a note typed while waiting', 'the next director note is kept');
+      h.mock.sampleHandler = null;
+      h.$('#action').value = 'Second action'; h.$('#director').value = ''; h.click('#send'); assert(await h.idle(20000));
+      assert.equal(h.$('#action').value, '', 'a box that still holds what was sent is cleared');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17i. A reply cut off is asked for again with a shorter one requested (the same prompt would be cut at the same place); a
+  // service failure is asked again once after a short wait; Stop during the length fit or the memory fold says so in the status.
+  // Fails on 10ae2ee.
+  async retriesAndStop() {
+    const h = await begin();
+    try {
+      await h.settle(150, 6000);
+      const { id } = onlyAdv(h.mock.store); const n0 = onlyAdv(h.mock.store).data.turnCount; const prompts = []; let calls = 0;
+      h.mock.sampleHandler = (input, o, call) => {
+        if (!/^turn/.test(call.label)) return h.mock.defaultHandler(input, o, call);
+        prompts.push(typeof input === 'string' ? input : input.map((m) => m.content).join('\n')); calls++;
+        if (calls === 1) return { text: '{"evaluation":{},"narrative":"The room is quiet and you', truncated: true };
+        return h.mock.defaultHandler(input, o, call);
+      };
+      assert(await h.turn('I look around the room.'));
+      assert.equal(prompts.length, 2, 'a cut-off reply is asked for once more');
+      assert(prompts[1].startsWith(prompts[0]) && /Your previous reply was cut off\. Reply again with the narrative at most \d+ words/.test(prompts[1].slice(prompts[0].length)), 'the second ask says the first was cut off and wants it shorter');
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, n0 + 1, 'the turn is kept');
+      calls = 0; prompts.length = 0;
+      h.mock.sampleHandler = (input, o, call) => {
+        if (!/^turn/.test(call.label)) return h.mock.defaultHandler(input, o, call);
+        calls++; if (calls === 1) throw { code: 'upstream_error', message: 'the service failed' };
+        return h.mock.defaultHandler(input, o, call);
+      };
+      assert(await h.turn('I look around again.', { max: 30000 }));
+      assert.equal(calls, 2, 'a service failure is asked again once');
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, n0 + 2, 'and the turn is kept');
+      assert(storedTurns(h.mock.store, id).at(-1).notes.some((n) => /the service failed; asked again/.test(n)));
       clean(h);
     } finally { h.close(); }
   },
@@ -1739,6 +2199,192 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // 17. A part under way is followed before the next begins: the part told last goes on (three waypoints in a row) and a new part
+  // waits while four of the kind are begun and unfinished. One waypoint a turn is kept, so the uncapped total is not slowed.
+  async followedParts() {
+    const g = await tfGame(22);
+    try {
+      const told = g.told; assert(told.length >= 18, 'one waypoint a turn is kept: ' + told.length + ' told in 22 turns');
+      const begun = new Set(told.slice(0, 14).map((t) => t.part));
+      assert(begun.size <= 7, 'at most seven parts begun in the first fourteen waypoints told: ' + begun.size + ' (' + [...begun].join(', ') + ')');
+      assert(told.some((t, i) => i && told[i - 1].part === t.part && t.j === told[i - 1].j + 1), 'a part goes on in the very next turn');
+      const open = new Map(); let most = 0;
+      for (const t of told) { if (t.kind === 'complete') open.delete(t.part); else open.set(t.part, t.j); most = Math.max(most, open.size); }
+      assert(most <= 5, 'no more than four parts (and one unlocked by a need) are begun and unfinished at once: ' + most);
+      assert(told.some((t) => t.kind === 'complete'), 'a part has finished within twenty-two turns');
+      clean(g.h);
+    } finally { g.h.close(); }
+  },
+
+  // 18. A waypoint's note says how it is lived: one new thing, met mid-action and never foretold, told in the order it happens with
+  // what the body does (from the world's sensation vocabulary), felt in pain or pleasure or both, and nothing else on the body new.
+  // The licences to invent between waypoints ("keeps changing by degrees", "found in passing (a shoe, a sock...)") are gone.
+  async noteIsLived() {
+    const g = await tfGame(14);
+    try {
+      const notes = g.prompts.flatMap((p) => p.match(/Note from the engine: (?:A new part begins|The change continues|The change completes a part|A change is beginning) \(bovine[^\n]*/g) || []);
+      assert(notes.length >= 10, 'notes reached the narrator: ' + notes.length);
+      const felt = loadWorld().transformation.felt || {}, clauses = Object.values(felt).filter((e) => typeof e === 'object').flatMap((e) => [].concat(e.on || [], e.mid || [], e.end || []));
+      for (const n of notes) {
+        assert.doesNotMatch(n, /keeps changing by degrees|found in passing|a shoe, a sock|in a sentence or two/, 'no licence to change a part between waypoints or to make it a footnote: ' + n.slice(0, 200));
+        assert.match(n, /mid-action/, 'it is met in the middle of an action: ' + n.slice(0, 200));
+        assert.match(n, /in pain or pleasure or both|Only the first sensation/, 'the sensation is asked for: ' + n.slice(0, 200));
+        assert.match(n, /Nothing else on the body is new|nobody else notices/, 'one new thing only: ' + n.slice(0, 200));
+        assert(clauses.some((c) => n.includes(c)), 'the note carries what the body does, from the world\'s vocabulary: ' + n.slice(0, 300));
+      }
+      assert(notes.some((n) => /^Note from the engine: A new part begins \(bovine mythkin\): [^\n]*never foretold or pointed out by anyone first/.test(n)), 'a part\'s first waypoint is a new part, not "the change continues"');
+      const block = g.prompts.at(-1); assert.match(block, /One part is new a turn; every other part stays as it stands and is only felt/, 'the block says earlier parts are only felt');
+      assert.doesNotMatch(block, /between waypoints the part keeps changing by degrees/, 'and no longer says they keep changing');
+      clean(g.h);
+    } finally { g.h.close(); }
+  },
+
+  // 19. The turn that completes a part gets the room the length line promises ("give it room", the wider band); a small step does not,
+  // and the length line's sentences are stopped before the next one starts.
+  async completionGetsRoom() {
+    const g = await tfGame(22);
+    try {
+      const done = g.prompts.find((p) => /Note from the engine: The change completes a part \(/.test(p)), step = g.prompts.find((p) => /Note from the engine: The change continues \(/.test(p) && !/The change completes a part \(/.test(p));
+      assert(done && step, 'a completion and a plain step reached the narrator');
+      const len = (p) => /Narrative length: at most (\d+) words[^\n]*/.exec(p.slice(p.lastIndexOf('<action>')));
+      assert.match(len(done)[0], /a change is under way; give it room/, 'the completion turn is told to give it room: ' + len(done)[0].slice(0, 200));
+      assert(+len(done)[1] > +len(step)[1], 'and gets a wider band than a small step: ' + len(done)[1] + ' vs ' + len(step)[1]);
+      assert.doesNotMatch(len(step)[0], /give it room/, 'a small step gets no extra room');
+      assert.doesNotMatch(len(step)[0], /[a-z\)] If romance/, 'the length line stops one sentence before the next: ' + len(step)[0].slice(0, 300));
+    } finally { g.h.close(); }
+  },
+
+  // 20. A part the engine note gives is not said twice: Body now points at the note, so the waypoint's line is in the prompt once.
+  async bodyNowNotRepeated() {
+    const g = await tfGame(9);
+    try {
+      const p = g.prompts.at(-1), tb = p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>')), note = (p.match(/Note from the engine: [^\n]*/g) || []).find((n) => /waypoint \d+ of \d+/.test(n));
+      const m = /([A-Z][^():]*?) \((?:[^()]*, )?waypoint (\d+) of (\d+)\): (.{30})/.exec(note || ''); assert(m, 'the note carries its fact: ' + note);
+      assert.match(tb, new RegExp(m[1] + ' \\(' + (m[2] === m[3] ? 'finished' : m[2] + ' of ' + m[3]) + '\\): in the note from the engine'), 'Body now points the announced part at the note');
+      assert(!tb.includes(m[4]), 'its line is not also in Body now: ' + m[4]);
+    } finally { g.h.close(); }
+  },
+
+  // 21. Fur is told as it grows: a covering's first waypoint is felt (itch, prickle) with the hairs coming through, its last says where
+  // it stops and how it feels to touch with and against the lie; the bovine coat vocabulary covers every bovine track, and every clause
+  // is a bodily event, never how the person feels about it.
+  async coatsAreFelt() {
+    const W = loadWorld(), M = W.transformation.tracks.species, F = W.transformation.felt;
+    for (const key of ['forearm_coat', 'leg_and_hip_coat']) {
+      const t = M.cow.find((x) => x.key === key);
+      assert.match(t.stages[0], /\b(itch|prickle)\b/i, key + ' begins with a felt onset: ' + t.stages[0]);
+      assert.match(t.stages[0], /hair/i, key + ' says the hairs coming in');
+      assert.match(t.stages.at(-1), /uneven line/, key + ' says where it stops');
+      assert.match(t.stages.at(-1), /with the lie[^.]*warm[^.]*against it/i, key + ' says how it feels stroked with and against the lie: ' + t.stages.at(-1));
+    }
+    assert(F && F._, 'the world carries transformation.felt with its fallback');
+    const look = (k, key) => { let e = F[k + '.' + key] || F[key]; if (typeof e === 'string') e = F[e]; return e; };
+    for (const t of M.cow) { const e = look('cow', t.key); assert(e && e.on && e.mid && e.end, 'a bovine track has its own sensations: ' + t.key); }
+    for (const side of ['woman', 'man']) for (const t of W.transformation.tracks[side]) assert(F[side + '.' + t.key], side + '.' + t.key + ' has its sensations');
+    const judgement = /\b(afraid|scared|frighten\w*|enjoy\w*|love[sd]?|hate[sd]?|proud|ashamed|embarrass\w*|happy|delight\w*|thrill\w*|disgust\w*|panic\w*|worr\w*|glad|sad|pleasant|unpleasant|welcome|want(?:s|ed|ing)?|desire\w*|crave\w*|temper)\b/i;
+    for (const [key, e] of Object.entries(F)) {
+      if (typeof e === 'string') { assert(F[e], key + ' aliases a real entry'); continue; }
+      if (!/\./.test(key)) for (const c of [].concat(...Object.values(e))) assert.doesNotMatch(c, /\b(enlarg\w*|lengthen\w*|forward|broaden\w*|widen\w*)\b/i, 'a shared entry names no shape: ' + key + ': ' + c);
+      for (const c of [].concat(...Object.values(e))) { assert(!/[{}]/.test(c) && c.length <= 125, key + ' clause is short and plain: ' + c); assert.doesNotMatch(c, judgement, key + ' says what the body does, never how the person feels: ' + c); }
+    }
+  },
+
+  // 22. The narrator keeps no Discoveries list (it capped at twelve, dropped the oldest finds first, and held changes the engine never
+  // announced): the engine knows every waypoint told. Condition is how the body feels now, short and replaced each turn, and a
+  // discovery the narrator still sends is ignored with a note, not stored.
+  async noDiscoveriesList() {
+    const W = loadWorld(); assert(!W.trackedItems.some((d) => d.key === 'discoveries'), 'no Discoveries item');
+    const cond = W.trackedItems.find((d) => d.key === 'condition'); assert(cond && cond.maxChars <= 140, 'Condition is short: ' + (cond && cond.maxChars));
+    const g = await tfGame(4, (r) => { r.state_updates = (r.state_updates || []).concat([{ key: 'items.discoveries', op: 'append', value: 'a coarse prickle of new hair on each wrist' }]); });
+    try {
+      const p = g.prompts.at(-1), at = p.indexOf('<state note='), state = at < 0 ? '' : p.slice(at, p.indexOf('</state>', at));
+      assert(state.length > 200, 'the state block was found');
+      assert.doesNotMatch(state, /discoveries/i, 'the state sent to the narrator has no Discoveries');
+      assert.match(p, /items\.condition: how the body feels now, replaced each turn; body changes are the engine's/, 'the reply contract says what Condition is');
+      assert(!('discoveries' in onlyAdv(g.store).data.state.items) || !onlyAdv(g.store).data.state.items.discoveries.length, 'nothing is stored as a discovery');
+      assert(storedTurns(g.store, g.id).at(-1).notes.some((n) => /^ignored unknown item "discoveries"/.test(n)), 'and the engine notes it ignored one');
+    } finally { g.h.close(); }
+  },
+
+  // 23. A scene that runs over several turns is one contact: at the unbounded pace (no day cap) eight five-minute turns of the same
+  // intimate contact add what one forty-minute contact would, not eight whole contacts; a contact three hours later counts whole
+  // again, and a single touch (intensity 1) is never shortened.
+  async continuingContact() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+    try {
+      const store = h.mock.store;
+      h.click('#btnSettings'); h.$('#setPace').value = 'unbounded'; h.$('#setPace').dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000)); h.click('[data-close="dlgSettings"]');
+      const inf = () => onlyAdv(store).data.state.tf.influence.cow || 0;
+      let advance = 5, level = 3;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = [{ species: 'cow', method: 'kissing Daisy', intensity: level }]; });
+      for (let i = 0; i < 8; i++) assert(await h.turn('I keep kissing Daisy.'));
+      const scene = inf(); assert(scene >= 12 && scene <= 30, 'eight five-minute turns of one scene count about as one contact: ' + scene);
+      advance = 180; patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = []; }); assert(await h.turn('I go for a long walk.'));
+      advance = 5; patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = [{ species: 'cow', method: 'kissing Daisy', intensity: level }]; });
+      const before = inf(); assert(await h.turn('I kiss Daisy again.'));
+      assert(inf() - before >= 12, 'a contact hours later counts whole: +' + (inf() - before));
+      level = 1; const b2 = inf(); assert(await h.turn('I hug Daisy.'));
+      assert(inf() - b2 >= 4, 'a single touch counts whole even straight after: +' + (inf() - b2));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 24. A man whose bovine path does not go over to a woman's body never opens the women's parts (the udder, the milk); the block says
+  // so once a change has begun, so the narrator does not supply breast tissue or milk the engine never gave this body.
+  async closedPartsSaid() {
+    const g = await tfGame(6);
+    try {
+      assert.equal(g.tf().paths.cow.sex == null, true, 'the path does not go over');
+      const p = g.prompts.at(-1), tb = p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>'));
+      assert.match(tb, /Not on this body \(its path does not go there; never describe them\): teats and udder, milk\./, 'the closed parts are named: ' + (tb.match(/Not on this body[^\n]*/) || ['none'])[0]);
+      assert.doesNotMatch(g.prompts[0].slice(g.prompts[0].indexOf('<transformation>'), g.prompts[0].indexOf('</transformation>')), /Not on this body/, 'and not before any change has begun');
+    } finally { g.h.close(); }
+  },
+
+  // 25. A part this body does not have never holds back what stands on it: a rabbit woman whose draw gives no belly fur still grows
+  // the further pairs that wait on the belly fur, and the belly fur is never told.
+  async nonePartDoesNotBlock() {
+    const T = loadWorld().transformation.tracks.species.rabbit;
+    const { h, id } = await seededTf({ rmSpecies: 'rabbit', rmName: 'Clover Dell', gender: 'female', name: 'Ana Reyes' }, () => baseTf('rabbit', 100, { lean: -1, face: 15, tracks: heldParts(T, { leg_and_hip_coat: { told: 'done', ext: 0 }, further_pairs: { open: true } }) }), { pace: 'unbounded' });
+    try {
+      patchTurns(h, (r) => { r.time_advance_minutes = 15; r.exposures = []; });
+      for (let i = 0; i < 4; i++) assert(await h.turn('I get on with the day.'));
+      const tr = onlyAdv(h.mock.store).data.state.tf.prog.rabbit.tracks;
+      assert(tr.further_pairs.told >= 1, 'the further pairs begin though there is no belly fur: ' + JSON.stringify(tr.further_pairs));
+      assert.equal(tr.belly_fur.told, 0, 'and the belly fur, none on this body, is never told');
+      assert.equal(onlyAdv(h.mock.store).id, id);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 26. The body easing back after a quiet day never takes a part out from under one that stands on it: the stance stands on the toes
+  // at their second waypoint, so the stance eases first and the toes stay.
+  async easeKeepsWhatIsStoodOn() {
+    const T = loadWorld().transformation.tracks.species.cow;
+    const { h, id } = await seededTf({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' }, () => baseTf('cow', 40, { lean: 0, face: 15, tracks: heldParts(T, { toes_and_hooves: { told: 2, open: true, nextAt: 500, s: 45, e: 60 }, feet_and_stance: { told: 1, open: true, nextAt: 100, s: 45, e: 60 } }) }), { pace: 'standard' });
+    try {
+      patchTurns(h, (r) => { r.time_advance_minutes = 1500; r.exposures = []; });
+      assert(await h.turn('A quiet day passes.'));
+      const tr = onlyAdv(h.mock.store).data.state.tf.prog.cow.tracks;
+      assert(tr.toes_and_hooves.told >= 2 || tr.feet_and_stance.told === 0, 'the stance stands on the toes: ' + JSON.stringify([tr.toes_and_hooves.told, tr.feet_and_stance.told]));
+      assert(storedTurns(h.mock.store, id).at(-1).notes.some((n) => /change easing/.test(n)), 'and something did ease: the stance went first');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 27. What the player and narrator are told about influence is true of the track model: parts begin anywhere from 12 to 50, not
+  // "at about 12 to 15"; an intimate contact doubles the standard day (so not "ten days at the least"); uncapped still tells one a turn.
+  async influenceNotesTrue() {
+    const W = loadWorld(); assert.doesNotMatch(W.transformation.thresholdsNote, /12 to 15/, 'the note does not promise the first changes at 12 to 15: ' + W.transformation.thresholdsNote);
+    assert.match(W.transformation.thresholdsNote, /own track/, 'it still says each part runs on its own track');
+    const html = fs.readFileSync(HTML, 'utf8'), sel = html.slice(html.indexOf('<select id="setPace">'), html.indexOf('</select>', html.indexOf('<select id="setPace">'))), pace = (v) => (new RegExp('<option value="' + v + '"[^>]*>([^<]*)<').exec(sel) || [])[1] || '';
+    assert.doesNotMatch(pace('standard'), /ten days at the least/, 'the standard label does not promise ten days: ' + pace('standard'));
+    // The options stay short; the note under the box (built from the engine's own tables) says what each pace does.
+    const note = html.slice(html.indexOf("$('#setPaceNote').textContent"), html.indexOf("$('#setDensityNote')"));
+    assert.match(note, /influence a story day \(' \+ day \* 2 \+ ' on the most intimate contact\)/, 'the note says an intimate contact doubles the day');
+    assert.match(note, /No daily limit .*A new step can be told every turn/, 'the uncapped note says what it does');
+  },
+
   async sunderedOnly() {
     // (a) No picker; the new adventure is a Sundered one.
     const a = await boot({});
@@ -1798,6 +2444,122 @@ const S = {
       assert.equal(hd.window.localStorage.getItem('windlass.last'), sunId, '(fifty retired) the Sundered save must be the one opened');
       clean(hd);
     } finally { hd.close(); }
+  },
+
+  // 17. The memory fold gets each beat with the day and time of its turn (the beats carry none), the opening's beat included, in
+  // the order the memory holds them; it is asked for days by number and a limit it cannot creep past. After the fold the prompt's
+  // <earlier_turns> holds exactly the beats the summary does not, each read as its own sentence, and none the summary already has.
+  async memoryFoldStamps() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    try {
+      let n = 0; const folds = [];
+      h.mock.sampleHandler = (input, o, call) => {
+        if (call.label === 'memory fold') folds.push(promptOf({ input }));
+        const out = h.mock.defaultHandler(input, o, call);
+        if (!/^turn/.test(call.label)) return out;
+        const r = JSON.parse(out); n += 1; r.beats = [1, 2, 3].map((k) => 'Marker B' + n + 'x' + k + ' Daisy kept the kettle on' + (k === 2 ? '' : '.')); r.time_advance_minutes = 50; return JSON.stringify(r);
+      };
+      const { data } = onlyAdv(h.mock.store); const opening = data.memory.beats.slice();
+      assert.equal(opening.length, 1, 'the memory opens with the opening\'s beat');
+      assert(!data.memory.events.some((e) => /\b(ago|today|tonight|yesterday)\b/i.test(e)), 'the seed timeline gives days, never "ago" or "today": ' + data.memory.events[0]);
+      while (!folds.length && n < 14) assert(await h.turn('I sit with Daisy, turn ' + (n + 1) + '.'), 'turn did not finish');
+      assert.equal(folds.length, 1, 'the memory fold ran once the beats passed 36');
+      const turns = storedTurns(h.mock.store, onlyAdv(h.mock.store).id);
+      const at = (t) => '[Day ' + t.stateBefore.day + ' ' + t.stateBefore.time + '] ';
+      const want = opening.map((b) => '[Day 1 17:40] ' + b).concat(turns.flatMap((t) => t.beats.map((b) => at(t) + b))).slice(0, 18);
+      assert.deepEqual((/<beats>\n([\s\S]*?)\n<\/beats>/.exec(folds[0]) || [])[1].split('\n'), want, 'the eighteen oldest beats, the opening\'s first, each with its turn\'s day and time');
+      assert.match(folds[0], /at most 250 words/, 'the fold asks for 250 words');
+      assert.match(folds[0], /Give times as "Day N", never "today"/, 'and for days by number');
+      assert(await h.turn('I sit with Daisy a while longer.'));
+      const earlier = (/<earlier_turns[^>]*>\n([\s\S]*?)\n<\/earlier_turns>/.exec(promptOf(lastTurn(h))) || [])[1] || '';
+      const marks = [...earlier.matchAll(/Marker B(\d+)x(\d)/g)].map((m) => Number(m[1]) * 10 + Number(m[2]));
+      const held = onlyAdv(h.mock.store).data.memory.beats.join('\n');
+      const pending = [...held.matchAll(/Marker B(\d+)x(\d)/g)].map((m) => Number(m[1]) * 10 + Number(m[2]));
+      const window = Number(onlyAdv(h.mock.store).data.settings.window) || 3;
+      // The last turn's prompt had turns 1 to n - 1; the newest `window` of them (the opening counted) are verbatim and carry their own beats.
+      assert.deepEqual(marks, pending.filter((m) => Math.floor(m / 10) <= n - 1 - window), '<earlier_turns> holds exactly the beats the summary does not, outside the verbatim turns: ' + earlier.slice(0, 300));
+      assert.doesNotMatch(earlier, /Daisy kept the kettle on Marker/, 'each beat ends in a stop before the next');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17b. What the prompt says twice is said once: <state> is compact, leaves out the closed places' flags that are not yet true
+  // (<gm_only> names them all) and, with bonds standing in for them, the attitudes; <timeline> is the newest twelve lines; and a
+  // lore entry costs what it sends, its generated list of parts included, so the lore stays inside the player's lore budget.
+  async promptRepeats() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    let seeded; try { seeded = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const advKey = [...seeded.keys()].find((k) => /^adventures\/[^/]+$/.test(k)); seeded.get(advKey).data.settings.loreBudget = 2500;
+    const h = await boot({ setup(w, m) { m.store = seeded; } });
+    try {
+      assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+      for (let i = 0; i < 12; i++) assert(await h.turn('I ask Daisy about the cow kin and the Creamery, part ' + (i + 1) + '.'), 'turn did not finish');
+      const p = promptOf(lastTurn(h));
+      const state = (/<state note="[^"]*">\n([^\n]*)\n/.exec(p) || [])[1] || '';
+      assert(state.startsWith('{') && state.endsWith('}'), 'the state is one line of JSON: ' + state.slice(0, 80));
+      assert.doesNotMatch(state, /dungeon_\w+_(found|cleared)/, 'closed-place flags not yet true are left out');
+      assert.match(p, /<gm_only[^>]*>[\s\S]*flags\.dungeon_<key>_found/, 'the narrator-only block still says how to set them');
+      assert.doesNotMatch(state, /"attitudes"/, 'with bonds, the attitudes are not repeated in the state');
+      const timeline = ((/<timeline[^>]*>\n([\s\S]*?)\n<\/timeline>/.exec(p) || [])[1] || '').split('\n');
+      assert(onlyAdv(h.mock.store).data.memory.events.length > 12 && timeline.length === 12, 'the timeline is the newest twelve of ' + onlyAdv(h.mock.store).data.memory.events.length + ' events: ' + timeline.length);
+      const entries = [...p.matchAll(/<entry name="([^"]*)">([\s\S]*?)<\/entry>/g)];
+      assert(entries.some((m) => m[1] === 'species: cow'), 'the cow entry is in: ' + entries.map((m) => m[1]));
+      const sent = entries.reduce((a, m) => a + m[2].length, 0);
+      assert(sent <= 2500, 'the lore sent (' + sent + ' characters) stays inside the 2,500 budget: ' + entries.map((m) => m[1] + ' ' + m[2].length));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 17d. A fold that keeps failing does not let <earlier_turns> grow without end: it holds at most the 36 beats a fold leaves. And a
+  // strict retry of up to 600 words is kept, so a long summary that will not come down to 400 words does not stop every fold.
+  async foldFailures() {
+    for (const mode of ['refuse', 'long']) {
+      const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+      try {
+        let n = 0, folds = 0; const long = Array.from({ length: 500 }, (_, i) => ['Daisy', 'kept', 'the', 'kettle', 'on', 'Day', '1.'][i % 7]).join(' ');
+        h.mock.sampleHandler = (input, o, call) => {
+          if (call.label === 'memory fold') { folds += 1; return mode === 'refuse' ? "I can't help with that." : long; }
+          const out = h.mock.defaultHandler(input, o, call);
+          if (!/^turn/.test(call.label)) return out;
+          const r = JSON.parse(out); n += 1; r.beats = [1, 2, 3].map((k) => 'Marker B' + n + 'x' + k + ' Daisy kept the kettle on.'); r.time_advance_minutes = 20; return JSON.stringify(r);
+        };
+        const turns = mode === 'refuse' ? 20 : 14;
+        for (let i = 0; i < turns; i++) assert(await h.turn('I sit with Daisy, turn ' + (i + 1) + '.'), 'turn did not finish');
+        const mem = onlyAdv(h.mock.store).data.memory;
+        if (mode === 'refuse') {
+          assert(folds > 0 && mem.beats.length > 40, 'the folds failed and the beats piled up: ' + mem.beats.length);
+          const earlier = (/<earlier_turns[^>]*>\n([\s\S]*?)\n<\/earlier_turns>/.exec(promptOf(lastTurn(h))) || [])[1] || '';
+          const sent = (earlier.match(/Marker B/g) || []).length;
+          assert(sent > 0 && sent <= 36, '<earlier_turns> holds at most 36 beats, the newest: ' + sent);
+          assert.match(earlier, new RegExp('Marker B' + (n - 1 - (Number(onlyAdv(h.mock.store).data.settings.window) || 3)) + 'x3'), 'the newest beats outside the verbatim turns stay');
+        } else {
+          assert(folds > 0, 'a fold ran'); assert.equal(mem.summary, long, 'the strict retry\'s 500-word summary was kept');
+        }
+        clean(h);
+      } finally { h.close(); }
+    }
+  },
+
+  // 17c. The style examples are the same for the same turn of the same game, however many times the prompt is built (the shedding
+  // loop rebuilds it and must measure what it sends), and move on from one turn to the next.
+  async stableExemplars() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    let seeded; try { seeded = [...first.mock.store].map(([k, v]) => [k, JSON.stringify(v)]); } finally { first.close(); }
+    const play = async () => {
+      const h = await boot({ setup(w, m) { m.store = new Map(seeded.map(([k, v]) => [k, JSON.parse(v)])); } });
+      try {
+        assert(await h.settle(150, 8000)); await h.idle(10000); await h.settle(100, 4000);
+        const out = [];
+        for (let i = 0; i < 2; i++) { assert(await h.turn('I ask Daisy about her classes, part ' + (i + 1) + '.'), 'turn did not finish'); out.push((/<style_examples[^>]*>\n([\s\S]*?)\n<\/style_examples>/.exec(promptOf(lastTurn(h))) || [])[1]); }
+        clean(h); return out;
+      } finally { h.close(); }
+    };
+    const a = await play(), b = await play();
+    assert(a[0] && a[1], 'each turn has style examples');
+    assert.deepEqual(b, a, 'the same turns of the same game get the same style examples');
+    // The examples turn with the turn count; with only one ordinary example in the world there is nothing to turn to.
+    const ordinary = loadWorld().exemplars.filter((e) => typeof e === 'string' || !e.scene || e.scene === 'ordinary').length;
+    if (ordinary > 2) assert.notEqual(a[1], a[0], 'the next turn gets others');
   },
 };
 

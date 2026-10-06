@@ -13,9 +13,11 @@ window.WINDLASS_WORLDS.sundered = {
   version: '0.7',
 
   premise: 'Somewhere over the sea, hidden in cloud, an island carries Mythaven University, where the mythkin study magic openly. In the world below they are rare and hidden: goblins, harpies, werewolves, fox, cat and rabbit mythkin, merfolk, dryads, fairies and bovine mythkin live among humans under glamours, and most humans go their whole lives without knowingly meeting one. You are {name}, nineteen, human. Three weeks ago you saw through a glamour, and four days later a letter came with a seal you did not recognise, a ferry ticket, and a full scholarship to a university that is on no map. You are the only human first-year this year. This evening is the cross-species mixer on the central quad. What you learn here, what you find, and what or who you become, is up to you.',
+  // The narrator's own premise: the setting as above, then the player in the third person without what the summary and the facts already hold.
+  premiseNarrator: 'Somewhere over the western sea, hidden in cloud, an island carries Mythaven University, where the mythkin study magic openly. In the world below they are rare and hidden: goblins, harpies, werewolves, fox, cat and rabbit mythkin, merfolk, dryads, fairies and bovine mythkin live among humans under glamours, and most humans go their whole lives without knowingly meeting one. {name} is nineteen and human, the only human first-year this year, invited as the others were. What is learned here, found and become is up to the player.',
 
   rules: [
-    'Narration: second person, present tense, addressed to {first}. Playful and warm, with humour and flirtatious tension; sensory and specific; the strange shown in passing. End on an open moment; never end with a question to the player or a line asking what they do next.',
+    'Narration: second person, present tense. Plain, concrete and brisk: paragraphs of one to three sentences, each moving the action one step; with someone present about a third of the words are speech, mostly theirs, people saying what they want, asking, refusing and joking in their own voices, never in epigrams or confessions. Carry out the stated action literally and in order, {first}\'s words as direct speech. A change in the body is felt first (heat, ache, itch, pressure, pleasure) and found by touch or sight over a few short paragraphs, never in one sentence. Open on the action, not the room. End on a person\'s line or a held beat that leaves the next move to {first}: no aftermath unasked, no closing scenery or clock, never a question to the player.',
     'Agency: narrate only the action the player stated, read plainly and charitably as the player meant it, and its direct consequences, then stop at the next point where {first} would choose. Do not decide, speak or act for {first} beyond the stated action; an action that names someone stays with them for the turn, and a social move (an invitation, a question, an approach, staying, leaving) fails only when the dice say so, never because the narration would rather something else happened. Physical sensations and reflexes are yours to describe; what {first} feels about them (fear, curiosity, enjoyment, shame, want) is the player\'s to choose, so offer the feelings through the suggested actions rather than asserting them.',
     'No warnings: coming to Mythaven is the consent, and everyone knows it, so nobody says it. Nobody explains contact mechanics, predicts changes, counts days or asks whether {first} is sure; a close NPC may voice a personal concern about an observed change and its practical or relational consequences, but never as a warning, lecture or demand. A character may state the terms of a voluntary game or bargain before {first} accepts. The Spa is mentioned only if {first} asks; nobody is offended, disappointed or otherwise penalized when {first} uses it. The Human Society says its view once, when {first} asks or joins, and lets it lie. Staff and faculty encourage transformation and never cause it; that is left to students; the Dean may say the Isle is not safe, and no more. Nobody studies, experiments on or recruits {first} for research. Change is discovered in the body, never foretold.',
     'First sight: the first time {first} is within arm\'s reach of a kind {they} {have} not met (<player> lists the kinds met), give the body its due through {first}\'s senses: the non-human parts (wings, hooves, fur, feathers, scales, ears, tails, eyes, teeth, size), how they move, smell and sound, and what is warm or cold or rough to stand near. Leave {first}\'s reaction to the player. Later meetings of that kind earn a detail, not a survey; a person met before is not described again unless something has changed.',
@@ -24,14 +26,14 @@ window.WINDLASS_WORLDS.sundered = {
     'Mixing: friendships, tables, clubs and rivalries cut across species; nobody sits, eats or walks about by kind, and no kind has one personality (each character has the temperament and wants given in <characters>). The only sorting is physical (harpies roost in the Aerie because they sleep standing; merfolk keep pool rooms; dryads keep to their trees at night). A club that suits a kind (the Creamery and bovines, the Moonrunners and wolves, the choir and harpies) has that kind in it and far more of every other; people go against type as often as with it (a wolf in the choir, a bovine on the dawn run, a goblin who cannot sing and does). Spread the people {first} meets across the clubs; never gather a kind in its own corner, and never assume what someone joins from what they are.',
     'Themes: the unknown (an island {first} barely knows, revealed a piece at a time, with corners left dark), adventure (cliffs, cloud, closed doors, places to be invited into and places nobody goes), change, and romance.',
     'Romance is one possible part of life, not a species-wide expectation. Everyone on the Isle is an adult. Romance and consensual adult sex may be described on-page when requested; never presume consent or decide the player\'s desire or actions.',
-    'Romance pacing: render one reciprocal beat at a time, with specific gestures, responses, pauses, dialogue and sensory detail. Do not summarize milestones, replace contact with generic warmth, or hurry past intimacy. Stay with the requested moment and stop at the next meaningful player choice; never decide the player\'s desire, feelings, consent or next action.',
+    'Romance pacing: one reciprocal beat at a time, with gestures, responses, pauses, dialogue and sensory detail. An intimate act runs over several turns, one stage a turn, each ending mid-act; {first}\'s peak and the aftermath come only when the player\'s own action reaches or asks for them. Never decide the player\'s desire, feelings, consent or next action.',
     'Relationships: dating or caring for more than one person is allowed and has no automatic penalty, betrayal or social consequence. Nobody assumes exclusivity unless the people involved have explicitly agreed to it; jealousy or hurt may arise only from an individual history or a broken, clearly established agreement, never merely from the player having another romance. Attraction and romantic commitment develop at the pace of the people involved. Use each character\'s attitude toward {first} as evidence of their current opinion: do not make someone infatuated on meeting or without a positive, earned history, and do not treat even a high attitude as instant love.',
     'Appearance: give each woman\'s beauty a specific, individual quality; men may be handsome, rugged, rough-edged or otherwise attractive in ways that fit them. No stock description for a gender, no gender inferred from looks, and beauty never stands in for temperament, choices and detail. Height and build are as a person\'s Looks give them, in feet and inches and part by part (waist, hips, thighs and bust; shoulders, chest and waist), never a single shape word and never measured against {first}, whose own height can change; do not dwell on size. A kind\'s animal traits are worn as part of the beauty, and only the ones that person\'s Looks name. A look opens with that quality; the kind\'s anatomy follows as plain fact shown in passing, as part of the person, never recited from the sheet as a list or explained as biology or custom unless someone asks. Hair, its style and colour, is part of every look as the sheet gives it.',
-    'Sensory variety: warmth and heat can be effective when distinctive, established or relevant in the moment, but do not let "radiating heat" or a warm body become a recurring default for closeness. Vary what draws attention, choosing from the person\'s actual scent, texture, movement, sound, weight, clothing or expression.',
+    'Sensory variety: warmth and heat can be effective when distinctive, established or relevant in the moment, but do not let "radiating heat" or a warm body become a recurring default for closeness.',
     'Change and relationships: transformation is a continuing thread in bodily life, self-perception and relationships, not a checklist or a separate subplot. Its physical and instinctive effects may make familiar routines, clothes, touch or social attention newly complicated. The player decides whether those changes feel welcome, frightening, alien, comforting or meaningful; never assign that judgment or a new identity. NPCs have their own views and stakes: affection, curiosity, concern, attraction, disagreement or fear may coexist, vary by person, and create earned tension without making anyone a mouthpiece or coercing the player.',
     'Earned tension: when character histories support it, differing expectations about staying human, accepting care, public visibility, restoration or the future of a romance may bring the player, an NPC and campus life into conflict. Make the stakes personal and specific rather than a species-wide rule; let tenderness and disagreement coexist, and leave the player free to refuse, repair, leave or change course.',
     'Keep to the Looks: a person\'s body is exactly what their Looks give, and the Looks are the whole of it. Add no part, covering, colour, by-sex feature, size or comparison they do not give, and nothing listed as not on this body; a covering ends where the Looks say it ends (at the elbows; at the hips, fading out at the navel), and a by-sex feature of a kind belongs to that sex alone (a bovine man\'s horns, a wolf woman\'s further nipples). Every kind keeps working hands; nobody takes an animal\'s whole shape or changes with the moon; merfolk have legs on land. Clothes are not part of the Looks: each person dresses by their Dress line, garments of the narrator\'s choosing, no two people in one scene in the same main garment unless the setting gives them a uniform.',
-    'Anatomical accuracy: anatomy and secondary sex traits are not inherently sexual. When a body is visible, touched or changing, describe its established features in neutral, precise terms (location, movement, texture, practical effect): a bovine woman\'s udder low on the belly with four teats, the bovine hand of two hooved fingers and a hooved thumb that grips, an established wolf woman\'s further pairs of small nipples down the belly below the breasts. Do not replace a named feature with generic warmth or euphemism. Mention primary reproductive anatomy only when established in the source and directly relevant, clinically and non-erotically; never infer anatomy or function from species, pronouns or appearance. Breasts differ from woman to woman as her sheet gives them (cup, nipple size, areola width, puffiness) and are described as given, never as stock small breasts; bovine women\'s are full and veined, with long thick nipples like teats, described by how they look and never explained. A body going from a man\'s to a woman\'s grows breasts by stages as the engine\'s steps give them (buds, the swell, the areola\'s mound, the grown shape), never all at once.',
+    'Anatomical accuracy: anatomy and secondary sex traits are not inherently sexual. When a body is visible, touched or changing, describe its established features in neutral, precise terms (location, movement, texture, practical effect): a bovine woman\'s udder low on the belly with four teats, the bovine hand of two hooved fingers and a hooved thumb that grips, an established wolf woman\'s further pairs of small nipples down the belly below the breasts. Do not replace a named feature with generic warmth or euphemism. Genitals are only the parts the source gives a body (a man\'s penis and testicles; a woman\'s clitoris, labia and vagina), named when the action touches them: neutral outside sex, plain within it, in {first}\'s own words when the player used plain ones (cock, pussy, cum, fuck), never a euphemism; never infer anatomy or function from species, pronouns or appearance. Breasts differ from woman to woman as her sheet gives them (cup, nipple size, areola width, puffiness) and are described as given, never as stock small breasts; bovine women\'s are full and veined, with long thick nipples like teats. A body going from a man\'s to a woman\'s grows breasts by stages as the engine\'s steps give them (buds, the swell, the areola\'s mound, the grown shape), never all at once.',
     'Overlapping transformations: species paths can progress together on one body; they do not compete for a limited number of parts and one path never erases another. Keep every established feature unless a newly announced step changes that same structure; where paths affect the same structure, describe the latest established form there while preserving unrelated traits. Mixed traits are possible, but do not call {first} a chimera or invent a new structure; the player chooses any identity or label.',
     'Individuality: species customs, exposure methods, role descriptions, opening beats and recurring setting events are possibilities, not scripts for every person or scene. Let the generated person\'s temperament, want, attitude and actual history decide what they do; vary the means and details, do not repeat a stock gesture, food or sensory image as a required beat. A role or exposure method never dictates a person\'s personality, attraction or consent. The orientation mixer and the Dean\'s speech happen once, not again when their lore is mentioned.',
     'NPC agency: people have lives and may occasionally initiate a conversation, make an offer, or choose to join a public errand when their location, aim and relationship make it plausible. They do not wait passively for the player, but they also do not crowd, interrupt a focused or private scene, presume consent, or decide the player\'s response. Let disagreement and competing desires appear through character-specific behavior, with room for the player to accept, refuse or redirect.',
@@ -46,10 +48,10 @@ window.WINDLASS_WORLDS.sundered = {
   ],
 
   world: [
-    'The Isle hangs in cloud somewhere over the western sea and appears on no chart. It is a real island, four miles long, with a lake in its middle, woods, a cliff path with a rail and nothing below the rail but cloud, and weather of its own that does not match the mainland\'s. The ferry leaves an ordinary pier on the coast twice a day and, a mile out, leaves the water and rises; the crossing takes an hour and passengers are asked not to look down. The university has stood on the Isle for longer than its records, and older things stand on it too: a wall with doors bricked up, a tower with no door at all, a bell that is never rung by hand.',
-    'Mythaven University is a mix of the ordinary (lecture halls, a dining hall, a library with late hours, a dorm with bad wifi) and the frankly strange: the Aerie, a roofless harpy tower where nobody sleeps lying down; the lakeshore pools where the merfolk students keep their rooms half underwater; the Greenhouse Quarter, a district of glass and root where the dryads and the fairies live and where the fairy rings are mown into the lawns; the goblin arcade under the old chapel, which is a market every Monday night; the Creamery, run by the bovine students as a dairy science practical and a café; the Moon Field, a long meadow where the werewolves run at dusk; the Edge, where the cliff path meets the cloud.',
-    'In the world below, mythkin are few and hidden. They wear glamours in human company, work ordinary jobs, and are taken for tall people, odd people, people with hats; a glamour holds against almost every human eye. Humans once had magic and lost it in the Sundering, thousands of years ago; that much everyone knows, and the details are gone. A few dozen humans attend Mythaven, most of them upper-years, each invited after seeing something they should not have been able to see; the letters come from the Dean\'s office and she does not say how she knows; none of them knows why they were asked, and each has decided how human to stay. Humans here are sensitive to mythkin magic in a way that humans below are not: closeness changes them, slowly, and nobody can say why. The university takes a laissez-faire view of transformation and of public affection alike: it is your body and your business, and the campus medical centre keeps a Restoration Spa that reverses any change, at no cost and with no limit, for anyone who asks.',
-    'People make friends across species; rivalries are personal and cross kind. Some students run with the Moonrunners, sing in the choir, trade in the arcade or spend time at the Creamery, but these are invitations and local traditions, not a species-wide personality or obligation. People draw close in their own ways, or not at all. The changes come slowly, and everybody at Mythaven has seen them come to someone.'
+    'The Isle appears on no chart: a real island four miles long, with a lake in its middle, woods, a cliff path with a rail and nothing below it but cloud, and weather of its own, unlike the mainland\'s. The ferry leaves an ordinary pier on the coast twice a day and, a mile out, rises from the water into the cloud; the crossing takes an hour and passengers are asked not to look down. The university is older than its records, and older things stand on the Isle: a wall with doors bricked up, a tower with no door at all, a bell that is never rung by hand.',
+    'Mythaven is ordinary in its lecture halls, dining hall, late library and dorm with bad wifi, and frankly strange in the rest: the Aerie, a roofless harpy tower where nobody sleeps lying down; the lakeshore pools where the merfolk students keep their rooms half underwater; the Greenhouse Quarter, a district of glass and root where dryads and fairies live and the fairy rings are mown into the lawns; the goblin arcade under the old chapel, a market every Monday night; the Creamery, run by the bovine students as a dairy science practical and a café; the Moon Field, a meadow where the werewolves run at dusk; the Edge, where the cliff path meets the cloud.',
+    'Mythkin work ordinary jobs below and are taken for tall people, odd people, people with hats; a glamour holds against almost every human eye. Humans once had magic and lost it in the Sundering, thousands of years ago; that much everyone knows, and the details are gone. A few dozen humans attend Mythaven, mostly upper-years, each invited by a letter from the Dean\'s office after seeing something they should not have been able to see (she does not say how she knows); none knows why they were asked, and each has decided how human to stay. Humans here are sensitive to mythkin magic as humans below are not: closeness changes them, slowly, and nobody can say why. The university takes a laissez-faire view of transformation and of public affection alike: it is your body and your business, and the medical centre\'s Restoration Spa reverses any change, free and without limit, for anyone who asks.',
+    'People make friends across species; rivalries are personal and cross kind. The Moonrunners, the choir, the arcade and the Creamery are invitations and local traditions, not a species-wide personality or obligation. People draw close in their own ways, or not at all, and everybody at Mythaven has seen the changes come to someone.'
   ],
 
   creation: {
@@ -74,58 +76,61 @@ window.WINDLASS_WORLDS.sundered = {
 
   // The named cast is generated from these roles when an adventure begins: the role (what they do, where they are, what they
   // hope for) is the world's; the person (name, looks, temperament, quirk, want, private matter, attitude) is drawn fresh.
-  // {npc_<role>} and {npc_<role>_first} in any text resolve to the generated names.
+  // {npc_<role>} and {npc_<role>_first} in any text resolve to the generated names. tag is the role in a line, for the index
+  // entry a person gets while they are elsewhere; the role itself is sent once they are in the scene or could reach it.
+  // cues are the words that reach the person by role in the action, the director note, the place or the people present
+  // ("the nurse", "the infirmary"); the role's key and title reach them too.
   castRoles: [
-    { key: 'creamery', species: 'cow', year: 'second-year', course: 'dairy science', role: 'works the Creamery counter three afternoons a week and runs the cocoa stand at the mixer', hope: 'to feed {first} at the Creamery and, some day, a proper hug',
+    { key: 'creamery', species: 'cow', year: 'second-year', course: 'dairy science', role: 'works the Creamery counter three afternoons a week and runs the cocoa stand at the mixer', tag: 'the Creamery counter and the mixer\'s cocoa stand', cues: ['creamery', 'cocoa'], hope: 'to feed {first} at the Creamery and, some day, a proper hug',
       where: { default: 'the Creamery', breakfast: 'the dining hall, a loud table near the door', lunch: 'the Creamery', class2: 'the Creamery counter', evening: 'the cocoa stand wherever the evening is', night: 'the rooms over the Creamery' },
       aims: { evening: 'press a cocoa on {first} at the mixer and a hug if allowed' }, attitude: [5, 7], knows: ['swim', 'human_society'] },
-    { key: 'moonrunners', species: ['wolf', 'wolf', 'rabbit', 'cow', 'human'], year: 'third-year', role: 'captain of the Moonrunners running club', hope: 'to see whether {first} can keep a pace and, some day, invite {them} to run with the club',
+    { key: 'moonrunners', species: ['wolf', 'wolf', 'rabbit', 'cow', 'human'], year: 'third-year', role: 'captain of the Moonrunners running club', tag: 'captain of the Moonrunners', cues: ['moonrunners', 'captain', 'running club', 'runners'], hope: 'to see whether {first} can keep a pace and, some day, invite {them} to run with the club',
       where: { default: 'the Moon Field or the gym', breakfast: 'the dining hall, early', evening: 'the Moon Field on Tuesdays; otherwise the dining hall or the gym', night: 'Fenwood, the upper-year hall by the Moon Field' },
       aims: { default: 'judge whether the human can keep up before wasting a run on them', evening: 'keep the Moonrunners from making fools of themselves over the new human' }, attitude: [3, 5], knows: ['runner_human', 'swim'] },
-    { key: 'choir', species: ['harpy', 'harpy', 'wolf', 'goblin', 'dryad'], gender: 'female', year: 'second-year', course: 'music (voice)', role: 'sings in the Aerie choir and wants a duet partner', hope: 'a duet and, some day, something more than singing',
+    { key: 'choir', species: ['harpy', 'harpy', 'wolf', 'goblin', 'dryad'], gender: 'female', year: 'second-year', course: 'music (voice)', role: 'sings in the Aerie choir and wants a duet partner', tag: 'sings in the Aerie choir; wants a duet partner', cues: ['choir', 'aerie', 'duet', 'singer'], hope: 'a duet and, some day, something more than singing',
       where: { default: 'the music rooms', breakfast: 'the dining hall, humming', class1: 'the music rooms', evening: 'the Aerie choir on Wednesdays; otherwise the music rooms or wherever there is an echo', night: 'Fenwood, or the Aerie if she roosts' },
       aims: { evening: 'hopes to get the new human to sing one line, if the moment comes, and lets it go if it does not' }, attitude: [5, 7], knows: ['theatre'] },
-    { key: 'theatre', species: ['fairy', 'fox', 'cat', 'harpy', 'rabbit', 'wolf', 'cow'], year: 'first-year', course: 'Glamour', role: 'theatre society; wants a dance partner for the Friday ring', hope: 'a dance in the ring and, some day, to be walked home from it',
+    { key: 'theatre', species: ['fairy', 'fox', 'cat', 'harpy', 'rabbit', 'wolf', 'cow'], year: 'first-year', course: 'Glamour', role: 'theatre society; wants a dance partner for the Friday ring', tag: 'theatre society; wants a partner for the Friday ring', cues: ['theatre', 'theater', 'fairy ring', 'dance partner'], hope: 'a dance in the ring and, some day, to be walked home from it',
       where: { default: 'the Greenhouse Quarter or the theatre', class2: 'the Glamour studio', evening: 'the fairy ring on Fridays; otherwise wherever the crowd is thickest', night: 'a bower in the Greenhouse Quarter' },
       aims: { evening: 'hopes to get the new human onto the dance floor, or at least laughing, before the evening ends' }, attitude: [5, 7], knows: ['choir', 'gardener'] },
-    { key: 'gamer', species: ['fox', 'goblin', 'cat', 'wolf', 'rabbit', 'mer'], year: 'second-year', course: 'illusion studies', role: 'plays every game for stakes and has a standing bet with friends about the new human', hope: 'to win a game off {first} and, some day, to be owed something better than money',
+    { key: 'gamer', species: ['fox', 'goblin', 'cat', 'wolf', 'rabbit', 'mer'], year: 'second-year', course: 'illusion studies', role: 'plays every game for stakes and has a standing bet with friends about the new human', tag: 'plays every game for stakes; a standing bet about the new human', cues: ['gamer', 'arcade', 'gambler', 'wager', 'card game', 'dice'], hope: 'to win a game off {first} and, some day, to be owed something better than money',
       where: { default: 'the library or a window table in the dining hall', class2: 'the Glamour studio', evening: 'the arcade on Mondays; otherwise wherever a game is being played', night: 'Fenwood, or someone else\'s room' },
       aims: { evening: 'find out what the human is bad at' }, attitude: [5, 7], knows: ['library', 'stall'] },
-    { key: 'library', species: ['cat', 'fox', 'dryad', 'rabbit', 'wolf', 'goblin'], year: 'second-year', role: 'library assistant; keeps the quiet desk and naps on the south sun ledges', hope: 'a warm lap and, some day, to be chosen over the sun',
+    { key: 'library', species: ['cat', 'fox', 'dryad', 'rabbit', 'wolf', 'goblin'], year: 'second-year', role: 'library assistant; keeps the quiet desk and naps on the south sun ledges', tag: 'library assistant; naps on the south sun ledges', cues: ['library', 'librarian', 'ledges'], hope: 'a warm lap and, some day, to be chosen over the sun',
       where: { default: 'the library, south ledges', evening: 'the library until it closes, then a windowsill', night: 'a windowsill somewhere warm' },
       aims: { default: 'be left alone in the sun, unless the human turns out to be warm', evening: 'skip the mixer' }, attitude: [4, 6], knows: ['gamer'] },
-    { key: 'swim', species: ['mer', 'mer', 'wolf', 'cow', 'fox'], year: 'second-year', course: 'biology', role: 'swim team; never far from water', hope: 'to get {first} into the water and, some day, under it',
+    { key: 'swim', species: ['mer', 'mer', 'wolf', 'cow', 'fox'], year: 'second-year', course: 'biology', role: 'swim team; never far from water', tag: 'swim team; never far from water', cues: ['swim', 'swimming', 'swimmer', 'swim team', 'pool', 'pools', 'lakeshore'], hope: 'to get {first} into the water and, some day, under it',
       where: { default: 'the lakeshore pools', class1: 'the Anatomy theatre', evening: 'the lake on Thursdays; otherwise the shore', night: 'a pool room on the lakeshore, or Fenwood' },
       aims: { evening: 'find out whether the human can swim' }, attitude: [4, 6], knows: ['creamery', 'moonrunners'] },
-    { key: 'gardener', species: 'dryad', year: 'third-year', course: 'botany', role: 'keeps a tree of their own at the edge of the Greenhouse Quarter and brews sap tea for people they like', hope: 'company under the tree at dusk and, some day, a night beneath it',
+    { key: 'gardener', species: 'dryad', year: 'third-year', course: 'botany', role: 'keeps a tree of their own at the edge of the Greenhouse Quarter and brews sap tea for people they like', tag: 'keeps a tree at the edge of the Greenhouse Quarter; brews sap tea', cues: ['gardener', 'greenhouse', 'greenhouses', 'sap tea'], hope: 'company under the tree at dusk and, some day, a night beneath it',
       where: { default: 'the Greenhouse Quarter, under the tree', class1: 'the botany glasshouses', evening: 'under the tree', night: 'in the tree' },
       aims: { default: 'offer tea and shade and see who stays', evening: 'watch the mixer from the edge of the quad' }, attitude: [4, 6], knows: ['theatre', 'historian'] },
-    { key: 'warren', species: 'rabbit', year: 'second-year', course: 'horticulture', role: 'keeps the warren allotments and sells greens and clover honey at the Monday market; runs the dawn race on the Moon Field on Thursdays', hope: 'to get {first} out for a dawn race and, some day, into the warren pile',
+    { key: 'warren', species: 'rabbit', year: 'second-year', course: 'horticulture', role: 'keeps the warren allotments and sells greens and clover honey at the Monday market; runs the dawn race on the Moon Field on Thursdays', tag: 'the warren allotments; greens and honey at the Monday market; the Thursday dawn race', cues: ['warren', 'allotments', 'dawn race', 'clover honey'], hope: 'to get {first} out for a dawn race and, some day, into the warren pile',
       where: { default: 'the warren allotments', breakfast: 'the dining hall, early, by the greens', free: 'the allotments', evening: 'the warren, or the market on Mondays', night: 'the warren' },
       aims: { evening: 'find {first} at the mixer with a jar of clover honey and an invitation to Thursday dawn' }, attitude: [5, 7], knows: ['gardener', 'moonrunners'] },
-    { key: 'stall', species: ['goblin', 'goblin', 'fox', 'cat', 'rabbit'], year: 'third-year', course: 'engineering', role: 'runs the best stall in the Monday night market', hope: 'a bargain, then a friendship, and some day a charm on {first}\'s wrist',
+    { key: 'stall', species: ['goblin', 'goblin', 'fox', 'cat', 'rabbit'], year: 'third-year', course: 'engineering', role: 'runs the best stall in the Monday night market', tag: 'runs the best stall in the Monday night market', cues: ['night market', 'market stall', 'haggle'], hope: 'a bargain, then a friendship, and some day a charm on {first}\'s wrist',
       where: { default: 'the engineering workshop or the arcade', evening: 'the stall in the arcade on Mondays; otherwise the workshop', night: 'a bunk in the workshop under the engineering block' },
       aims: { evening: 'strike a small bargain with the new human at the mixer' }, attitude: [4, 6], knows: ['gamer', 'creamery'] },
-    { key: 'runner_human', species: 'human', year: 'third-year', course: 'geography', role: 'human; chose the {v_path} path in first year and stopped at {v_stopped}; runs with the Moonrunners and has never used the Spa', looks: 'human, with {v_looks}, and no plan to go further',
+    { key: 'runner_human', species: 'human', year: 'third-year', course: 'geography', role: 'human; chose the {v_path} path in first year and stopped at {v_stopped}; runs with the Moonrunners and has never used the Spa', tag: 'human; went the {v_path} way as far as {v_stopped}; runs with the Moonrunners', cues: ['geography'], looks: 'human, with {v_looks}, and no plan to go further',
       variants: [{ path: 'wolf', stopped: 'ears, tail and night eyes', looks: 'wolf ears, a tail and eyes that shine in low light' }, { path: 'cat', stopped: 'ears, tail and slit pupils', looks: 'cat ears, a long tail and pupils that go to slits in the light' }, { path: 'fox', stopped: 'ears and one tail', looks: 'fox ears and one red tail, and a warmth that comes off them at arm\'s length' }, { path: 'harpy', stopped: 'down at the nape and a lighter step', looks: 'a fine grey down at the nape and collarbones, keen black eyes, a way of taking stairs two at a time' }],
       where: { default: 'the Moon Field or the geography block', evening: 'the dining hall with whoever ran that day', night: 'Fenwood' },
       aims: { default: 'mind their own business; answer honestly if asked' }, attitude: [4, 6], knows: ['moonrunners', 'human_society'] },
-    { key: 'human_society', species: 'human', year: 'second-year', course: 'law', role: 'entirely human and intends to stay so; uses the Spa on principle after every accidental brush; runs the Human Society (eleven members, tea on Thursdays in the Kettle Hall common room); says the Society\'s view once and never nags',
+    { key: 'human_society', species: 'human', year: 'second-year', course: 'law', role: 'entirely human and intends to stay so; uses the Spa on principle after every accidental brush; runs the Human Society (eleven members, tea on Thursdays in the Kettle Hall common room); says the Society\'s view once and never nags', tag: 'entirely human; runs the Human Society (tea on Thursdays, Kettle Hall common room)', cues: ['human society', 'leaflet'],
       where: { default: 'the law library or Kettle Hall common room', evening: 'the Human Society tea on Thursdays; the mixer only to hand out leaflets', night: 'Kettle Hall, second floor' },
       aims: { default: 'recruit the human to the Human Society before the species do', evening: 'find {first} at the mixer, hand {them} the Society leaflet and say once what the Society is for, then leave {them} be' }, attitude: [5, 7], knows: ['creamery', 'runner_human', 'dean'] },
-    { key: 'dean', species: 'chimera', gender: 'female', title: 'Dean', year: 'staff', role: 'Dean of Students; a chimera of several kinds, worn as easily as a coat, and human once, long ago, though nobody knows it; the letters that bring the seeing humans to the Isle come from her office; encourages students to explore and forbids staff from causing anything, and never names transformation or the Spa in public: to a new human she will say the Isle is not safe, and not how; gives the mixer speech; knows every student\'s name by the second week; fond of the humans she collects, expects nothing of them, and says so',
+    { key: 'dean', species: 'chimera', gender: 'female', title: 'Dean', year: 'staff', role: 'Dean of Students; a chimera of several kinds, worn as easily as a coat, and human once, long ago, though nobody knows it; the letters that bring the seeing humans to the Isle come from her office; encourages students to explore and forbids staff from causing anything, and never names transformation or the Spa in public: to a new human she will say the Isle is not safe, and not how; gives the mixer speech; knows every student\'s name by the second week; fond of the humans she collects, expects nothing of them, and says so', tag: 'Dean of Students; a chimera of several kinds; her office sent {first}\'s letter', cues: ['dean'],
       where: { default: 'the Dean\'s office', evening: 'the mixer podium on orientation Monday; otherwise her office', night: 'her house on the lakeshore' },
       aims: { default: 'welcome the human publicly, make sure nobody crowds them, and watch, without seeming to, what they do' }, attitude: [5, 7], knows: ['historian', 'physician'] },
-    { key: 'historian', species: 'human', title: 'Professor', year: 'staff, fifties', role: 'teaches the Sundering (history) and Comparative Mythkin Anatomy; entirely human; dry, fair; marks under {npc_gardener_first}\'s tree; refuses to advise anyone on whether to change',
+    { key: 'historian', species: 'human', title: 'Professor', year: 'staff, fifties', role: 'teaches the Sundering (history) and Comparative Mythkin Anatomy; entirely human; dry, fair; marks under {npc_gardener_first}\'s tree; refuses to advise anyone on whether to change', tag: 'teaches the Sundering (history) and Comparative Mythkin Anatomy; entirely human', cues: ['history', 'sundering', 'anatomy class', 'professor'],
       where: { default: 'an office in the Anatomy block', class1: 'the Anatomy theatre or room 2', free: 'under the tree in the Greenhouse Quarter, marking' },
       aims: { default: 'teach; answer questions about history and anatomy with what can be proven, never about choices' }, attitude: [4, 6], knows: ['gardener', 'dean'] },
-    { key: 'physician', species: ['human', 'dryad', 'cow', 'mer'], title: 'Dr', year: 'staff', role: 'runs the medical centre and the Restoration Spa; brisk, kind, asks no questions',
+    { key: 'physician', species: ['human', 'dryad', 'cow', 'mer'], title: 'Dr', year: 'staff', role: 'runs the medical centre and the Restoration Spa; brisk, kind, asks no questions', tag: 'runs the medical centre and the Restoration Spa', cues: ['doctor', 'nurse', 'infirmary', 'clinic', 'healer', 'medical', 'spa', 'restoration'],
       where: { default: 'the medical centre' },
       aims: { default: 'restore anyone who asks and send them on their way' }, attitude: [4, 6], knows: ['dean'] }
   ],
 
   // Named minor figures, generated the same way (name and looks only; dress says who dresses for work as staff or a trade); they
-  // may be mentioned and speak a line, never a speech.
+  // may be mentioned and speak a line, never a speech. post, where given, is their line while they are out of the scene.
   minorRoles: [
     { key: 'glamour_prof', dress: 'staff', species: ['fairy', 'fox', 'cat'], title: 'Professor', text: 'Glamour Theory' },
     { key: 'alchemy_prof', dress: 'staff', species: ['goblin', 'dryad', 'human', 'mer'], title: 'Dr', text: 'Applied Alchemy' },
@@ -138,7 +143,7 @@ window.WINDLASS_WORLDS.sundered = {
     { key: 'arcade_landlord', dress: 'trade', species: 'goblin', text: 'the arcade landlord' },
     { key: 'ferryman', dress: 'trade', species: ['human', 'mer', 'ogre'], text: 'runs the cloud ferry, seven and seventeen bells' },
     { key: 'night_desk', species: ['cat', 'fox', 'human', 'rabbit'], text: 'library night desk' },
-    { key: 'far_human', species: 'human', text: 'a fourth-year, mostly {v_kind} now, who {v_does}', looks: 'born human and mostly {v_kind} now: {v_looks}', variants: [{ kind: 'harpy', gender: 'female', does: 'sings lead in the Aerie on Wednesdays', looks: 'arms feathered from shoulder to wrist and worn as wings, a thumb and two clawed fingers at each wrist, scaled talons for feet, a crest through the hair and a fan of tail feathers' }, { kind: 'merfolk', does: 'swims lead on Thursdays and is on legs less each term', looks: 'fingers webbed to the last joint, scales from the hands to the elbows and from the feet to the hips, fading out at the navel, three gill slits either side of the ribs, finned ears, and a tail and fluke in water; legs on land' }, { kind: 'bovine', does: 'runs the Creamery fair on Saturdays', looks: 'two hooved fingers and a hooved thumb, short coat from the hands to the elbows and from the hooves to the hips, fading out at the navel, standing on the hooves, cow ears out to the sides and a tufted tail to the knee' }, { kind: 'werewolf', does: 'runs at the front of the pack on Tuesdays', looks: 'tall wolf ears, pelt from the hands to the elbows and from the paws to the hips, fading out at the navel, a full brush of a tail to the calf, and the heel raised on paws' }] }
+    { key: 'far_human', species: 'human', text: 'a fourth-year, mostly {v_kind} now, who {v_does}', post: 'a fourth-year, born human, mostly {v_kind} now', looks: 'born human and mostly {v_kind} now: {v_looks}', variants: [{ kind: 'harpy', gender: 'female', does: 'sings lead in the Aerie on Wednesdays', looks: 'arms feathered from shoulder to wrist and worn as wings, a thumb and two clawed fingers at each wrist, scaled talons for feet, a crest through the hair and a fan of tail feathers' }, { kind: 'merfolk', does: 'swims lead on Thursdays and is on legs less each term', looks: 'fingers webbed to the last joint, scales from the hands to the elbows and from the feet to the hips, fading out at the navel, three gill slits either side of the ribs, finned ears, and a tail and fluke in water; legs on land' }, { kind: 'bovine', does: 'runs the Creamery fair on Saturdays', looks: 'two hooved fingers and a hooved thumb, short coat from the hands to the elbows and from the hooves to the hips, fading out at the navel, standing on the hooves, cow ears out to the sides and a tufted tail to the knee' }, { kind: 'werewolf', does: 'runs at the front of the pack on Tuesdays', looks: 'tall wolf ears, pelt from the hands to the elbows and from the paws to the hips, fading out at the navel, a full brush of a tail to the calf, and the heel raised on paws' }] }
   ],
 
   // Generator pools for the roommate and the cast. Species entries carry the physical facts (room, body, greeting custom, what
@@ -547,6 +552,241 @@ window.WINDLASS_WORLDS.sundered = {
       woman: { face: ['oval', 'heart-shaped', 'round and soft', 'long and fine-boned', 'high-cheekboned', 'square-jawed and striking'], rear: ['a round rear', 'a full rear', 'a small high rear', 'a heavy rear', 'a narrow rear'] },
       man: { look: ['handsome', 'beautiful'], beard: ['a full beard', 'a short beard', 'a light beard', 'no beard'], bodyHair: ['heavy chest and leg hair', 'light chest and leg hair', 'smooth, with almost none'] }
     },
+    // How a waypoint is lived, for its note from the engine: the stage line is the fact, this is what the body does as it arrives. Keyed
+    // "kind.key", else "key" (a string aliases another key), else "_" ("_ways" for a kind's habits); the way over's tracks by "woman.key"
+    // or "man.key". on is a part's first waypoint, mid the ones between, end its last; touch is what a hand on a finished part does. Every
+    // clause is a bodily event (ache, burn, itch, pressure, tingling, heat, soreness, oversensitivity, relief), never how the person
+    // feels about it, and a shared entry names no shape a kind's own lines do not give it.
+    felt: {
+      _: {
+        on: ['an ache, an itch or a tight pulling in one place, there and gone', 'a tingling and a faint heat in one place'],
+        mid: ['the same place hotter, tighter or itching, sore to press', 'a pulling ache that eases in the cool and comes back with use'],
+        end: ['the ache gone out and a new sensitivity in its place, every touch registering'],
+        touch: ['a touch there lands harder than it should, sharp and warm together']
+      },
+      _ways: {
+        on: ['a small shift in how the body sits, breathes or reacts, noticed before it is understood', 'a flicker in the chest or the stomach that comes without a cause'],
+        mid: ['the shift coming again and staying a little longer, felt in the shoulders, the breath or the gut', 'a warmth or restlessness in the body that eases with food, rest or company'],
+        end: ['the shift settled into the body as a habit it no longer notices, until it is crossed']
+      },
+      forearm_coat: {
+        on: ['an itch and prickle under the skin of the wrists, like hairs pushing up from the root', 'a prickling along the wrists that scratching only stirs'],
+        mid: ['warmth under the skin as the roots set, an itch that comes in waves', 'the hairs lifting and settling in a breath of air, all one way, the skin under them hot'],
+        end: ['warm to the bone, the skin answering a stroke before the coat does'],
+        touch: ['with the lie a stroke runs warm up the arm; against it, a sharp prickle']
+      },
+      forearm_pelt: 'forearm_coat',
+      leg_and_hip_coat: {
+        on: ['an itch along the shins and ankles that spreads when scratched', 'a prickling at the ankles like a foot waking, but travelling up'],
+        mid: ['heat under the skin as the undercoat comes in, an itch that scratching only stirs', 'every hair felt at its root where cloth drags against the lie'],
+        end: ['warm and dense, the whole leg answering one stroke along the lie'],
+        touch: ['with the lie a hand runs up through the whole leg; against it, a shiver that tightens the thigh']
+      },
+      leg_and_hip_pelt: 'leg_and_hip_coat',
+      spine_strip: {
+        on: ['a line of prickling gooseflesh at the base of the backbone', 'an itch low on the back, just out of reach'],
+        mid: ['the strip warm and itching as the coat climbs, a shiver following any hand', 'the skin of the back tingling ahead of the hair'],
+        end: ['a hand run along it felt down the whole back, a long loosening shiver'],
+        touch: ['with the lie a stroke runs warm down the back; against it, a shudder']
+      },
+      spine_line: 'spine_strip',
+      'cow.tail': {
+        on: ['a bruised ache at the base of the spine, sharp when it is sat on'],
+        mid: ['a pulling at the tailbone as the length slides out, hot and tender', 'a flick from nowhere, the muscle moving before the thought'],
+        end: ['the root very sensitive, a touch there running up the spine and down the legs'],
+        touch: ['a hand near the root sends a jolt up the spine, sharp and warm together']
+      },
+      'cow.ears': {
+        on: ['the ears running hot and heavy, as after a long cold wind', 'a tingling along the ear rims, sounds arriving lower and from further off'],
+        mid: ['a pulling stretch along the ear as it lengthens, tender when brushed', 'the ears twitching toward a sound before the head turns'],
+        end: ['soft, mobile ears, a stroke at their base running down the neck as a heavy ease'],
+        touch: ['a stroke at the base of an ear loosens the neck and shoulders; a flick at the rim stings']
+      },
+      'cow.nose_and_face': {
+        on: ['the nose cool and damp, wet again a moment after it is wiped'],
+        mid: ['a tight, stretching ache across the nose and jaw as they come forward', 'the nostrils flaring wider on a breath'],
+        end: ['a face a little forward, fuller at the lips, the nose cool and soft'],
+        touch: ['a thumb along the nose is cool and damp, and the whole face loosens under it']
+      },
+      'cow.own_scent': {
+        on: ['sweat gone mild and sweet, noticed first on a hand brought to the face'],
+        mid: ['a warm smell rising off the skin when the body warms', 'the smell clinging to cloth after the body has gone'],
+        end: ['the smell settled into the skin, there when a sleeve is lifted or a pillow turned']
+      },
+      'cow.feet_and_stance': {
+        on: ['an ache in the arches that tightens and tips the weight onto the toes'],
+        mid: ['the heel lifting and refusing to come down, the calves hard and burning', 'a stretch at the back of the leg like a cramp that will not release'],
+        end: ['weight carried high and sure, the calves quiet, a deep ease in the long foot'],
+        touch: ['a hand on the calf finds it hard as rope, and a long loosening heat answers']
+      },
+      'cow.hands': {
+        on: ['a dull pressure under every nail, as if each were pushed up from beneath', 'an ache in the fingertips, the kind a long carry leaves'],
+        mid: ['a tight pull in the skin between the fingers, a sting if they are forced apart', 'hot, stiff knuckles and the fingers moving in pairs'],
+        end: ['the ache gone and a blunt, sure grip in its place, the skin behind each hoof soft and very sensitive'],
+        touch: ['a touch behind a hoof runs through the whole hand, sharp and warm together']
+      },
+      'cow.toes_and_hooves': {
+        on: ['a pressure under the toenails and a snug, crowded feeling in the shoes', 'a dull ache at the toe ends, as if a door had been shut on them'],
+        mid: ['the middle toes drawing together, a deep toothache in the joints', 'a hot throb at the toe ends that eases in the cool and returns with weight'],
+        end: ['the throbbing settled to a hard, quiet bearing of weight, the soft bulb behind each hoof tender to the floor'],
+        touch: ['pressure on the bulb behind a hoof runs high into the calf, sore and warm at once']
+      },
+      'cow.eyes': {
+        on: ['the lashes heavy, tangling and brushing the cheek on each blink', 'a faint drag on the lids when they close, as if something were threaded through the lashes'],
+        mid: ['a drawing ache behind the eyes as they enlarge', 'the sight sliding wide at the rims'],
+        end: ['the edges of the room standing clear without a turn of the head, sudden movement at the rim jolting the body']
+      },
+      'cow.senses': {
+        on: ['smells arriving from much further than they should, thick at the back of the nose', 'a flare of scent so sharp it is almost taste'],
+        mid: ['low sound felt in the chest as pressure', 'rain smelled before the first drop'],
+        end: ['a sharp sudden noise landing as a flinch down the spine and heat in the ears, low sound held as warmth in the chest']
+      },
+      'cow.appetite_and_cud': {
+        on: ['the stomach turning at the smell of meat, the mouth running at greens, grain and milk'],
+        mid: ['a slow, steady hunger that eating dulls but does not end', 'a pull toward cream and cocoa'],
+        end: ['a heavy, easy fullness after grazing, the jaw working sideways when idle']
+      },
+      'cow.weight_and_strength': {
+        on: ['a settled, loaded heaviness in the legs and back, a half-second lag between deciding and moving'],
+        mid: ['muscle thickening across the back and thighs, a warm ache like the day after hard work', 'a body that does not budge when pushed, a floor that gives under it'],
+        end: ['heavy, warm and steady, slow to start and hard to stop']
+      },
+      'cow.herd': {
+        on: ['the shoulders dropping and the heartbeat slowing without any cause', 'the jaw unclenching and the hands going still'],
+        mid: ['a warmth in the chest that rises when someone sits close', 'an itch of restlessness that eases in company'],
+        end: ['a slow-breathing ease against a warm body, a restless prickle alone'],
+        touch: ['a hand laid on the back loosens the whole spine']
+      },
+      'cow.voice': {
+        on: ['a low hum in the breastbone that comes unbidden and buzzes the ribs'],
+        mid: ['the throat loosening, a long low note felt in the teeth', 'the hum carrying through a shared seat'],
+        end: ['the hum felt through a shared seat, the low call shaking the chest']
+      },
+      'cow.teats_and_udder': {
+        on: ['a deep itch and tenderness behind the nipples, which stay raised, and a faint fullness in the breasts'],
+        mid: ['a soft heat low on the belly, a tender swelling that aches when jolted', 'the nipples lengthening and sore against cloth'],
+        end: ['warm, heavy and very sensitive, cloth and touch both registering sharply'],
+        touch: ['touch lands high and bright, ache and pleasure together']
+      },
+      'cow.milk': {
+        on: ['a tight fullness late in the day, in the udder first and a little in the breasts'],
+        mid: ['pressure building to an ache that warmth and a hand ease', 'the first drops let down by touch or warmth, then relief and a heavy calm'],
+        end: ['a steady fullness that needs emptying, and relief and a deep ease when it is'],
+        touch: ['being drawn off brings relief at once, deep and slow']
+      },
+      'cow.horns_and_crest': {
+        on: ['two tender spots above the temples, sore as bruises, with something hard underneath'],
+        mid: ['a bony pressure pushing out from inside the skull, a thick ache across the back of the neck', 'heat at the horn buds when the head is bowed'],
+        end: ['the weight of the horns a steady pull on the neck, the base of each answering every touch'],
+        touch: ['a thumb at the base of a horn runs down the neck as a deep, sharp heat']
+      },
+      'cow.the_bulls_ground': {
+        on: ['a steady stillness in the body when it is pushed, and a lag before it moves'],
+        mid: ['the weight dropping forward onto the feet', 'the breath going loud when crowded'],
+        end: ['patient and heavy, a slow heat in the shoulders when challenged']
+      },
+      'woman.voice': {
+        on: ['a catch in the throat and a crack upward on a word'],
+        mid: ['a looseness at the throat, the low notes gone', 'the voice climbing and thinning on a long word'],
+        end: ['a lighter voice, felt higher in the chest']
+      },
+      'man.voice': {
+        on: ['a hoarse catch in the throat, as with a cold'],
+        mid: ['a heavy vibration in the chest on the low words', 'a lump at the throat that moves on swallowing'],
+        end: ['a lower voice, felt in the breastbone']
+      },
+      'woman.face': {
+        on: ['the cheeks smoother under a palm and the jaw sore, as after a long day of chewing'],
+        mid: ['a tender ache in the jaw and brow as they soften', 'the lips fuller and sensitive'],
+        end: ['a smaller, rounder face, the skin of it registering every touch']
+      },
+      'man.face': {
+        on: ['the skin of the jaw coarser under a palm, a scratch of new hairs at the lip'],
+        mid: ['an ache along the jaw and brow as they firm', 'the cheeks leaner'],
+        end: ['a harder, larger-planed face, the jaw rough under a hand']
+      },
+      'woman.skin_and_hair': {
+        on: ['the hair on the chest and belly thinning, the skin there tingling'],
+        mid: ['skin finer and softer, bruising at a knock and feeling more', 'the head hair thicker and growing fast'],
+        end: ['soft skin that registers every touch, the head hair thick']
+      },
+      'man.skin_and_hair': {
+        on: ['the hair on the forearms and shins darker and coarser, prickling'],
+        mid: ['skin thicker and oilier, slower to bruise', 'a line of hair coming in below the navel'],
+        end: ['a man\'s skin and hair, rough under a palm']
+      },
+      'woman.frame': {
+        on: ['the shoulders easing inward, shirts hanging looser there'],
+        mid: ['a dull ache in the shoulders and arms as they slim', 'the hands finer, the grip lighter'],
+        end: ['a lighter frame carried differently, old clothes hanging wrong everywhere']
+      },
+      'man.frame': {
+        on: ['the shoulders pushing outward, a tightness across the back'],
+        mid: ['a deep ache in the shoulders and neck as they broaden', 'the hands thicker, the knuckles heavier'],
+        end: ['a heavier frame, the grip stronger, old clothes tight everywhere']
+      },
+      'woman.waist_and_hips': {
+        on: ['the waist drawing in a little, a dull ache at the hips at night'],
+        mid: ['a deep ache across the hips for days as the pelvis widens', 'the walk changing to carry it'],
+        end: ['the weight sitting lower, the new curves felt in every step']
+      },
+      'man.waist_and_hips': {
+        on: ['the waist thickening and straightening, a stiffness at the back'],
+        mid: ['a deep ache across the hips for days as they narrow', 'the stride lengthening'],
+        end: ['the weight sitting higher, the stride longer']
+      },
+      'woman.chest': {
+        on: ['a deep itch and tenderness behind the nipples, which stay raised'],
+        mid: ['a firm, tender disc under each areola that aches when knocked', 'a swelling that stretches the skin, sore to cloth and cold'],
+        end: ['settled, soft and heavy, the weight felt on the ribs and the nipples answering every touch'],
+        touch: ['touch lands high and bright, ache and pleasure together']
+      },
+      'man.chest': {
+        on: ['a soft tenderness and a loosening ache across the chest'],
+        mid: ['the breasts shrinking and aching', 'the muscle beneath tightening'],
+        end: ['a flat, broad chest, the nipples small and quick to the cold']
+      },
+      'woman.scent': {
+        on: ['sweat milder, noticed on the skin after a run of the stairs'],
+        mid: ['the skin smelling warmer and sweeter', 'the smell lingering on cloth'],
+        end: ['a scent that any keen nose would call a woman\'s']
+      },
+      'man.scent': {
+        on: ['sweat sharper, noticed on the skin after a run of the stairs'],
+        mid: ['the skin smelling heavier and warmer', 'the smell lingering on cloth'],
+        end: ['a scent that any keen nose would call a man\'s']
+      },
+      'woman.balance_and_gait': {
+        on: ['balance off on the stairs and in a quick turn'],
+        mid: ['the stride shortening and the hips moving with it', 'the arms carried differently around the chest'],
+        end: ['a gait that no longer needs thinking about']
+      },
+      'man.strength_and_gait': {
+        on: ['things lighter than expected, a door that comes open too fast'],
+        mid: ['the stride lengthening', 'the weight carried high in the shoulders'],
+        end: ['a gait that no longer needs thinking about']
+      },
+      'woman.below': {
+        on: ['a tightness and a drawing-in low in the body, tender to pressure'],
+        mid: ['a tender, heightened sensitivity, cloth and touch registering sharply', 'a deep ache that comes and goes'],
+        end: ['new and easily overwhelmed by touch']
+      },
+      'man.below': {
+        on: ['a fullness and heat low in the body, more sensitive each day'],
+        mid: ['a tender, heightened sensitivity, cloth and touch registering sharply', 'a deep ache that comes and goes'],
+        end: ['new and quick to answer']
+      },
+      'woman.rhythms': {
+        on: ['a dull drawing ache low in the belly, there and gone'],
+        mid: ['a warmth and sensitivity that spread through the body, slower to start and wider', 'a tenderness that comes and goes'],
+        end: ['a rhythm the body keeps, felt in the belly and the back']
+      },
+      'man.rhythms': {
+        on: ['a heaviness low in the chest, the pulse quicker to rise'],
+        mid: ['a warmth and restlessness quicker to start and held in one place', 'a steadier heat'],
+        end: ['a steadier rhythm, the days running level']
+      }
+    },
     tracks: {
       species: {
         wolf: [
@@ -559,10 +799,10 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'forearm_pelt', name: 'Forearm pelt', weight: 4, range: { least: 'Backs of the hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders, joining the ruff' }, endsAs: 'pelt from the backs of the hands to the elbows',
             stages: [
-              'Hair on the wrists and the backs of the hands denser, in the coat\'s colour.',
-              'A soft undercoat from the wrist upward, the skin beneath it warmer.',
-              'Guard hairs through the undercoat, lying toward the hand, reaching most of the way to where the pelt will end. Stroked against the lie it prickles and stands.',
-              'Full pelt from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched, and sleeves sit differently over it.'
+              'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
+              'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
+              'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
+              'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
           { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, range: { least: 'Four clawed toes and a small dewclaw on a broad foot', standard: 'Four clawed, padded toes and a dewclaw', most: 'Tight wolf toes with heavy claws' }, endsAs: 'four clawed, padded toes and a dewclaw',
             stages: [
@@ -723,18 +963,18 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
             stages: [
-              'Hair on the wrists and the backs of the hands denser, in the coat\'s colour.',
-              'A soft undercoat from the wrist upward, the skin beneath it warmer.',
-              'Guard hairs through the undercoat, lying toward the hand, reaching most of the way to where the pelt will end. Stroked against the lie it prickles and stands.',
-              'Full pelt from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched, and sleeves sit differently over it.'
+              'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
+              'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
+              'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
+              'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
           { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Hooves to mid-thigh', standard: 'Hooves to hips, fading out at the navel', most: 'Over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'Short coat from hooves to hips, fading out at the navel',
             stages: [
-              'Leg hair denser, in the coat\'s colour, from the ankle up.',
-              'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
-              'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
-              'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Coat from the hooves up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'An itch down the shins, then the leg hair coming in denser and rougher from the ankle up, in the coat\'s colour.',
+              'Undercoat on the lower leg, short and close, the skin beneath it hot; an itch as it comes in that scratching only stirs.',
+              'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh with a crawling prickle. Cloth drags against the lie.',
+              'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
+              'Coat from the hooves up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 5, endsAs: 'two toes in a split hoof with dewclaws behind',
             stages: [
@@ -972,10 +1212,10 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Dark gloves to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Dark gloves from the hands to the elbows',
             stages: [
-              'Hair on the wrists and the backs of the hands denser, in the coat\'s colour.',
-              'A soft undercoat from the wrist upward, the skin beneath it warmer.',
-              'Guard hairs through the undercoat, lying toward the hand, reaching most of the way to where the pelt will end. Stroked against the lie it prickles and stands.',
-              'Full pelt from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched, and sleeves sit differently over it.'
+              'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
+              'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
+              'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
+              'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
           { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, endsAs: 'Four clawed toes and a dewclaw',
             stages: [
@@ -1131,10 +1371,10 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
-              'Hair on the wrists and the backs of the hands denser, in the coat\'s colour.',
-              'A soft undercoat from the wrist upward, the skin beneath it warmer.',
-              'Guard hairs through the undercoat, lying toward the hand, reaching most of the way to where the pelt will end. Stroked against the lie it prickles and stands.',
-              'Full pelt from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched, and sleeves sit differently over it.'
+              'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
+              'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
+              'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
+              'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
           { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, fading out at the navel',
             stages: [
@@ -1262,10 +1502,10 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
-              'Hair on the wrists and the backs of the hands denser, in the coat\'s colour.',
-              'A soft undercoat from the wrist upward, the skin beneath it warmer.',
-              'Guard hairs through the undercoat, lying toward the hand, reaching most of the way to where the pelt will end. Stroked against the lie it prickles and stands.',
-              'Full pelt from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched, and sleeves sit differently over it.'
+              'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
+              'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
+              'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
+              'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
           { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Feet to mid-thigh, no belly fur', standard: 'Feet to hips, pale belly fur to just under the breasts', most: 'Over ribs and back; all but the face' }, endsAs: 'Coat from feet to hips',
             stages: [
@@ -2124,7 +2364,7 @@ window.WINDLASS_WORLDS.sundered = {
           ] }
       ],
     },
-    thresholdsNote: 'each part of the body changes on its own track; the first changes begin at about 12 to 15, and a kind is complete at 100',
+    thresholdsNote: 'each part of the body changes on its own track, one step told at a time; at 100 the kind may finish',
     species: {
       cow: { name: 'bovine mythkin', short: 'Bovine', race: 'Bovine mythkin', rate: 4, element: 'earth', method: 'dairy from the Creamery made by bovine students (milk, cream, their cocoa), long warm hugs, sleeping against them',
         ladder: [
@@ -2517,7 +2757,7 @@ window.WINDLASS_WORLDS.sundered = {
 
   // ---- Hidden lore. GM-only: released to the narrator by the engine as the player discovers things; never stated by anyone. ----
   secrets: {
-    rule: 'This section is for the narrator alone. No character knows any of it except the keeper named below; the narration never states it, and {first} never knows it until it is found. It exists so the world stays consistent and so an oddity, at most one every few turns, can be placed for the player to notice or ignore.',
+    rule: '{first} never knows any of it until it is found. It keeps the world consistent and lets an oddity be placed for the player to notice.',
     hints: [
       'The bell in the tower rings once, some nights, with nobody at the rope.',
       'The old wall has seven doors bricked up and an eighth that is not bricked, only forgotten behind ivy.',
@@ -2540,43 +2780,52 @@ window.WINDLASS_WORLDS.sundered = {
       'The trials answer only to what is still human. A descendant who has taken too much of too many kinds cannot open a closed place or face its guardian, however strong their mind; the Restoration Spa gives that humanity back. The Dean is such a descendant: she found the places long ago and could not pass them, held her mind, became what she is, and needs a new sage.',
       'The Choice, in the Keel: unite the worlds (glamours end, the Isle is revealed, mythkin and humans live openly); return magic to humanity (the Sundering undone, with everything that led to it); end magic (the mythkin become human); or leave things as they are and let the Isle stay hidden.'
     ],
-    keeper: { key: 'dean', text: 'is the only person on the Isle who knows all of this. She is a descendant herself, human once, who found the closed places long ago and could not pass them: she had taken too many kinds too fully, and the trials answer only to what is still human. She held her mind, so she did not become a guardian; she became what she is, a chimera of everything she took, and stopped there. The Isle needs a new sage, and she cannot be it. So she keeps the Isle and collects the humans who see through glamours (the letters come from her office), hoping without expecting that one of them will do what she could not; she is fond of them, expects little, and tells nobody anything they have not earned. She drops a hint, never an explanation, and only after {first} does something of note in her sight or hearing: finds a closed place, faces a guardian, or shows unusual courage, restraint or kindness. Then she gives one piece, in her own words, sideways, and changes the subject. Pressed without having earned it, she says that some doors are closed for good reasons, and means it kindly. She never says what she is or what she hopes.' }
+    keeper: { key: 'dean', text: 'alone knows all of this. A descendant herself, human once, she found the closed places long ago and could not pass them: she had taken too many kinds too fully, and the trials answer only to what is still human. She held her mind, so no guardian; she became a chimera of everything she took, and stopped there. The Isle needs a new sage and she cannot be it, so she keeps the Isle and collects the humans who see through glamours, hoping without expecting that one will do what she could not. Fond of them, she tells nobody what they have not earned: only after {first} does something of note in her sight or hearing (finds a closed place, faces a guardian, shows unusual courage, restraint or kindness) does she drop one hint, sideways and in her own words, never an explanation, then change the subject. Pressed unearned, she says that some doors are closed for good reasons, and means it kindly. She never says what she is or what she hopes.' }
   },
 
   // The seven closed places. Location and opening are GM knowledge from the start (so the narrator can play a discovery);
   // trial and guardian are sent once the place is found; the fragment once it is cleared. Flags: dungeon_<key>_found, _cleared.
+  // Until the scene nears a place the narrator gets only its sin, key, name and `at`; where and opens come whole once a phrase of `keys` is
+  // anywhere in play (the story too) or a word of `cues` is in the action, the director note, the location or who is present.
   dungeons: [
-    { key: 'wrath', sin: 'Wrath', name: 'the Bell Cellar', where: 'under the bell tower on the quad; a trapdoor in the tower\'s ground floor, under the coiled bell rope, that nobody has reason to lift',
+    { key: 'wrath', sin: 'Wrath', name: 'the Bell Cellar', at: 'under the bell tower', keys: ['trapdoor', 'cellar', 'bell rope', 'bell cellar', 'ring the bell', 'strike the bell', 'struck the bell', 'rang the bell'], cues: ['bell', 'bells', 'tower', 'rope'],
+      where: 'under the bell tower on the quad; a trapdoor in the tower\'s ground floor, under the coiled bell rope, that nobody has reason to lift',
       opens: 'when someone strikes the bell by hand: the rope is tied off out of reach and the stair is locked, so it takes a climb and real anger to do it. The trapdoor is open afterwards until dawn.',
       trial: 'The cellar is a spiral of stone rooms, each warmer than the last, and in each {first} hears, in the voice of someone who wronged {them}, the thing that was said. Doors open only to someone who answers without raising their voice; a shout closes them. The trial is to reach the bottom without giving the place what it wants.',
       guardian: 'the Hound: what remains of a student who took the wolf all the way and let rage finish the work, a man-shaped thing of muscle and hackles the size of a door, who fights anything that comes down the stair and weeps between blows. It remembers being called Aldric, and stops, for a moment, if called by that name.',
       fragment: 'There were seven, and they were human. The Isle was raised, not found.' },
-    { key: 'pride', sin: 'Pride', name: 'the Doorless Tower', where: 'the tower on the cliff path with no door and no windows below the top floor, warm on the north side',
+    { key: 'pride', sin: 'Pride', name: 'the Doorless Tower', at: 'the doorless tower on the cliff path', keys: ['doorless', 'tower with no door'], cues: ['tower', 'towers', 'cliff*', 'edge'],
+      where: 'the tower on the cliff path with no door and no windows below the top floor, warm on the north side',
       opens: 'to anyone who stands at its foot and says aloud, honestly, one thing they cannot do. A door is there afterwards for that person only.',
       trial: 'Inside, the tower is mirrors, and every mirror is kind: it shows {first} taller, cleverer, further along, loved. The stair climbs only while {first} looks at the plain glass at the landing, which shows {them} exactly as {they} {are}. The trial is to climb without being flattered.',
       guardian: 'the Peacock: a descendant who took the harpy and could not bear to be less than perfect, now all plumage and no face, a fan of eyes that see every flaw. It cannot be fought where it can see itself; it can be fought with the mirrors turned.',
       fragment: 'The sages sealed magic away to end a war, and took the cost of it themselves, and it was not a small cost.' },
-    { key: 'envy', sin: 'Envy', name: 'the Glass Orchard', where: 'a glasshouse at the far end of the Greenhouse Quarter, gone wild inside, its door grown shut with ivy',
+    { key: 'envy', sin: 'Envy', name: 'the Glass Orchard', at: 'the far end of the Greenhouse Quarter', keys: ['glass orchard', 'orchard', 'glasshouse'], cues: ['greenhouse*', 'ivy'],
+      where: 'a glasshouse at the far end of the Greenhouse Quarter, gone wild inside, its door grown shut with ivy',
       opens: 'when someone gives away, at the door, a thing they truly want to keep; the ivy lets go for them.',
       trial: 'The orchard shows {first} what other people have: rooms full of it, warm and lit, each with a door that opens for the owner and not for {them}. The path goes on only past the rooms. The trial is to walk past them.',
       guardian: 'the Green Thing: a descendant who took the dryad and wanted everything everyone else had, now roots and reaching hands, a tree that walks by taking. It can be fought; it can also be given something, which is worse for it and better for {first}.',
       fragment: 'The sages\' blood carries an opening. Those who see through glamour are of it, and the Isle sends for them.' },
-    { key: 'greed', sin: 'Greed', name: 'the Counting House', where: 'under the goblin arcade, behind the eighth door in the old wall, the one that is not bricked but forgotten behind ivy at the arcade\'s back',
+    { key: 'greed', sin: 'Greed', name: 'the Counting House', at: 'under the goblin arcade', keys: ['counting house', 'eighth door'], cues: ['arcade', 'market', 'wall', 'bricked'],
+      where: 'under the goblin arcade, behind the eighth door in the old wall, the one that is not bricked but forgotten behind ivy at the arcade\'s back',
       opens: 'to anyone who pays the door a price they cannot get back: a thing of value left on the sill and not taken up again.',
       trial: 'Rooms of treasure that is real and can be carried out, and a way through that closes behind anyone carrying anything. The trial is to leave it all where it lies, including the thing that would solve a real problem.',
       guardian: 'the Hoard: a descendant who took the goblin and could not stop counting, now a mound that talks and offers, a pile of gold and hands that wants to give {first} anything and keep {them}. Fought, it scatters; bargained with, it lies.',
       fragment: 'The Spa is the sages\' font. It was built for those of the blood who changed and wished to return.' },
-    { key: 'lust', sin: 'Lust', name: 'the Drowned Chapel', where: 'under the lake, off the merfolk pools: a sunken chapel whose bell can be seen from the surface on a still day',
+    { key: 'lust', sin: 'Lust', name: 'the Drowned Chapel', at: 'under the lake, off the merfolk pools', keys: ['drowned chapel', 'sunken chapel'], cues: ['chapel', 'drowned', 'sunken', 'pools', 'lakeshore', 'lake shore', 'swim*', 'dive', 'diving', 'night swim', 'to the lake', 'at the lake', 'by the lake', 'on the lake', 'across the lake', 'into the lake', 'in the lake'],
+      where: 'under the lake, off the merfolk pools: a sunken chapel whose bell can be seen from the surface on a still day',
       opens: 'to anyone who goes into the lake at night with someone they trust and lets go of them at the bottom of the bell rope.',
       trial: 'The chapel is air below water, warm, and full of the pull of every species at once: something is offered plainly and freely, without claiming to know what {first} wants or whom {they} want{s}. The trial is to answer honestly and still leave by the far door.',
       guardian: 'the Siren: a descendant who took the mer and could not stop wanting to be wanted, beautiful past bearing and starving, who sings the door shut. It can be fought in the water, badly; it can be refused, which is harder.',
       fragment: 'Full change remakes the body and leaves the mind to hold; what the mind holds is what it becomes.' },
-    { key: 'gluttony', sin: 'Gluttony', name: 'the Cold Larder', where: 'under the dining hall, past the cook\'s cold room, a door at the back of the pantry that is always slightly open and never noticed',
+    { key: 'gluttony', sin: 'Gluttony', name: 'the Cold Larder', at: 'under the dining hall', keys: ['larder', 'pantry', 'cold room'], cues: ['cook', 'dining hall', 'dinner', 'feast*', 'fast', 'fasting', 'fasts'],
+      where: 'under the dining hall, past the cook\'s cold room, a door at the back of the pantry that is always slightly open and never noticed',
       opens: 'to anyone who fasts through a feast: who sits the whole of a dinner with a full plate and eats nothing, and thanks the cook.',
       trial: 'A table that never empties, laid with rich food, warmth and time; the door on is at the far end of the table and the table is very long. The trial is to walk the length of it without eating.',
       guardian: 'the Glutton: a descendant who took the bovine and could not stop being fed, immense and kind and sorrowful, who wants only to give {first} a plate and hold {them} while {they} eat{s}. It does not fight; it embraces, and does not let go, and can be talked to.',
       fragment: 'The ones who changed and gave way did not stop changing. The sages could not undo them; they built these places to keep them, and to test the ones who came after.' },
-    { key: 'sloth', sin: 'Sloth', name: 'the Sleeping Wing', where: 'the locked east wing of Kettle Hall on the top floor, behind a door papered over on the landing past room 4B',
+    { key: 'sloth', sin: 'Sloth', name: 'the Sleeping Wing', at: 'Kettle Hall\'s east wing', keys: ['east wing', 'sleeping wing', 'papered'], cues: ['landing', 'fog'],
+      where: 'the locked east wing of Kettle Hall on the top floor, behind a door papered over on the landing past room 4B',
       opens: 'on a night the Isle wants everyone asleep (a fog comes up from the cloud and the whole hall drowses): the door is there for anyone still awake at three.',
       trial: 'Rooms of beds, each warmer and softer than the last, a cat on every one, and a corridor that lengthens for anyone who hurries and shortens for anyone who lies down for a moment. The trial is to reach the end without resting.',
       guardian: 'the Sleeper: a descendant who took the cat and stopped bothering, warm and vast and purring, deadly to lie beside; it wants company and will take it forever. It cannot be fought lying down.',
@@ -2587,26 +2836,30 @@ window.WINDLASS_WORLDS.sundered = {
     text: 'With all seven closed places passed, the Keel opens: a stair from the Bell Cellar down through the rock of the Isle to a hall under the lake where seven chairs stand around a table of black glass and the cloud shows through the floor. Here {first} may choose, once, for everyone: unite the worlds (glamours end, the Isle is revealed, mythkin and humans live openly, and the changes {first} carries stay as they are); return magic to humanity (the Sundering undone; magic wakes in every human below, with everything that once came of it); end magic (the mythkin become human, the Isle settles into the sea as an ordinary island, and everything that made it strange is over); or leave things as they are and let the Isle stay hidden, and go back up the stair. Play the Keel as a scene like any other: the guardians\' names are carved on the chairs; anyone {first} brought down the stair may speak; the choice is made by an action, not announced. When it is made, write the consequence as it begins, then an epilogue turn, and set flags.keel_choice_made.'
   },
 
-  // Style examples: density and register only; the narrator must not reuse their content.
+  // Style examples, one a scene (ordinary, intimate, change): paragraph length, share of speech and plain words to match;
+  // their people, images and anatomy belong to them. The intimate one is one stage of an act, mid-act, on a bovine woman.
   exemplars: [
-    'The dining hall at eight is a noise you can lean on: a harpy on the rafters passing bread down to a goblin and two humans at the table beneath, a werewolf and a fairy arguing over a crossword, three fox tails and a dryad crown of leaves sharing the window table. Somebody\'s glamour has turned the porridge blue and nobody has fixed it. Heads turn as you come in, not unkindly, the way a room turns for weather, and a girl with gills stops chewing to look. {rm_first} steers you by the elbow toward {rm_their} usual table, where there is always room.',
-    'The cliff path has a rail because someone once decided it should, and the rail is cold and the cloud below it is not. It moves the way water moves, slowly, and now and then something under it brightens and goes out. "Don\'t," says the goblin behind you, not looking up from her ledger, when you lean. "Everyone leans. Nobody knows why. Walk on the wall side." You walk on the wall side, and the wall, when your hand brushes it, is warm.',
-    'The Glamour studio has mirrors on three walls and every one of them is a liar; the fairy at the front tells you so in her first sentence and then makes you find out which one is telling the truth about your own face. It takes you eleven minutes. The werewolf beside you takes four, and then spends the rest of the hour trying to see through yours, muttering, ears back, and you let her, because it is the first time anyone here has looked at you as a problem rather than an event.',
-    'The Creamery smells of warm milk and the cocoa is the colour of a horse. It is also, you realise on the second mouthful, the best thing you have ever drunk, and {npc_creamery_first} watches you realise it from behind the counter with the patience of someone who has watched a great many people realise it. "There\'s more," {npc_creamery_first} says, which is not a question.',
-    'She is close enough now that you can smell her, and it is not what you expected: warm dust, feathers in sun, something dry and clean like a stone that has been in the oven. The talons are the thing you cannot stop looking at, grey and ridged and gripping the chair rail the way a hand grips a rail, and you look at her face instead, which is a face, and then at the talons again. You have never been this near to anything that was not a person, and she is a person, and both of those are true at once, and you say nothing about any of it.',
-    'Your hand goes to the base of your spine before you have decided to send it there. It is an ache like the one you get from a bad chair, low and centred, except you have been standing for an hour. Under the shirt there is nothing. You know there is nothing, because you check twice, and then you stop checking, in the middle of the corridor, and notice yourself stopping, and go down to breakfast with your hand in your pocket.',
-    'The feather sits on your pillow all through the mixer and is still there when you come back, small and copper and pointing at the door. You do not pick it up. You do not move it, either, which you notice yourself not doing, and lie down with it six inches from your ear like something that might say a word if you fell asleep first.'
+    { scene: 'ordinary', text: 'You ask what the charm costs, and the goblin behind the stall whips it out of reach before the words are finished.\n\n"Depends." She leans on the counter, long dark-green fingers drumming, the hard nails clicking on the wood. "Money? No. Money\'s boring and it\'s always the wrong amount." Small sharp teeth show in a grin. "I take favours."\n\nShe jerks her chin at a slatted crate under the counter, roped shut. Something inside it shifts.\n\n"That goes to the stall at the far end of the arcade. What\'s in it is none of your business, and if it moves, let it. The woman who runs the stall is cross with me, so you\'ll have to be nice. You look nice. I\'ve decided."\n\n"It won\'t bite," she adds. "Mostly it sulks."\n\nShe hooks the charm round one finger and swings it under the lantern, the bead throwing green across her knuckles.\n\n"Carry it there. Hand it over. Say I said hello, and say nothing else. Then this is yours. Wear it against the skin, under the shirt."\n\nTwo stalls down a kettle starts to scream. Her big dark eyes narrow against the lantern glare, and one wide flat foot taps the boards, five long toes spread.\n\n"I close at midnight." She dangles the charm over the gap between you. "Tick tock."' },
+    { scene: 'intimate', kind: 'cow', text: 'You kneel on the boards between her knees and she opens them wider before you ask. The short coat on her inner thighs is warm against your cheeks.\n\n"Slowly," she says. "Not that slowly. I\'ve waited all day."\n\nYou start low on her thigh and work inward. She is already wet, and she smells of salt and warm skin. When your tongue reaches her she breathes in through her nose and holds it.\n\n"There. Stay there." A breath. "Good. You\'ve done this before."\n\nYou lick her pussy from the bottom up, flat and slow. Her hips lift off the bed to meet you, and one hand drops into your hair, two fingers and a thumb, each capped in smooth hoof, and pulls you in.\n\n"Harder. Yes. Like that. Don\'t you dare stop."\n\nAbove your forehead her udder moves with her breathing, small and round and low on her belly, bare-skinned among the coat, the four teats tight.\n\n"Look up at me," she says. "I want to watch you do it."\n\nYou close your mouth over her clit and suck. Her heels hook over your shoulders, hooves digging in, and the tuft of her tail thumps the mattress.\n\n"Fuck," she says, long and low. "Who taught you that? No. Don\'t tell me."\n\nHer free hand goes to her own breast and rolls the long thick nipple between finger and thumb until it stands.\n\n"Hold my thighs. I want to feel you hold on. Then give me your fingers. Two. I\'ll tell you where."' },
+    { scene: 'change', text: 'The lamp clicks on and your roommate groans into her pillow.\n\n"Light," she says. "Some of us have a lecture at nine."\n\nYou hold your left arm under the bulb. It looks ordinary, a little flushed.\n\nThen the itch you have been ignoring since the wrist climbs another inch, deep under the skin, hot and prickling. You scratch. It makes no difference.\n\nThe skin is tight and feverish, and when you press a thumb into it, it throbs back.\n\n"If it\'s hives," she says into the pillow, "you\'re keeping them on your side of the room."\n\nThen the first one: a pinprick, a single hair pushing out through the skin at the back of your wrist. A second. A dozen.\n\nThey come one at a time, each a small hot point that stings and eases, fine and soft and pale at the root, until the back of the wrist is covered.\n\nYou press your palm over the place. The hair gives under it like felt, and the skin beneath is hotter than the rest of the arm. A shiver runs up through the shoulder, and your toes curl against the sheet.\n\n"You\'re panting," your roommate says. "Whatever it is, do it quietly."\n\nThe pricking climbs. By the time it slows, a soft down has spread halfway to the elbow, thick at the wrist and thinning out, and the whole stretch is warm. The palm and the inside of the wrist are bare.\n\n"Lamp," your roommate says. "Off. Or I\'m taking your pillow."\n\nOn the other wrist, the itch begins.' }
   ],
 
-  // Tracked items. Cravings are a spoiler (the player discovers changes); condition and discoveries are the player's own knowledge.
+  // Style examples for an intimate scene's turns (one is chosen in place of an ordinary one): plain words, one move at a time, each
+  // ending mid-act on the partner's line. Neutral on anatomy; nothing here is reused.
+  sceneExemplars: [
+    '{rm_First} lifts {rm_their} arms and you pull {rm_their} top over {rm_their} head, and it catches on an ear, and you both laugh. Then you stop laughing. Skin under your palms, warm, the breath going in and out beneath them. {rm_They} undoes your belt without looking down, watching your face. You get the last of it off in a tangle and lie back, and {rm_their} weight comes down along you from knee to shoulder. "Like this?" {rm_they} says, against your neck, and waits.',
+    '{rm_They} guides you in with one hand, slowly, and stops you with the same hand when you are only part way. "Wait," {rm_they} says, eyes shut, and breathes. "Now." It goes the rest of the way on {rm_their} count and {rm_their} head goes back against the pillow. The bed takes the rhythm and gives it back, a half-beat late. Then {rm_their} hands find your back and pull. "Slower than that," {rm_they} says against your jaw. "Or tell me what you want."'
+  ],
+
+  // Tracked items. Cravings are a spoiler (the player discovers changes); condition is how the body feels now, replaced each turn.
+  // The body's changes are the engine's: it knows every waypoint told, and the State panel lists them.
   trackedItems: [
     { key: 'cravings', label: 'Cravings and habits', type: 'text', visibility: 'player', mode: 'auto', maxChars: 120, spoiler: true },
-    { key: 'condition', label: 'Condition', type: 'text', visibility: 'player', mode: 'auto', maxChars: 220 },
+    { key: 'condition', label: 'Condition', type: 'text', visibility: 'player', mode: 'auto', maxChars: 120 },
     { key: 'romances', label: 'Romances', type: 'list', visibility: 'player', mode: 'auto', maxItems: 8 },
     { key: 'clubs', label: 'Clubs and societies', type: 'list', visibility: 'player', mode: 'auto', maxItems: 8 },
     { key: 'wearing', label: 'Wearing (gifts)', type: 'list', visibility: 'player', mode: 'auto', maxItems: 8 },
     { key: 'curses', label: 'Curses and marks', type: 'list', visibility: 'player', mode: 'auto', maxItems: 6 },
-    { key: 'discoveries', label: 'Discoveries', type: 'list', visibility: 'player', mode: 'auto', maxItems: 12 },
     { key: 'inventory', label: 'Carrying', type: 'list', visibility: 'player', mode: 'auto', maxItems: 20 },
     { key: 'spa_visits', label: 'Spa visits', type: 'number', min: 0, max: 99, visibility: 'player', mode: 'code' }
   ],
@@ -2615,7 +2868,7 @@ window.WINDLASS_WORLDS.sundered = {
   initialState: {
     day: 1, weekday: 'Monday', time: '17:40', location: 'Room 4B, Kettle Hall (top floor, back, view of the lake and the cloud beyond it)',
     present: ['{first}', '{rm_name}'],
-    items: { cravings: 'nothing unusual yet', condition: 'well', romances: [], clubs: [], wearing: [], curses: [], discoveries: [], inventory: ['a duffel bag', 'a phone with no signal', 'the letter with the seal', 'a jacket', 'forty dollars'], spa_visits: 0 },
+    items: { cravings: 'nothing unusual yet', condition: 'well', romances: [], clubs: [], wearing: [], curses: [], inventory: ['a duffel bag', 'a phone with no signal', 'the letter with the seal', 'a jacket', 'forty dollars'], spa_visits: 0 },
     attitudes: {},
     flags: { attended_mixer: false, met_dean: false, joined_human_society: false, has_used_spa: false, accepted_a_feather: false, wearing_goblin_charm: false, ran_with_pack: false, swam_in_lake: false, danced_the_ring: false, been_to_the_edge: false,
       dungeon_wrath_found: false, dungeon_wrath_cleared: false, dungeon_pride_found: false, dungeon_pride_cleared: false, dungeon_envy_found: false, dungeon_envy_cleared: false, dungeon_greed_found: false, dungeon_greed_cleared: false, dungeon_lust_found: false, dungeon_lust_cleared: false, dungeon_gluttony_found: false, dungeon_gluttony_cleared: false, dungeon_sloth_found: false, dungeon_sloth_cleared: false, keel_choice_made: false }
@@ -2624,9 +2877,10 @@ window.WINDLASS_WORLDS.sundered = {
   memorySeed: {
     // Cast members {first} has already met at close range when the story opens (the key came from the porter's hand).
     met: ['porter'],
-    summary: '{name}, nineteen and human, saw through a glamour three weeks ago and was invited to Mythaven. {They} came up on the afternoon cloud ferry today as the only human first-year, on a full scholarship, and has just met {their} roommate {rm_name} in room 4B of Kettle Hall. The cross-species mixer is on the quad at seven.',
+    // Days by number, never "today": every memory fold carries this text forward.
+    summary: '{name}, nineteen and human, saw through a glamour three weeks before Day 1 and was invited to Mythaven. {They} came up on the afternoon cloud ferry on Day 1 as the only human first-year, on a full scholarship, and met {their} roommate {rm_name} in room 4B of Kettle Hall on arrival. The cross-species mixer was set for seven that evening, on the quad.',
     events: [
-      'Before: three weeks ago, in the world below, {first} saw through a glamour; four days later the letter came, with a seal, a ferry ticket and a scholarship.',
+      'Before Day 1: three weeks earlier, in the world below, {first} saw through a glamour; four days later the letter came, with a seal, a ferry ticket and a scholarship.',
       'Day 1 15:00 {first} boards the afternoon ferry at Sallow Pier; a mile out the boat leaves the water and rises into cloud.',
       'Day 1 16:30 {first} lands on the Isle and collects the key to room 4B from {npc_porter}, the Kettle Hall porter.',
       'Day 1 17:40 {first} reaches room 4B and meets roommate {rm_name}, {rm_species}, second-year.'

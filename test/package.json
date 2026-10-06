@@ -18,6 +18,12 @@
     "long-game": "node probe2.js",
     "import-export": "node probe3.js",
     "looks-drift": "node looks-drift.js",
+    "prompt-budget": "node prompt-budget.js",
+    "ui-panels": "node ui-panels.js",
+    "pacing-scenes": "node pacing-scenes.js",
+    "voice-tics": "node voice-tics.js",
+    "save-sync": "node save-sync.js",
+    "gm-prompt": "node gm-prompt.js",
     "serve": "node server.js 4173"
   },
   "dependencies": { "jsdom": "24.1.3" }

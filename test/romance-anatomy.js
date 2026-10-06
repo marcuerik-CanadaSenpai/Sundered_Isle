@@ -113,7 +113,7 @@ async function main() {
     assert(await h.turn('Stay at the table', { director: 'Luna arrives and sits down.' }), 'director-arrival turn did not finish');
     assert.match(prompts[13], /Focus: the action or director note names Luna/,
       'a person the director note brings in must be in focus, not shut out by it');
-    assert.match(prompts[13], /Luna \(Werewolf\).*gender: Woman.*she\/her/,
+    assert.match(prompts[13], /Luna \(Werewolf\) \[npc\d+\] \(Woman, she\/her/,
       'cast edits must preserve an explicit gender and matching pronouns in the storyteller prompt');
     assert.match(prompts[13], /unless the action or the director note invites it/,
       'the focus rule must leave room for the director note');

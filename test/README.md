@@ -14,6 +14,8 @@ npm run smoke          # create an adventure, take one turn, check it was shown 
 npm run turns          # twelve turns, each shown and stored
 npm run schedule-precedence # day-specific events take precedence over generic slots
 npm run romance-anatomy # romance pacing, anatomical guidance and world-boundary regressions
+npm run ui-panels      # panels, labels and editors: spoiler toggle, State and header, Settings notes, Cast, Override, Debug, phone sheet
+npm run gm-prompt       # the game-master blocks of the prompt (closed places, skills, world) stay small and grow when the scene needs them
 npm run long-game      # realistic long game; on the snapshot it shows the chunk-size save failure (review/REVIEW.md H1)
 npm run import-export  # export then import a 25-turn save (chunks 0000-0002); on the snapshot the imported copy keeps only 0002 (H2)
 npm run serve          # the real page with the mock injected, at http://127.0.0.1:4173/
