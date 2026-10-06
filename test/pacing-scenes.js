@@ -56,7 +56,7 @@ const S = {
     try {
       for (const a of ['Fuck her.', 'Keep fucking her until you finish inside her.', 'Play with your nipples and masturbate.', 'Suck her nipples.', 'Climb on top of her and ride her.',
         'Strip her slowly.', 'Take off her top.', 'Slide your cock into her.', 'Cum inside her.', 'Pick up the pace and thrust harder.', 'Engage in lovemaking.', 'Lick her pussy until she comes.',
-        'Pick up the pace and jack hammer her pussy.', 'Let\'s have sex.', 'I have sex with her.', 'Make her orgasm with your mouth.']) {
+        'Pick up the pace and jack hammer her pussy.', 'Let\'s have sex.', 'I have sex with her.', 'Make her orgasm with your mouth.', 'Go down on her.', 'Finger her slowly.', 'Rub her nipples.', 'Eat her out.', 'Bend her over the desk.']) {
         assert(await h.turn(a), a + ' did not finish');
         const p = promptOf(lastTurn(h));
         assert.match(p, /Romance scene pacing \(binding\)/, a + ' gets the romance pacing');
@@ -77,7 +77,7 @@ const S = {
         'I fuel the stove.', 'I read about the cumin harvest.', 'I strip the bed.', 'I thrust the letter into my pocket.', 'I read the climax of the novel.', 'Look down at your own chest and see what she sees.',
         'What is happening, you say; as you get up to look in the mirror. The milk, and cum and on your body fueling the rapid changes.', 'I check how far the sex change has gone.',
         'Fuck, what is happening to my hands?', 'Ask May what the fuck she put in the milk.', 'Fuck me, that is a hoof.', 'Lick your lips and look at the bowl of milk.', 'You lick your fingers clean.',
-        'Suck your thumb.', 'Lick her hand.', 'I suck air through my teeth.']) {
+        'Suck your thumb.', 'Lick her hand.', 'I suck air through my teeth.', 'I touch her ear.', 'Stroke her neck.', 'I tease her about the hat.', 'Pound on the door.']) {
         assert(await h.turn(a), a + ' did not finish');
         assert.doesNotMatch(promptOf(lastTurn(h)), /Romance scene pacing|Scene note \(binding\)/, a + ' is not an act');
       }
@@ -152,6 +152,13 @@ const S = {
       assert.match(act, /carry it one stage on, to a build: a change of position, pace or act/);
       // Its band is the rich one while the scene is on, whatever the words.
       assert.match(act, new RegExp('Narrative length: at most ' + h.window.WINDLASS_WORLDS.sundered.wordBands.rich[1] + ' words'));
+      // Verbs of the act that happen to open like leaving keep the scene.
+      for (const a of ['Run your hands down her back.', 'Go down on her.', 'Stop teasing and take her.', 'Eat her out.']) {
+        const n = sceneOf(h).n;
+        assert(await h.turn(a));
+        assert.match(section(promptOf(lastTurn(h)), 'action'), /Scene note \(binding\)/, a + ' is the scene going on');
+        assert.equal(sceneOf(h).n, n + 1, a + ' counts as a turn of the act');
+      }
       // Walking away ends it, even though the narrator still says "build".
       assert(await h.turn('I go down to the library.'));
       p = promptOf(lastTurn(h));
@@ -173,6 +180,15 @@ const S = {
       assert(await h.turn('Stop, and ask her what is wrong.'));
       assert.doesNotMatch(promptOf(lastTurn(h)), /Scene note \(binding\)/, 'a stop is not carried on as the act');
       assert.deepEqual(sceneOf(h), { n: 0, stage: '' });
+      // So do a meal, a wash and going back to one's room.
+      for (const a of ['Eat breakfast with her.', 'Shower, then get dressed.', 'Run back to my room.']) {
+        h.say.stage = 'enter';
+        assert(await h.turn('Make love to her.'));
+        assert.equal(stateOf(h).scene.n, 1);
+        assert(await h.turn(a));
+        assert.doesNotMatch(promptOf(lastTurn(h)), /Scene note \(binding\)/, a + ' leaves the act');
+        assert.deepEqual(sceneOf(h), { n: 0, stage: '' }, a + ' ends the scene');
+      }
       clean(h);
     } finally { h.close(); }
   },
