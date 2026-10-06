@@ -84,6 +84,9 @@ const { boot } = require('./boot');
       ['Wipe your mouth, then move to her breasts and suck to relieve those as well.', 3, 'sucking, her named earlier in the clause'], ['Take her hand and go down the stair together.', 1, 'holding a hand'],
       ['I nurse my sore ankle.', 0, 'nursing an ankle'], ['Order the chicken breast at the cafeteria.', 0, 'a breast of chicken'], ['I lick the envelope and hand it to her.', 0, 'licking an envelope'],
       ['Say the milk tasted good, and offer to milk her if she wants.', 0, 'an offer'], ['I watch her sleep against the window.', 0, 'she sleeps against the window'],
+      ['Lick her neck.', 0, 'licking a neck is not milk'], ['Suck on her earlobe.', 0, 'an earlobe is not milk'], ['I drink from her water bottle.', 0, 'her water is not her milk'],
+      ['She sucks on my finger.', 0, 'her mouth on my finger'], ['I suck my thumb nervously beside her.', 0, 'my own thumb'], ['Drink from her breast.', 3, 'drinking from her breast'],
+      ['Suck on her right nipple.', 3, 'sucking, a part named with its side'], ['Lick her pussy.', 4, 'sex by mouth'],
     ]) {
       expect(await hc.turn(action), description + ': the turn did not finish');
       expect(intensityIn(latestTurn(hc), 'cow') === level, description + ' (' + JSON.stringify(action) + '): cow intensity was ' + intensityIn(latestTurn(hc), 'cow') + ', expected ' + level);

@@ -3276,8 +3276,11 @@
   // are the only one else in the scene. A verb counts in its own clause with no ask, offer, wish or negation before it, and only where
   // the kind's method (world data) names that sort of contact; sex always counts.
   const CONTACT_VERBS = [
-    { level: 4, re: /\b(?:fuck\w*|make(?:s|ing)?\s+love|made\s+love|love-?making|(?:have|had|having)\s+sex|jack\s*-?hammer\w*|(?:thrust\w*|climax\w*|cum(?:s|ming)?)\s+(?:in|inside|into|deep|deeper|hard|harder)|penetrat(?:e|es|ed|ing)\s+(?:her|him|them))\b/i },
-    { level: 3, gate: /\b(?:milk|dairy|nurs|cream|teat)/, re: /\b(?:suck(?:s|ed|ing)?(?!\s+(?:in|up)\b)|nurs(?:e|es|ed|ing)\s+(?:from|at|on)\s+(?!(?:the|a|an|my|your)\b)|(?:(?:^|\b(?:i|to|and|you|we)\s+)milk(?:s|ed)?|milking)\s+(?:her|him|them|(?!(?:and|at|in|is|was|from|with|for|on|to|the|a|an|some|my|your|it)\b)[a-z]+)|drink(?:s|ing)?\s+(?:deeply\s+)?from\s+(?!(?:the|a|an|my|your|this|that|some|it|its)\b)|lick(?:s|ed|ing)?\s+(?:her|him|them|\w+['’]s)\b|latch(?:es|ed|ing)?\s+on)/i },
+    { level: 4, re: /\b(?:fuck\w*|make(?:s|ing)?\s+love|made\s+love|love-?making|(?:have|had|having)\s+sex|jack\s*-?hammer\w*|(?:thrust\w*|climax\w*|cum(?:s|ming)?)\s+(?:in|inside|into|deep|deeper|hard|harder)|penetrat(?:e|es|ed|ing)\s+(?:her|him|them)|(?:lick|suck)(?:s|ed|ing)?\s+(?:on\s+)?(?:her|his|their|\w+['’]s)\s+(?:pussy|clit\w*|cock|penis|dick)|go(?:es|ing)?\s+down\s+on\s+(?:her|him|them)|eat(?:s|ing)?\s+(?:her|him|them)\s+out)\b/i },
+    // Milk is taken from the person: the person is the very next word and what follows is milk, a part that gives it, or nothing
+    // ("suck her nipple", "drink from her", "milk her"), or the part was named earlier in the clause ("move to her breasts and suck");
+    // "lick her neck", "suck on her earlobe" and "drink from her glass" are not.
+    { level: 3, gate: /\b(?:milk|dairy|nurs|cream|teat)/, obj: true, before: /\b(?:her|his|their|\w+['’]s)\s+(?:\w+\s+)?(?:breasts?|nipples?|teats?|udders?|milk)\b/i, tail: /^\s*(?:(?:\w+\s+){0,2}(?:breasts?|nipples?|teats?|udders?|milk|chest)\b|$)/i, re: /\b(?:suck(?:s|ed|ing)?(?:\s+on)?|lick(?:s|ed|ing)?|nurs(?:e|es|ed|ing)\s+(?:from|at|on)|drink(?:s|ing)?\s+(?:deeply\s+)?from|latch(?:es|ed|ing)?\s+on(?:to)?|milk(?:s|ed|ing)?)\b/i },
     { level: 3, gate: /\b(?:sleep|night)/, obj: true, re: /\b(?:(?:sleep|sleeps|slept|sleeping)(?:\s+[a-z]+){0,3}|(?:lie|lies|lay|lying)(?:\s+down)?|(?:spend|spent|spending)\s+the\s+night|(?:share|shared|sharing)\s+(?:a\s+)?bed)\s+(?:with|beside|next to|against|on top of)\b/i },
     { level: 1, gate: /\bkiss/, re: /\bkiss(?:es|ed|ing)?\b/i },
     { level: 1, gate: /\b(?:hug\w*|cuddl\w*|touch\w*|warmth)/, re: /\b(?:hug(?:s|ged|ging)?|embrac\w+|cuddl\w+|snuggl\w+|(?:hold|held|take|took|grab)\w*\s+(?:her|his|their|\w+['’]s)\s+hands?)\b/i },
@@ -3300,7 +3303,9 @@
         if ((/\b(?:she|he|they)\b/i.test(pre) || everyone.some((c) => named(c, pre))) && !/\b(?:you|your|me|my|yourself|myself)\b/i.test(cl.slice(m.index + m[0].length))) continue;
         // Sleeping against and touching need the person as the very next word ("sleep against her", "stroke May's hair"), not
         // "sleep against the window" or "brush my teeth next to her".
-        const scope = f.obj ? (/^\s*(?:\w+ly\s+)?(\S+)/.exec(cl.slice(m.index + m[0].length)) || ['', ''])[1] : cl;
+        const after = /^\s*(?:\w+ly\s+)?(\S+)(.*)$/.exec(cl.slice(m.index + m[0].length)) || ['', '', ''], partBefore = !!(f.before && f.before.test(pre));
+        const scope = f.obj && !partBefore ? after[1] : cl;
+        if (f.tail && !partBefore && !f.tail.test(after[2])) continue;
         const people = mythkin.filter((c) => named(c, scope));
         const pr = sole && sole.pronouns ? [sole.pronouns.they, sole.pronouns.them, sole.pronouns.their] : [];
         if (!people.length && sole && sole.species !== 'human' && pr.some((w) => w && new RegExp('\\b' + w + '\\b', 'i').test(scope))) people.push(sole);
