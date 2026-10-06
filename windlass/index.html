@@ -1925,7 +1925,8 @@
           shut.push(t.name.toLowerCase());
         }
       }
-      if (shut.length) lines.push('Not on this body (its path does not go there; never describe them): ' + shut.join(', ') + '.');
+      // Named to the player: other people keep the parts their own bodies have.
+      if (shut.length) lines.push('Not on ' + pl.first + '\'s body, whatever others have (' + pl.first + '\'s path does not go there; never give ' + pl.first + ' them): ' + shut.join(', ') + '.');
     }
     // At the Spa, what the healer tells before a bath: the changes that stand on others and go back with them.
     if (T.tracks && /\b(?:spa|restoration)\b/i.test(text + ' ' + (state.location || ''))) { const links = healLinks(tf); if (links.length) lines.push('Healing links (the Spa\'s healer says these before the bath, plainly): ' + links.slice(0, 6).join('; ') + '.'); }
@@ -3662,7 +3663,8 @@
   // An older turn is still shown (the feed, its engine notes and exposures in Debug, its secret and outcome) and a recovery
   // replays its memory lines; its state diff, notes for the next turn, raw updates, bond shifts and suggestions are read only
   // while it is the newest. Returns true when something was dropped.
-  const TURN_DEBRIS = ['diff', 'pendingAfter', 'updates', 'bondShifts', 'suggestions'];
+  // Suggestions stay: after an Undo an older turn is the newest again and shows its chips.
+  const TURN_DEBRIS = ['diff', 'pendingAfter', 'updates', 'bondShifts'];
   function dropDebris(t) {
     let dropped = false;
     for (const k of TURN_DEBRIS) if (t[k] !== undefined) { delete t[k]; dropped = true; }

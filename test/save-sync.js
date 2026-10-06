@@ -1,15 +1,22 @@
 'use strict';
-// Saves, sync between devices, interrupted writes and save migration, played on a real 25-turn save (WL_SAVE_DIR, default the
-// copy the review used; adventures/<id>.json and adventures/<id>/turns/000N.json). Exits 1 on any failed expectation.
+// Saves, sync between devices, interrupted writes and save migration, played on a real 25-turn save (the anonymised fixture, or
+// WL_SAVE_DIR with adventures/<id>.json and adventures/<id>/turns/000N.json). Exits 1 on any failed expectation.
 // Run one scenario with: node save-sync.js <name>
 const fs = require('fs'), path = require('path');
 const { boot } = require('./boot');
-const SAVE_DIR = process.env.WL_SAVE_DIR || '/tmp/claude-0/-home-user-Sundered-Isle/e8debf26-b8d3-524c-99ed-70a3c39f7fe2/scratchpad/saves/adventures';
+// WL_SAVE_DIR points at a real save on disk; without it the anonymised 25-turn fixture (the same game, see prompt-budget.js) is used.
+const SAVE_DIR = process.env.WL_SAVE_DIR || '', FIXTURE = path.join(__dirname, 'fixtures', 'cow-roommate-25.json');
 const ID = 'advmuvpigxlqpae', DOC = 'adventures/' + ID;
+// Three scenarios need the second, older save on disk (advmuq6y2ozresh, 47 turns, from before the looks rebuild); they are skipped without it.
+const SECOND = 'advmuq6y2ozresh', hasSecond = !!SAVE_DIR && fs.existsSync(path.join(SAVE_DIR, SECOND + '.json')), NEEDS_SECOND = ['migrationSameEverywhere', 'renameKeepsOrder', 'deleteCutShort'];
 // The save as store entries, one fresh copy per call.
 function realSave(id = ID) {
-  const file = path.join(SAVE_DIR, id + '.json');
-  if (!fs.existsSync(file)) throw new Error('the real save is missing: ' + file + ' (set WL_SAVE_DIR)');
+  const file = SAVE_DIR && path.join(SAVE_DIR, id + '.json');
+  if (!file || !fs.existsSync(file)) {
+    const F = JSON.parse(fs.readFileSync(FIXTURE, 'utf8')), m = new Map([['adventures/' + F.id, { data: F.adventure, version: 1 }]]);
+    for (const [c, doc] of Object.entries(F.turns)) m.set('adventures/' + F.id + '/turns/' + c, { data: doc, version: 1 });
+    return m;
+  }
   const m = new Map([['adventures/' + id, { data: JSON.parse(fs.readFileSync(file, 'utf8')), version: 1 }]]);
   for (let c = 0; ; c++) { const p = path.join(SAVE_DIR, id, 'turns', String(c).padStart(4, '0') + '.json'); if (!fs.existsSync(p)) break; m.set('adventures/' + id + '/turns/' + String(c).padStart(4, '0'), { data: JSON.parse(fs.readFileSync(p, 'utf8')), version: 1 }); }
   return m;
@@ -101,7 +108,7 @@ async function regenInterrupted(fail) {
   clean(R, fail, 'regenerate interrupted'); R.close();
 }
 // 5. Older turns keep only what is shown or replayed: the real save is opened and played one turn, which rewrites its blocks
-//    without each older turn's debug debris (state diff, notes for the next turn, raw updates, bond shifts, suggestions, the
+//    without each older turn's debug debris (state diff, notes for the next turn, raw updates, bond shifts, the
 //    evaluation beyond its outcome). Nothing the player sees of the 25 turns changes, and Undo still goes back two turns.
 async function olderTurnsShrink(fail) {
   const store = realSave();
@@ -113,7 +120,7 @@ async function olderTurnsShrink(fail) {
   const seen = shown(h);
   await h.turn('T26 say nothing', { max: 60000 }); h.close();
   const after = trimmedBytes(), turns = storedTurns(store);
-  const debris = turns.filter((t) => t._trimmed && ['diff', 'pendingAfter', 'updates', 'bondShifts', 'suggestions'].some((k) => t[k] !== undefined));
+  const debris = turns.filter((t) => t._trimmed && ['diff', 'pendingAfter', 'updates', 'bondShifts'].some((k) => t[k] !== undefined));
   if (debris.length) fail('older turns: ' + debris.length + ' stored older turns still carry debug debris (turn ' + debris[0].n + ')');
   if (after > before * 0.75) fail('older turns: the older turns take ' + after + ' bytes, ' + before + ' before; expected at least a quarter less');
   const R = await open(store); R.click('#toggleHidden'); await R.settle(100, 2000);
@@ -257,6 +264,7 @@ const SCENARIOS = { twoDevices, handOver, undoInterrupted, regenInterrupted, old
   const only = process.argv[2]; const failures = [];
   for (const [name, fn] of Object.entries(SCENARIOS)) {
     if (only && only !== name) continue;
+    if (NEEDS_SECOND.includes(name) && !hasSecond) { console.log('skip ' + name + ' (needs the second save on disk: set WL_SAVE_DIR)'); continue; }
     const mine = []; const t0 = Date.now();
     try { await fn((m) => mine.push(m)); } catch (e) { mine.push('threw: ' + ((e && e.stack) || e)); }
     console.log((mine.length ? 'FAIL ' : 'ok   ') + name + ' (' + Math.round((Date.now() - t0) / 1000) + ' s)'); for (const m of mine) console.log('   - ' + m);

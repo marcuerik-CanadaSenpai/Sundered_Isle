@@ -2336,8 +2336,8 @@ const S = {
     try {
       assert.equal(g.tf().paths.cow.sex == null, true, 'the path does not go over');
       const p = g.prompts.at(-1), tb = p.slice(p.indexOf('<transformation>'), p.indexOf('</transformation>'));
-      assert.match(tb, /Not on this body \(its path does not go there; never describe them\): teats and udder, milk\./, 'the closed parts are named: ' + (tb.match(/Not on this body[^\n]*/) || ['none'])[0]);
-      assert.doesNotMatch(g.prompts[0].slice(g.prompts[0].indexOf('<transformation>'), g.prompts[0].indexOf('</transformation>')), /Not on this body/, 'and not before any change has begun');
+      assert.match(tb, /Not on \S+'s body, whatever others have \(\S+'s path does not go there; never give \S+ them\): teats and udder, milk\./, 'the closed parts are named, to the player: ' + (tb.match(/Not on this body[^\n]*/) || ['none'])[0]);
+      assert.doesNotMatch(g.prompts[0].slice(g.prompts[0].indexOf('<transformation>'), g.prompts[0].indexOf('</transformation>')), /whatever others have/, 'and not before any change has begun');
     } finally { g.h.close(); }
   },
 
