@@ -104,8 +104,8 @@ async function main() {
     check(/<facts> are background, not props/.test(rules), 'the anti-tic rule does not reach the prompt');
     // The roommate's Close up and Ways lines come one fragment a turn, and the fragment turns with the turn.
     const castLine = (p) => p.split('\n').find((l) => /^- Bess Alder/.test(l)) || '';
-    const closeUp = (p) => (/ Close up: ([^]*?)\.(?= Ways,| Now:)/.exec(castLine(p)) || [])[1];
-    const ways = (p) => (/never explained: ([^]*?)\. Now:/.exec(castLine(p)) || [])[1];
+    const closeUp = (p) => (/ Close up: ([^]*?)\.(?= Ways \(| Now:)/.exec(castLine(p)) || [])[1];
+    const ways = (p) => (/Ways \(show, never explain\): ([^]*?)\. Now:/.exec(castLine(p)) || [])[1];
     for (const p of prompts) {
       check(closeUp(p), 'the roommate\'s Close up line is missing from the cast block: ' + castLine(p).slice(0, 200));
       check(closeUp(p) && !/;/.test(closeUp(p)), 'Close up is the whole line, not one fragment: ' + closeUp(p));
@@ -119,4 +119,6 @@ async function main() {
     console.log('voice-tics passed: ' + TICS.length + ' tics and ' + STEERING.length + ' steering phrases kept out of the rules and ' + ex.length + ' style examples; the cast block turns one fragment a turn');
   } finally { h.close(); }
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+// narration-lint.js counts the same tics in what a real model wrote.
+module.exports = { TICS, PLAIN };
+if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });

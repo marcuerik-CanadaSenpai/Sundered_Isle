@@ -3,6 +3,9 @@
   "private": true,
   "description": "Runs the real Windlass page in jsdom against a strict mock of the artifact runtime (db, sample, downloads).",
   "scripts": {
+    "test": "node run.js",
+    "test:quick": "node run.js --quick",
+    "test:seeds": "node run.js --seed 7 && node run.js --seed 31",
     "exposure-fallback": "node exposure-fallback.js",
     "smoke": "node smoke.js",
     "turns": "node turnsmoke.js",
@@ -21,9 +24,12 @@
     "prompt-budget": "node prompt-budget.js",
     "ui-panels": "node ui-panels.js",
     "pacing-scenes": "node pacing-scenes.js",
+    "talk-scenes": "node talk-scenes.js",
     "voice-tics": "node voice-tics.js",
     "save-sync": "node save-sync.js",
+    "model-errors": "node model-errors.js",
     "gm-prompt": "node gm-prompt.js",
+    "calendar": "node calendar.js",
     "serve": "node server.js 4173"
   },
   "dependencies": { "jsdom": "24.1.3" }

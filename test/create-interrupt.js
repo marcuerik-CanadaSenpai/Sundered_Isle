@@ -25,6 +25,7 @@ async function startCow(h, opts) {
   if (opts.world) { h.click('#btnAdventures'); h.$('#newWorld').value = opts.world; h.click('#newAdv'); await h.sleep(50); }
   assert(h.$('#dlgCreate').open, 'creation must be open');
   h.type('#cRmSpecies', 'cow'); h.type('#cRmName', 'Daisy Clover'); h.type('#cName', 'Erik Marcu');
+  if (h.$('#cGlimpse') && !h.$('#cGlimpseRow').hidden) h.type('#cGlimpse', 'A face that was two faces for a second');
   h.click('#cBegin');
   await h.sleep(opts.at || 1500);
   assert.match(h.$('#cNote').textContent, /Inventing/, 'the cast must be being invented');
@@ -59,12 +60,14 @@ async function reloadRestoresIn(world) {
     assert(h.$('#dlgCreate').open, 'the boot load must not close or reset the restored creation');
     assert.equal(h.$('#createTitle').textContent, title, 'same world');
     assert.equal(h.$('#cName').value, 'Erik Marcu'); assert.equal(h.$('#cRmSpecies').value, 'cow'); assert.equal(h.$('#cRmName').value, 'Daisy Clover');
+    if (world === 'sundered') assert.equal(h.$('#cGlimpse') && h.$('#cGlimpse').value, 'A face that was two faces for a second', 'what you think you saw comes back too');
     assert(!h.$('#cRestoreNote').hidden && /reloaded/.test(h.$('#cRestoreNote').textContent), 'a plain explanation must be shown');
     assert(!h.$('#status').classList.contains('bad'), 'no error: ' + h.$('#status').textContent);
     assert.equal(h.$('#summaryNote').textContent, 'no saves yet');
     h.click('#cBegin'); assert(await h.idle(30000), 'creation did not finish'); await h.settle(150, 6000);
     assert.equal(advDocs(h.mock).length, 1, 'the restored creation is saved');
     assert.equal(advDocs(h.mock)[0][1].data.worldId, world);
+    if (world === 'sundered') assert.equal((advDocs(h.mock)[0][1].data.player.glimpse || {}).key, 'faces', 'and the adventure begins with it');
     assert.equal(h.window.localStorage.getItem('windlass.createDraft'), null);
     assert.match(debugCreate(h), /page loaded with a creation left unfinished/, 'Debug must record the reload');
     clean(h);
@@ -318,6 +321,28 @@ const S = {
         clean(h);
       } finally { h.close(); }
     }
+  },
+  // A cast invention reply with a line of prose before the list of people fills every slot, not just the first; a batch that gives no one
+  // is kept with the adventure (at most three), so Erik's empty batches can be read afterwards.
+  async proseBeforeList() {
+    const h = await boot({ setup(w, m) {
+      m.sampleHandler = (input, o, call) => { const out = m.defaultHandler(input, o, call); return call.label === 'cast invention' ? 'Here are the people:\n' + JSON.stringify(JSON.parse(out).people, null, 1) + '\nI hope they suit the story.' : out; };
+    } });
+    try {
+      assert(await h.settle(150, 6000)); h.click('#cBegin'); assert(await h.idle(30000)); await h.settle(150, 6000);
+      const inv = advDocs(h.mock)[0][1].data.cast.generated.invention;
+      assert(inv.notes.length && inv.notes.every((n) => /: (\d) of \1 invented/.test(n) || !/invented in/.test(n)), 'every slot of every batch filled: ' + JSON.stringify(inv.notes));
+      assert(inv.notes.some((n) => /invented in/.test(n))); assert.equal(inv.emptyRaw, undefined, 'no empty batch to keep');
+      clean(h);
+    } finally { h.close(); }
+    const g = await boot({ setup(w, m) { m.sampleHandler = (input, o, call) => (/cast invention/.test(call.label) ? 'I cannot think of anyone right now.' : m.defaultHandler(input, o, call)); } });
+    try {
+      assert(await g.settle(150, 6000)); g.click('#cBegin'); assert(await g.idle(30000)); await g.settle(150, 6000);
+      const inv = advDocs(g.mock)[0][1].data.cast.generated.invention;
+      assert(Array.isArray(inv.emptyRaw) && inv.emptyRaw.length >= 1 && inv.emptyRaw.length <= 3, 'empty batches kept: ' + JSON.stringify(inv.emptyRaw));
+      assert(inv.emptyRaw.every((t) => t === 'I cannot think of anyone right now.'));
+      clean(g);
+    } finally { g.close(); }
   },
   async noUnhandled() {
     const h = await boot({ setup(w, m) { slowInvention(w, m); } });

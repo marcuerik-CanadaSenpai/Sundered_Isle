@@ -387,6 +387,84 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+
+  // 11b. A director note that skips time or moves on ends the act as the action would: no "stop mid-act" and no scene carried over,
+  // even beside an act word, and the skip is not read as the player's peak. A skip turned down, a cut to the act, or a writing note
+  // ends nothing.
+  async directorSkipLeaves() {
+    const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
+    try {
+      narratorSays(h); h.say.stage = 'build';
+      for (const [a, d] of [['Kiss her.', 'Skip to the next morning.'], ['Make love to her.', 'Then jump ahead to breakfast.'], ['Hold her.', 'Go back to the dorm.'], ['Kiss her neck.', 'They get dressed and leave.']]) {
+        assert(await h.turn('Make love to her.', { director: '' }));
+        assert(await h.turn('Make love to her.', { director: '' })); assert.equal(sceneOf(h).n, 2, 'the act is under way');
+        assert(await h.turn(a, { director: d }));
+        const p = promptOf(lastTurn(h));
+        assert.doesNotMatch(p, /stop mid-act|Scene note \(binding\)/, d + ' is not held mid-act');
+        assert.doesNotMatch(p, /carries \S+ to the peak/, d + ' is not read as the peak');
+        assert.deepEqual(sceneOf(h), { n: 0, stage: '' }, d + ' ends the scene');
+      }
+      assert(await h.turn('Make love to her.', { director: 'Take it slowly.' })); assert.match(promptOf(lastTurn(h)), /stop mid-act/, 'a director note that stays in the act keeps it');
+      // Not a time skip: one turned down, a cut to the act itself, or a clause that asks for the act. The act goes on a turn.
+      // Nor is a note about the writing: only the player's action walks away by a stop, a wake or a dress.
+      for (const d of ['Don\'t skip ahead; stay in the moment.', 'Do not cut to the next morning.', 'No fast-forward, take it slowly.', 'Skip to the part where they have sex.', 'Cut to them in bed together.', 'Later that night they make love.',
+        'Stop here.', 'Enough euphemism; use plain words.', 'Pull back the narration and keep it close.', 'Wake her slowly with kisses.', 'Leave her wanting more.']) {
+        const n = sceneOf(h).n; assert(n > 0, 'the act is under way before: ' + d);
+        assert(await h.turn(/^(?:Stop|Enough|Pull|Wake|Leave)/.test(d) ? 'Kiss her neck.' : 'Kiss her and keep going.', { director: d }));
+        assert.match(promptOf(lastTurn(h)), /Scene note \(binding\): turn \d+ of this act[^\n]*stop mid-act/, d + ' keeps the act');
+        assert.equal(sceneOf(h).n, n + 1, d + ' carries the act on a turn');
+      }
+      assert(await h.turn('Take her to bed.', { director: 'Skip to the bedroom.' })); assert.match(promptOf(lastTurn(h)), /Scene note \(binding\)/, 'a cut to the bedroom is not a time skip');
+      const n = sceneOf(h).n; h.click('#regenWith'); h.$('#rewrite').value = 'Stop here, on her plea.'; h.click('#rewriteGo'); assert(await h.idle(15000));
+      assert.match(promptOf(lastTurn(h)), /Regeneration note[^\n]*Stop here, on her plea\.[\s\S]*stop mid-act|stop mid-act[\s\S]*Regeneration note[^\n]*Stop here, on her plea\./, 'a regeneration note about where to stop keeps the act');
+      assert.equal(sceneOf(h).n, n, 'the regenerated turn stands where the one it replaces stood');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 12. The scene examples presume no anatomy (neither body enters the other; no genital named) and agree with a non-binary
+  // roommate's "they": every scene example reaches the prompt in turn, none reads "They undoes" or "they says", and the bovine
+  // example is not shown when no bovine is present.
+  async sceneExemplarAgrees() {
+    const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi', rmGender: 'nonbinary' });
+    try {
+      const Wd = h.window.WINDLASS_WORLDS.sundered;
+      for (const e of Wd.sceneExemplars) assert.doesNotMatch(e, /\byou in\b|part way|the rest of the way|\binside\b|\b(cock|pussy|penis|vagina|clit)/i, 'a scene example presumes a body: ' + e.slice(0, 80));
+      // Each ends by handing the next move to the player: its last line is the partner's question or invitation, with nothing after
+      // it but who says it (no order the partner holds the player to, no move made for the player).
+      for (const e of Wd.sceneExemplars) {
+        const q = (e.match(/"[^"]*"/g) || []).at(-1) || '', after = e.slice(e.lastIndexOf('"') + 1);
+        assert.match(q, /\?"$|tell me what you want/i, 'a scene example ends on a question or an invitation to the player: ' + e.slice(-120));
+        assert.match(after, /^(?:\s*\{rm_they\} [^.!?",]*(?:, and wait\{rm_s\})?\.)?$/, 'nothing follows the last line but who says it: ' + e.slice(-120));
+      }
+      const seen = new Set(); let kinded = false;
+      for (let i = 0; i < 6; i++) {
+        assert(await h.turn('Make love to Rin.'));
+        const ex = section(promptOf(lastTurn(h)), 'style_examples');
+        assert.doesNotMatch(ex, /\b[Tt]hey (undoes|guides|says|lifts|rolls|settles|breathes|stops|finds)\b/, 'a scene example does not agree with "they": ' + ex.slice(0, 300));
+        Wd.sceneExemplars.forEach((e, k) => { if (ex.includes(e.split(/\{[^}]*\}/).sort((a, b) => b.length - a.length)[0])) seen.add(k); });
+        kinded = kinded || Wd.exemplars.some((e) => e.kind && ex.includes(e.text.slice(0, 60)));
+      }
+      assert.equal(seen.size, Wd.sceneExemplars.length, 'every scene example was checked: ' + [...seen]);
+      assert(!kinded, 'an example tagged with a kind nobody present has (a bovine woman\'s udder and hooves) is not shown in a human roommate\'s scene');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 12b. The bovine woman's example (her udder, teats and the rest) is shown with a bovine woman present and never with a bovine man,
+  // whose body it would hand the narrator in his scene.
+  async kindExampleMatchesSex() {
+    for (const [g, want] of [['female', true], ['male', false]]) {
+      const h = await begin({ rmSpecies: 'cow', rmName: 'Rin Kitsuragi', rmGender: g });
+      try {
+        const cow = h.window.WINDLASS_WORLDS.sundered.exemplars.find((e) => e.kind === 'cow'); assert(cow && cow.sex === 'female', 'the bovine example is tagged a woman\'s');
+        let seen = false;
+        for (let i = 0; i < 4; i++) { assert(await h.turn('Make love to Rin.')); seen = seen || section(promptOf(lastTurn(h)), 'style_examples').includes(cow.text.slice(0, 60)); }
+        assert.equal(seen, want, 'the bovine woman\'s example with a ' + g + ' bovine roommate');
+        clean(h);
+      } finally { h.close(); }
+    }
+  },
 };
 
 (async () => {

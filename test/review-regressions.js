@@ -156,6 +156,7 @@ async function checkStaleChunkRecovery() {
     for (let i = 1; i <= 21; i++) assert(await h.turn('Stored turn ' + i), 'turn did not finish: ' + i);
     const [mainPath, mainEntry] = adventureEntry(h);
     const id = mainPath.split('/')[1];
+    h.mock.allowStoreEdits = true;   // a stale save found on reload
     mainEntry.data.turnCount = 10;
     mainEntry.data.rev++;
 
@@ -225,6 +226,7 @@ async function checkChunkRecoveryRevision() {
     const id = path.split('/')[1];
     const doc = () => h.mock.store.get('adventures/' + id).data;
     const chunk = h.mock.store.get('adventures/' + id + '/turns/0000');
+    h.mock.allowStoreEdits = true;   // the edits below stand for an interrupted save found on reload
     chunk.data.turns[0].memAfter = { summary: 'folded checkpoint', events: ['checkpoint event'], beats: [], facts: [] };
     doc().turnCount = 0;
     doc().rev = chunk.data.rev - 1;

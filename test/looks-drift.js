@@ -24,13 +24,15 @@ function loadGenerator() {
   const html = fs.readFileSync(HTML, 'utf8');
   const a = html.indexOf('  // ---------- generated people (worlds with genPools) ----------'), b = html.indexOf('  // A roommate drawn from the pools');
   assert(a > 0 && b > a, 'the person generator was not found in the page');
+  const r0 = html.indexOf('  // A look written'), r1 = html.indexOf('  // Saves from before v9 kept');
+  assert(r0 > 0 && r1 > r0, 'the look migration was not found in the page');
   const win = {}; new Function('window', fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'))(win);
   const W = Object.values(win.WINDLASS_WORLDS)[0];
   const pre = "const escRe = (s) => s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;"
     + " const NB = { they: 'they', them: 'them', their: 'their', theirs: 'theirs' };"
     + " function speciesRace(Wc, k) { const sp = Wc.transformation && Wc.transformation.species[k]; return sp ? (sp.race || sp.short) : cap(String(k || '')); }";
-  const names = ['genPerson', 'absentText'];
-  const api = new Function('W', pre + html.slice(a, b) + '\nreturn {' + names.map((n) => n + ': typeof ' + n + " !== 'undefined' ? " + n + ' : null').join(', ') + '};')(W);
+  const names = ['genPerson', 'absentText', 'recomposeLooks'];
+  const api = new Function('W', pre + html.slice(a, b) + html.slice(r0, r1) + '\nreturn {' + names.map((n) => n + ': typeof ' + n + " !== 'undefined' ? " + n + ' : null').join(', ') + '};')(W);
   return Object.assign(api, { W });
 }
 
@@ -80,6 +82,8 @@ const has = (looks, label) => new RegExp('(?:^|\\s)' + esc(label) + ':').test(lo
 // A labelled field's text, up to the next label or the closing negatives.
 const fieldOf = (looks, label) => { const m = new RegExp('(?:^|\\. )' + esc(label) + ': ([^]*?)\\.(?= [A-Z][A-Za-z\' ]{1,30}: | No [a-z]|$)').exec(looks); return m ? m[1] : ''; };
 const N = 20, FREE = 60;
+// A garment of another age has no place in what a kind's body asks of clothes: Mythaven dresses in modern clothes.
+const PERIOD = /\b(?:robes?|tunics?|cloaks?|gowns?|bodices?|shawls?|aprons?|waistcoats?|loincloths?|togas?|smocks?|breeches|doublets?|corsets?|kirtles?|wraps?)\b/i;
 
 const failures = [];
 const fail = (what) => { failures.push(what); };
@@ -202,6 +206,22 @@ for (const k of kinds) {
     }
     if (/\byou(?:r|rs|rself)?\b/i.test(L)) fail(tag + ': "you" in the looks');
     for (const re of LEAKS[k][g]) if (re.test(L.replace(/\. no [^.]*\.$/, '.'))) fail(tag + ': the other sex\'s feature ' + re);
+    // A whole-body coat is still told from the legs under the Legs label, never as a coat with no legs in it.
+    const legs = fieldOf(p.looks, 'Legs'); if (legs && !/^(?:(?:feathers|scales|bark) from )?(?:paws|hooves|feet|knee|stockings) to /.test(legs)) fail(tag + ': the Legs row does not start from the legs: ' + legs);
+    // 2a. As far as the kind goes, the person stays themselves: the face is human first (a muzzle short and the eyes human, never
+    // an animal's head or a face too fine to be human), and the hair stays hair with whatever grows through it. Fails on efff600
+    // (a fairy's face, a harpy's and a dryad's hair).
+    if (col === 'most') {
+      const face = fieldOf(String(p.looks || ''), 'Face');
+      if (!face || /\b(?:head|snout|long muzzle|inhuman|to be human|animal'?s? face)\b/i.test(face)) fail(tag + ': the face is not human first: "' + face + '"');
+      if (/\bmuzzle\b/i.test(face) && !(/\bshort\b[^;]*\bmuzzle\b/i.test(face) && /\bhuman eyes\b/i.test(face))) fail(tag + ': a muzzle that is not short, with the person\'s eyes: "' + face + '"');
+      if (!has(String(p.looks || ''), 'Hair') || /\bin place of hair\b/.test(L)) fail(tag + ': the hair does not stay hair: ' + p.looks);
+      // The fullest crest names the crest and the tufts where the ears were; a coat over the body says what it is and that it
+      // covers the legs, under Legs. Fails on b46a295.
+      if (k === 'harpy' && !/\bcrest\b[^.]*\btufts\b[^.]*\bears\b/.test(fieldOf(String(p.looks || ''), 'Crest'))) fail(tag + ': the crest does not name the crest and the ear tufts: "' + fieldOf(String(p.looks || ''), 'Crest') + '"');
+      const coat = { harpy: 'feathers', mer: 'scales', dryad: 'bark' }[k], legs = fieldOf(String(p.looks || ''), 'Legs');
+      if (coat && !new RegExp('^' + coat + ' from (?:knee|feet) to hips\\b').test(legs)) fail(tag + ': the Legs field does not name the ' + coat + ' over the legs: "' + legs + '"');
+    }
   }
 }
 
@@ -219,6 +239,16 @@ for (const k of kinds) {
   if (face.least / M < 0.18 || face.least / M > 0.32) fail('the face lands on the least column ' + face.least + ' of ' + M + ' times, not about 25 in 100');
   if (lean.standard / M < 0.58 || lean.standard / M > 0.75) fail('the body is all at the standard ' + lean.standard + ' of ' + M + ' times, not about two in three');
   if (lean.least / M < 0.1 || lean.most / M < 0.1) fail('the body leans least ' + lean.least + ' and most ' + lean.most + ' of ' + M + ' times, not about a sixth each');
+}
+
+// 2c. What each kind's body asks of clothes (genPools.looks.kinds[k].dress, read into every Dress line) names no garment of another age.
+for (const [k, K] of Object.entries(LK.kinds)) for (const fact of [].concat(...Object.values(K.dress || {}))) if (PERIOD.test(fact)) fail(k + ': a garment of another age in what the body asks of clothes: ' + fact);
+
+// 2d. A dryad's Hair field is hair alone, at every column: the Leaves field alone says how many leaves grow through it, so the
+// two never give different amounts (a leaf or two in the hair beside a crown of leaves). Fails on b46a295.
+for (const g of W.genPools.species.dryad.genders) for (const extent of [-1, 0, 1]) for (let i = 0; i < N; i++) {
+  const L = String(G.genPerson(W, { species: 'dryad', gender: g, extent }).looks || ''), hair = fieldOf(L, 'Hair');
+  if (!hair || /\bleaf|\bleaves\b/i.test(hair)) { fail('dryad ' + g + ' extent ' + extent + ': the Hair field is not hair alone: "' + hair + '"'); break; }
 }
 
 // 3. The prompt side, on a real adventure: the roommate's first appearance and a scene carry the looks, what is not on the
@@ -265,7 +295,16 @@ for (const k of kinds) {
     assert(old !== fresh && /Forearm coat: /.test(old) && !/\. No /.test(old), 'the older look is made from the fresh one: ' + old);
     rm.looks = old; rm.gen.looks = old; delete rm.looksV;
     const edited = stored.cast.generated.characters.find((c) => c.species && W.genPools.species[c.species]);
-    stored.cast.overrides = Object.assign({}, stored.cast.overrides, { roommate: { looks: old }, [edited.key]: { looks: 'A tall woman with a scar across one eyebrow.' } });
+    // A harpy's look of this version as efff600 composed it at the fullest: her crest took the place of her hair, so there is no
+    // Hair field, and the crest and the leg feathers are in words the world has since changed; it carries a word the Cast editor
+    // showed filled ({first}), and a Cast edit holds that filled form. On load the words are mended in place, a Hair field from the
+    // kind's pool goes in before the eyes, nothing else is drawn again, and the edit follows. Fails on b46a295.
+    const worded = stored.cast.generated.characters.find((c) => c !== edited && c.looksV === 2);
+    Object.assign(worded, { species: 'harpy', gender: 'female', pronouns: { they: 'she', them: 'her', their: 'her', theirs: 'hers' } });
+    const wordedOld = 'Height: about five foot two. Build: slim, with a slim waist, narrow hips and slim thighs. Bust: shallow breasts, an A cup, with nipples long for the size of them and areolae small and dark. Eyes: bright black eyes. Plumage: black with a green sheen. Arms: arms feathered from shoulder to wrist. Wings: great wings and strong sustained flight. Hands: a thumb and one strong clawed finger. Legs: over belly, ribs and back; all but the face and chest. Feet: heavy talons, scaled to above the knee. Tail: a long sweeping fan that {first} once called a duster. Crest: feathers in place of hair. Face: a fine hard-edged nose, feathered brows and cheeks; never a beak. Frame: a light frame, a deep breastbone and small high breasts. No wings on the back apart from the arms, no beak.';
+    const wordedNew = wordedOld.replace('Legs: over belly', 'Legs: feathers from knee to hips and over belly').replace('Crest: feathers in place of hair', 'Crest: a full crest, feathers all through the hair, and tufts where the ears were');
+    worded.looks = wordedOld; if (worded.gen) worded.gen.looks = wordedOld;
+    stored.cast.overrides = Object.assign({}, stored.cast.overrides, { roommate: { looks: old }, [edited.key]: { looks: 'A tall woman with a scar across one eyebrow.' }, [worded.key]: { looks: wordedOld.replace('{first}', 'Ada') } });
     const h2 = await boot({ setup(w, m) { m.store = seeded; } });
     assert(await h2.settle(150, 8000), 'the older save did not load'); await h2.idle(10000); await h2.settle(100, 4000);
     assert(await h2.turn('I look around the room.'), 'a turn on the older save');
@@ -273,13 +312,72 @@ for (const k of kinds) {
     if (r2.looks === old || !/^Height: /.test(r2.looks) || / Arms: /.test(r2.looks) === false || /Forearm coat: /.test(r2.looks)) fail('older save: the roommate\'s look was not composed again: ' + r2.looks);
     if (r2.looksV !== 2) fail('older save: the recomposed look is not marked (looksV ' + r2.looksV + ')');
     if (!r2.looks.endsWith(' No horns, no crest, no heavy neck.')) fail('older save: the recomposed look does not close with the must-nots: ' + r2.looks.slice(-120));
-    for (const label of ['Eyes', 'Hair', 'Bust', 'Hide']) if (fieldOf(r2.looks, label) !== fieldOf(fresh, label)) fail('older save: the ' + label + ' changed from "' + fieldOf(fresh, label) + '" to "' + fieldOf(r2.looks, label) + '"');
+    for (const label of ['Eyes', 'Hair', 'Bust', 'Hide', 'Height', 'Build', 'Face', 'Hands', 'Legs', 'Feet', 'Tail']) if (fieldOf(r2.looks, label) !== fieldOf(fresh, label)) fail('older save: the ' + label + ' changed from "' + fieldOf(fresh, label) + '" to "' + fieldOf(r2.looks, label) + '"');
     if (r2.gen.looks !== r2.looks) fail('older save: the generated record kept the old look');
     if (!after.cast.overrides || after.cast.overrides.roommate.looks !== r2.looks) fail('older save: the Cast edit that only carried the old look did not follow it: ' + JSON.stringify(after.cast.overrides && after.cast.overrides.roommate));
     if (after.cast.overrides[edited.key].looks !== 'A tall woman with a scar across one eyebrow.') fail('older save: a look edited by hand was changed');
+    const w2 = after.cast.generated.characters.find((c) => c.key === worded.key);
+    const hair2 = fieldOf(w2.looks, 'Hair');
+    if (!W.genPools.species.harpy.hair.includes(hair2)) fail('older save: a harpy whose crest had taken the place of her hair was given no Hair field from her pool: ' + w2.looks);
+    if (w2.looks !== wordedNew.replace(' Eyes: ', ' Hair: ' + hair2 + '. Eyes: ') || w2.looksV !== 2) fail('older save: the reworded lines were not mended in place, word for word, with nothing else changed (looksV ' + w2.looksV + '): ' + w2.looks);
+    if (after.cast.overrides[worded.key].looks !== w2.looks) fail('older save: the Cast edit that only carried the reworded look, filled, did not follow it: ' + after.cast.overrides[worded.key].looks);
     const calls = h2.mock.sampleCalls.filter((c) => /turn/i.test(c.label || '')), P2 = calls.length ? prompt(calls[calls.length - 1]) : '';
     if (!P2 || /Forearm coat: /.test(P2) || /wide-seeing eyes; |; large, dark-lashed/.test(P2)) fail('older save: the turn prompt still carries the old look');
+    if (/Not on this body: [^.]*\bpaws in place of hands\b/.test(P2)) fail('turn prompt: what no body here has is said beside a person, which <rules> already says');
+    if (!/Every kind keeps working hands; nobody takes an animal's whole shape or changes with the moon/.test(P2)) fail('turn prompt: the rule that no body here has paws for hands or changes with the moon is missing');
+    // The narrator dresses everyone by their Dress line in the clothes of the world it reads, which are modern. Fails on b46a295.
+    if (!/<world>[^<]*\bmodern\b[^.<]*\bclothes\b[^<]*<\/world>/.test(P2) || !/Dress: \w+, \w+ taste, dressed for /.test(P2)) fail('the turn prompt does not dress the cast in modern clothes');
     h2.close && h2.close();
+  }
+
+  // 5. A look composed again keeps everything the old one settled. A fresh look of any kind comes back as itself; a look written as
+  // prose by the first version keeps its coat colour (never an eye's or a garment's), a stated chest size and, for a kind with no
+  // lines of its own, its body; and two loads agree on the height, build and face where the old look gave them.
+  {
+    const same = []; let n = 0;
+    for (const k of kinds) for (const g of W.genPools.species[k].genders) for (let i = 0; i < 6; i++) {
+      const p = G.genPerson(W, { species: k, gender: g }), c = { species: k, gender: g, pronouns: p.pronouns, looks: p.looks }, again = G.recomposeLooks(W, c); n++;
+      if (again !== p.looks) same.push(k + ' ' + g + ': "' + p.looks.slice(0, 90) + '…" came back as "' + again.slice(0, 90) + '…"');
+    }
+    for (const f of same.slice(0, 6)) fail('recompose: a fresh look changed on recompose, ' + f);
+    if (same.length > n / 20) fail('recompose: ' + same.length + ' of ' + n + ' fresh looks changed');
+    const she = { they: 'she', them: 'her', their: 'her', theirs: 'hers' };
+    const wolf = { key: 'roommate', species: 'wolf', gender: 'female', pronouns: she, looks: 'lean and quick, red-brown at the ears and the tail and the pelt that runs from the small of the back down the legs to padded feet. Pale grey eyes with a shine in low light, canines a little long, hands with rough pads and dark claws. Wears a vest and running shorts and is barefoot, because shoes do not fit paws. Breasts, and below them two more pairs of small nipples down the belly, small and dark in the pelt. a silver wolf pendant on a leather cord, always worn' };
+    const w1 = G.recomposeLooks(W, wolf), w2 = G.recomposeLooks(W, wolf);
+    if (!/(?:^|\s)Pelt: red-brown;/.test(w1)) fail('recompose: the red-brown wolf did not keep her colour (an eye\'s grey taken for the coat): ' + w1.slice(0, 200));
+    if (fieldOf(w1, 'Eyes') !== 'pale grey eyes') fail('recompose: the wolf\'s pale grey eyes changed: ' + fieldOf(w1, 'Eyes'));
+    for (const label of ['Hands', 'Arms', 'Legs', 'Feet', 'Tail', 'Face']) if (fieldOf(w1, label) !== fieldOf(w2, label)) fail('recompose: the wolf\'s ' + label + ' differs between two loads: "' + fieldOf(w1, label) + '" and "' + fieldOf(w2, label) + '"');
+    if (/\bmuzzle\b/i.test(w1)) fail('recompose: a muzzle given to a face the old look left human: ' + fieldOf(w1, 'Face'));
+    const cow = { key: 'creamery', species: 'cow', gender: 'female', pronouns: she, looks: 'a head taller than you and broad as a good wall. Short polished horns, smoke-grey hide showing at the temples, shoulders and forearms, long soft ears set low. Soft hazel eyes, slow to blink. a cream wool cardigan worn over everything, summer and winter' };
+    const c1 = G.recomposeLooks(W, cow);
+    if (!/(?:^|\s)Hide: smoke-grey/.test(c1)) fail('recompose: the smoke-grey cow did not keep her hide (a cardigan\'s cream taken for it): ' + c1.slice(0, 200));
+    const dean = { key: 'dean', species: 'chimera', gender: 'female', pronouns: she, looks: 'a chimera of several kinds worn as easily as a coat: antlers, a lion\'s forepaw for a left hand, copper scales down the right arm, feathers at the nape, a tail that has not decided what it is, and a warm amused face that has heard everything; eyes of two colours. a silver charm bracelet worn under her left sleeve, never visible' };
+    const d1 = G.recomposeLooks(W, dean);
+    if (!/(?:^|\s)Body: a chimera of several kinds[^.]*\bantlers\b[^.]*lion's forepaw/.test(d1)) fail('recompose: the Dean lost her antlers and forepaw to a drawn body: ' + d1.slice(0, 300));
+    if (/\bbracelet\b/.test(d1)) fail('recompose: the keepsake sentence stayed in the Dean\'s body line: ' + d1);
+    const gardener = { key: 'gardener', species: 'dryad', gender: 'female', pronouns: she, looks: 'tall and still, dark oak grain showing at the collarbones and down the spine, a scatter of leaves in the hair. Moss at the knuckles; moss-green eyes. Small breasts where the bark gives way to skin below the collarbones, green-veined' };
+    const g1 = G.recomposeLooks(W, gardener), cup = /\b(AA|A|B|C|D|DD|E|F|G)\b(?= cup|,)/.exec(fieldOf(g1, 'Bust') || '');
+    if (!cup || !/^(?:AA|A|B)$/.test(cup[1])) fail('recompose: the gardener\'s small breasts came back as a ' + (cup ? cup[1] : '?') + ': ' + fieldOf(g1, 'Bust'));
+    // A kind with no lines keeps its prose as the body, hair and all: no second hair beside it, and never one coloured from the eyes or
+    // from inside another word ("red" in "tired").
+    const he = { they: 'he', them: 'him', their: 'his', theirs: 'his' }, they = { they: 'they', them: 'them', their: 'their', theirs: 'theirs' };
+    for (const [key, gender, pr, looks, mine] of [['human_society', 'male', he, 'human, red hair cut short, a face that has decided things; brown eyes. nails cut short and filed smooth, almost obsessively neat', 'red hair'],
+      ['wardcraft_prof', 'nonbinary', they, 'entirely human, brown hair, the ordinary kind of tired, which on the Isle is the strangest look in the room; blue eyes', 'brown hair']]) {
+      for (let i = 0; i < 6; i++) {
+        const x = G.recomposeLooks(W, { key, species: 'human', gender, pronouns: pr, looks });
+        if (fieldOf(x, 'Hair') || !fieldOf(x, 'Body').includes(mine)) fail('recompose: ' + key + ' has a second hair beside the body\'s ' + mine + ': ' + x);
+      }
+    }
+    // A height and a build the prose gives in words are kept: a head taller or tall at the top of the kind's range, the opening build as
+    // written ("lean and quick" is never drawn again as full).
+    const top = (k, sx) => { const r = W.genPools.looks.kinds[k].height[sx]; return (h) => { const m = /^about (\w+) foot(?: (\w+))?$/.exec(h) || [], w = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven']; const n = w.indexOf(m[1]) * 12 + (m[2] ? w.indexOf(m[2]) : 0); return n >= r[1] - Math.floor((r[1] - r[0]) / 3); }; };
+    const choir = { key: 'choir_lead', species: 'harpy', gender: 'female', pronouns: she, looks: 'tall, hooked in the stance, slate-grey in the wing and grey at the throat, amber eyes like a hawk\'s, set a little too wide. She perches on the backs of chairs rather than sitting on them' };
+    for (let i = 0; i < 6; i++) {
+      const c2 = G.recomposeLooks(W, cow), h2 = G.recomposeLooks(W, choir), w3 = G.recomposeLooks(W, wolf);
+      if (!top('cow', 'female')(fieldOf(c2, 'Height')) || fieldOf(c2, 'Build') !== 'broad as a good wall') fail('recompose: the cow a head taller and broad as a good wall came back as "' + fieldOf(c2, 'Height') + '", "' + fieldOf(c2, 'Build') + '"');
+      if (!top('harpy', 'female')(fieldOf(h2, 'Height'))) fail('recompose: the tall choir lead came back as ' + fieldOf(h2, 'Height'));
+      if (fieldOf(w3, 'Build') !== 'lean and quick') fail('recompose: the lean and quick wolf came back as ' + fieldOf(w3, 'Build'));
+    }
   }
 
   if (failures.length) {

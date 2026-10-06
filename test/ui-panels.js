@@ -172,6 +172,10 @@ const S = {
         assert.equal(Number(row.querySelector('.num').textContent), total(c.key), 'the number is ' + c.name + '\'s bond of 100');
       }
       assert.match(text(h, '#attitudes'), /attitude \d+ of 10/, 'the attitude stays, small, under the bond');
+      h.click('#btnCast'); h.click('#castAdd'); assert(await h.idle(8000)); await h.sleep(20);
+      assert(!fieldOf(h, '#cfAttitude').hidden, 'a person with no bond yet keeps the attitude box: it sets the first bond');
+      assert.match(text(h, 'label[for=cfAttitude]'), /Starting attitude \(0–10, sets the first bond\)/);
+      h.click('[data-close="dlgCast"]');
       clean(h);
     } finally { h.close(); }
   },
@@ -183,12 +187,27 @@ const S = {
     const base = await game(); const W = world(); const h = await reopen(copyStore(base), { spoilers: true });
     try {
       h.click('#btnCast'); assert.doesNotMatch(h.$('#cfReset').textContent, /world's version/, h.$('#cfReset').textContent); assert.match(h.$('#cfReset').textContent, /this adventure first wrote/);
+      const other = [...h.document.querySelectorAll('#castList button')].find((b) => b.dataset.key !== 'roommate'); h.click(other); await h.sleep(20);
+      h.click('#cfRemove'); assert(await h.idle(8000)); await h.sleep(20);
+      const row = h.$('#castList [data-key="' + other.dataset.key + '"]');
+      assert.match(row.textContent, / · not in this story/, 'a person out of the story says so: ' + row.textContent); assert.doesNotMatch(h.$('#castList').textContent, /· removed/, 'nobody reads "removed" who was never in play');
       h.click('[data-close="dlgCast"]');
       h.click('#btnOverride');
       const kinds = Object.keys(W.transformation.species);
       assert.equal(h.document.querySelectorAll('[data-manifest]').length, kinds.length);
       for (const b of h.document.querySelectorAll('[data-manifest]')) assert.equal(b.textContent, 'tell next step', 'the button says what it does');
       assert.equal(h.document.querySelectorAll('[data-unmake]').length, 0, 'undo last change can only fail for a kind on tracks ("on the tracks a Bovine change is undone only by the Spa")');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 6b. A test instruction left on says how to clear it, since Override, where it is edited, is behind the spoiler toggle.
+  async testBannerSaysHow() {
+    const store = copyStore(await game()); docOf(store).settings.testNote = 'Daisy hums.';
+    const h = await reopen(store);
+    try {
+      assert(!h.$('#testBanner').hidden, 'the banner shows'); assert(h.$('#btnOverride').hidden, 'Override is behind the spoilers');
+      assert.match(text(h, '#testBanner'), /Daisy hums\. \(to clear it, show spoilers and open Override\)/, text(h, '#testBanner'));
       clean(h);
     } finally { h.close(); }
   },
@@ -215,9 +234,35 @@ const S = {
       const n = g.document.querySelectorAll('.turn').length;
       assert.match(pills(n - 1), /sent 1 of 3 turns/, 'the turn whose prompt was shed says so: ' + pills(n - 1));
       assert.doesNotMatch(pills(n - 2), /sent \d+ of/, 'a turn sent in full does not');
-      assert.match([...g.document.querySelectorAll('.turn')][n - 1].querySelector('.pill.warn').title, /only the last turn in full/);
+      assert.match([...g.document.querySelectorAll('.turn')][n - 1].querySelector('.pill.warn').title, /the narrator was sent only the last turn in full/);
+      assert.doesNotMatch([...g.document.querySelectorAll('.turn')][n - 1].querySelector('.pill.warn').title, /storyteller/, 'one word for the writer: the narrator');
       clean(g);
     } finally { g.close(); }
+    // The note names the setting the turn ran with, so a later change of the setting does not rewrite what an older turn says.
+    const set2 = copyStore(base); docOf(set2).settings.window = 2; const lt = turnDocs(set2).at(-1).turns.at(-1);
+    lt.notes = (lt.notes || []).concat('prompt near the size cap: verbatim window reduced to 3 of 4, timeline 10 events');
+    const k = await reopen(set2);
+    try {
+      const foot = [...k.document.querySelectorAll('.turn')].at(-1).querySelector('.turn-foot').textContent;
+      assert.match(foot, /sent 3 of 4 turns/, 'the pill reads the setting from the note: ' + foot);
+      clean(k);
+    } finally { k.close(); }
+  },
+
+  // 7b. An older turn's change list and evaluation detail are dropped from the save on purpose; Debug says so rather than showing
+  // "Changes (0)" and "No state changes." for a turn that changed things.
+  async trimmedTurnsSayTrimmed() {
+    const store = copyStore(await game()); const t = turnDocs(store)[0].turns[0];
+    t._trimmed = true; delete t.diff; t.evaluation = { stat: 'none', outcome: 'success', difficulty: 'easy' };
+    const h = await reopen(store, { spoilers: true });
+    try {
+      const first = h.$('.turn[data-id="' + t.id + '"]'), btn = first.querySelector('[data-reveal="changes"]');
+      assert.equal(btn.textContent, 'Changes', 'no count for a list that was not kept: ' + btn.textContent);
+      assert.match(first.querySelector('[data-panel="changes"]').textContent, /Not kept for older turns\./); assert.doesNotMatch(first.querySelector('[data-panel="changes"]').textContent, /No state changes/);
+      assert.match(first.querySelector('[data-panel="eval"]').textContent, /Older turns keep only the stat, the outcome and the difficulty\./);
+      const last = [...h.document.querySelectorAll('.turn')].at(-1); assert.match(last.querySelector('[data-reveal="changes"]').textContent, /^Changes \(\d+\)$/, 'the newest turn keeps its count');
+      clean(h);
+    } finally { h.close(); }
   },
 
   // 8. Settings say what they do: the density note gives the word ranges (and that romance and body-change scenes stay rich), the
@@ -274,6 +319,16 @@ const S = {
       assert(h.$('#actionbar.tucked'), 'the bar is tucked'); assert(h.$('#actionbar .inner').hasAttribute('inert'), 'a bar tucked off screen must not take focus');
       assert(!h.$('#actionHandle').closest('.inner'), 'the tab that brings it back stays reachable');
       h.click('#actionHandle'); await h.sleep(10); assert(!h.$('#actionbar .inner').hasAttribute('inert'), 'the bar is reachable again');
+      // A turn that fails while the bar is tucked brings the bar back, so its status is heard and its Retry reachable; behind the
+      // sheet the status is announced.
+      h.mock.sampleHandler = (input, o, call) => (/^turn/.test(call.label) ? 'no reply here' : h.mock.defaultHandler(input, o, call));
+      h.click('#actionHandle'); await h.sleep(10); assert(h.$('#actionbar .inner').hasAttribute('inert'));
+      await h.turn('I wait.');
+      assert(h.$('#status').classList.contains('bad') && !h.$('#status').hidden, 'the turn failed: ' + text(h, '#status'));
+      assert(!h.$('#status').closest('[inert]'), 'a bad status is not left inside the tucked, inert bar');
+      h.click('#btnRail'); await h.sleep(20); assert(h.$('.story').hasAttribute('inert'));
+      await h.turn('I wait again.');
+      assert(text(h, '#announce').length > 10 && text(h, '#status').includes(text(h, '#announce').slice(0, 20)), 'behind the sheet the failure is announced: ' + text(h, '#announce'));
       clean(h);
     } finally { h.close(); }
   },
@@ -287,6 +342,7 @@ const S = {
       for (const id of ['#action', '#director', '#rewrite']) assert(h.$(id).getAttribute('aria-label'), id + ' needs a name that stays when text is typed');
       assert(h.$('h1'), 'a page heading');
       assert.equal(h.$('#toggleHidden').getAttribute('aria-pressed'), 'true'); h.click('#toggleHidden'); assert.equal(h.$('#toggleHidden').getAttribute('aria-pressed'), 'false'); h.click('#toggleHidden');
+      const tg = h.$('#toggleHidden'), nm = (tg.getAttribute('aria-label') || tg.textContent).toLowerCase(); assert(tg.textContent.toLowerCase().includes(nm), 'the toggle\'s name is its visible text: "' + nm + '" / "' + tg.textContent + '"');
       const reveal = h.$('[data-reveal]'); assert.equal(reveal.getAttribute('aria-expanded'), 'false'); h.click(reveal); assert.equal(reveal.getAttribute('aria-expanded'), 'true'); h.click(reveal); assert.equal(reveal.getAttribute('aria-expanded'), 'false');
       assert.equal(text(h, '#announce'), '', 'nothing announced before a turn');
       assert(await h.turn('I wait by the window.')); assert.match(text(h, '#announce'), /^Turn 3 is ready\.$/);
@@ -320,6 +376,102 @@ const S = {
       assert.equal(rule('.advrow .t', 'min-width'), '0');
       clean(h);
     } finally { h.close(); }
+  },
+
+  // 12. What the player has learned has a panel of its own in the Character sheet, beside State: each explanation the engine
+  // recorded, newest first, with the day it was told and who told it (never the player: a named person who was there or whom the
+  // line marks as the speaker, else whoever else was there, else no one), and a short line before anything is explained. Spoilers
+  // off it lists only what was told; spoilers on, the keeper's secrets follow that line, marked hidden as secrets the keeper knows.
+  // It is in the phone sheet too, an exported save brings it back whole, an old save says its explanations are not listed, and
+  // undo takes an explanation back off the list.
+  async learnedPanel() {
+    const base = await game(), W = world(), truth0 = W.secrets.truth[0].slice(0, 60), d0 = docOf(base), me = d0.player.first;
+    const dean = d0.cast.generated.characters.find((c) => c.key === W.secrets.keeper.key), deanFirst = dean.first || dean.name.split(' ')[1];
+    const properWord = (hay, w) => new RegExp('(^|[^A-Za-z])' + w + '([^A-Za-z]|$)').test(hay);
+    const lines = (h) => [...h.document.querySelectorAll('#learned li')].map((li) => ({ label: (li.querySelector('span') || {}).textContent || '', text: li.textContent.replace((li.querySelector('span') || {}).textContent || '', ''), hidden: li.classList.contains('hidden-item') }));
+    const secretLabel = (l) => l.label === 'Secret · ' + deanFirst + ' knows it' || (l.label === 'Not yet learned' && /^Who /.test(l.text));
+    const h = await reopen(copyStore(base));
+    let exported, want;
+    try {
+      const panel = h.$('#learnedPanel'); assert(panel && panel.closest('#rail') && !panel.hidden, 'the Character sheet has no panel of what the player has learned');
+      assert.deepEqual(lines(h).map((l) => l.text), ['Nothing explained yet.'], 'before anything is explained the panel says so: ' + JSON.stringify(lines(h)));
+      h.click('#toggleHidden');
+      const empty = lines(h);
+      assert(empty[0].text === 'Nothing explained yet.' && empty.length > 1 && empty.slice(1).every((l) => l.hidden), 'spoilers on, the empty line comes before the secrets, not under them: ' + JSON.stringify(empty.map((l) => l.text.slice(0, 30))));
+      h.click('#toggleHidden');
+      let n = 0;
+      h.mock.sampleHandler = (input, o, call) => {
+        const out = h.mock.defaultHandler(input, o, call); if (!/^turn/.test(call.label)) return out;
+        const r = JSON.parse(out); n += 1;
+        if (n === 1) r.facts = ['Told: a glamour is a worn seeming that hides someone from human eyes below, as Daisy put it'];
+        if (n === 2) r.time_advance_minutes = 720;
+        if (n === 3) r.facts = ['Told: the Spa takes a change back a step at a time', 'Told: ' + dean.name + ' sets the curfew at ten and nobody argues with her', 'The warden keeps the keys on a hook'];
+        if (n === 4) r.state_updates = [{ key: 'present', op: 'set', value: [me] }];
+        if (n === 5) r.facts = ['Told: the lodge bell rings at dusk', 'Told: the north stair is shut after dark, as ' + dean.name + ' put it'];
+        return JSON.stringify(r);
+      };
+      for (const a of ['I ask Daisy about the horns.', 'I go down to the lodge.', 'I ask Daisy about the Spa.', 'I walk on alone.', 'I read the notices.']) assert(await h.turn(a), 'the turn "' + a + '" did not finish');
+      const t = turnDocs(h.mock.store).flatMap((d) => d.turns || [d]).filter((x) => x && x.n >= 3).sort((a, b) => a.n - b.n), d1 = t[0].stateBefore.day, d3 = t[2].stateBefore.day, d5 = t[4].stateBefore.day;
+      assert(d3 > d1, 'the test needs the second explanation on a later day: ' + d1 + ', ' + d3);
+      assert.deepEqual(t[2].stateBefore.present, [me, 'Daisy Holm'], 'the test needs the player and Daisy there for the third turn: ' + JSON.stringify(t[2].stateBefore.present));
+      assert.deepEqual(t[4].stateBefore.present, [me], 'the test needs the player alone for the fifth turn: ' + JSON.stringify(t[4].stateBefore.present));
+      want = [{ label: 'Day ' + d5 + ' · ' + deanFirst, text: 'the north stair is shut after dark, as ' + dean.name + ' put it', hidden: false },
+        { label: 'Day ' + d5, text: 'the lodge bell rings at dusk', hidden: false },
+        { label: 'Day ' + d3 + ' · Daisy Holm', text: dean.name + ' sets the curfew at ten and nobody argues with her', hidden: false },
+        { label: 'Day ' + d3 + ' · Daisy Holm', text: 'the Spa takes a change back a step at a time', hidden: false },
+        { label: 'Day ' + d1 + ' · Daisy', text: 'a glamour is a worn seeming that hides someone from human eyes below, as Daisy put it', hidden: false }];
+      assert.deepEqual(lines(h).filter((l) => l.label !== 'Words'), want, 'newest first, each with its day and who told it (a person named only when there or speaking, never the player): ' + JSON.stringify(lines(h)));
+      assert(!lines(h).some((l) => l.label !== 'Words' && properWord(l.label, me)), 'the player is never credited with telling: ' + JSON.stringify(lines(h).map((l) => l.label)));
+      assert.match(text(h, '#learnedCount'), /^5 learned$/);
+      assert(!text(h, '#learned').includes(truth0) && !lines(h).some((l) => l.hidden), 'spoilers off: only what was told is listed');
+      assert.equal(dd(h, 'Told so far'), null, 'the list lives in its own panel, not again in State');
+      h.click('#toggleHidden');
+      const on = lines(h), hid = on.filter((l) => l.hidden);
+      assert.deepEqual(on.filter((l) => !l.hidden && l.label !== 'Words'), want, 'spoilers on: what was told still leads');
+      assert(on.findIndex((l) => l.hidden) === on.length - hid.length, 'spoilers on: the secrets come after everything learned: ' + JSON.stringify(on.map((l) => l.hidden)));
+      assert(hid.length >= W.secrets.truth.length && hid.some((l) => l.text.startsWith(truth0)), 'spoilers on: the keeper\'s secrets not yet learned follow: ' + JSON.stringify(hid.map((l) => l.text.slice(0, 40))));
+      assert(hid.every(secretLabel), 'and each is marked as a secret the keeper knows, not as unlearned: ' + JSON.stringify(hid.map((l) => l.label)));
+      assert.match(text(h, '#learnedCount'), /^5 learned$/, 'a secret not learned is not counted as learned');
+      h.click('#toggleHidden'); assert(!text(h, '#learned').includes(truth0), 'hiding spoilers again takes them away');
+      h.click('#exportAdv'); await h.settle(50, 3000);
+      exported = h.mock.downloadsLog.at(-1); assert(exported, 'the export did not download');
+      clean(h);
+    } finally { h.close(); }
+    const save = JSON.parse(exported.data); assert.equal(save.adventure.state.told.length, 5, 'the export carries the told record');
+    const phone = await reopen(copyStore(base), { mobile: true });
+    try {
+      phone.click('#btnAdventures'); await phone.settle(80, 4000);
+      const input = phone.$('#importFile'); Object.defineProperty(input, 'files', { value: [new phone.window.File([exported.data], 'save.json', { type: 'application/json' })], configurable: true });
+      input.dispatchEvent(new phone.window.Event('change', { bubbles: true })); await phone.idle(30000); await phone.settle(150, 8000);
+      phone.click('[data-close="dlgAdventures"]'); phone.click('#menuBtn'); phone.click('#btnRail'); await phone.sleep(20);
+      assert(phone.$('#rail').classList.contains('open') && phone.$('#learnedPanel').closest('#rail.open'), 'on a phone the panel is in the Character sheet');
+      assert.deepEqual(lines(phone).filter((l) => l.label !== 'Words'), want, 'an imported save shows what was learned with its days and tellers: ' + JSON.stringify(lines(phone)));
+      clean(phone);
+    } finally { phone.close(); }
+    // A save from before the told record: it says its explanations are not listed (never "nothing yet"), counts none, and with
+    // spoilers on that line still comes before the secrets.
+    const old = copyStore(base); delete docOf(old).state.told; delete docOf(old).state.toldWords;
+    const o = await reopen(old);
+    try {
+      const legacy = 'Explanations from before this save kept a record are not listed.', ol = lines(o).filter((l) => l.label !== 'Words');
+      assert.deepEqual(ol.map((l) => l.text), [legacy], 'an old save says what it lacks, and not "nothing yet": ' + JSON.stringify(ol));
+      assert.equal(text(o, '#learnedCount'), '', 'an old save counts nothing as learned');
+      o.click('#toggleHidden');
+      const oh = lines(o).filter((l) => l.label !== 'Words');
+      assert(oh[0].text === legacy && oh.length > 1 && oh.slice(1).every((l) => l.hidden), 'spoilers on, the old-save line comes before the secrets: ' + JSON.stringify(oh.map((l) => l.text.slice(0, 30))));
+      clean(o);
+    } finally { o.close(); }
+    // Undo takes back the turn that explained something, and the explanation with it.
+    const u = await reopen(copyStore(base));
+    try {
+      u.mock.sampleHandler = (input, op, call) => { const out = u.mock.defaultHandler(input, op, call); if (!/^turn/.test(call.label)) return out; const r = JSON.parse(out); r.facts = ['Told: the Spa takes a change back a step at a time']; return JSON.stringify(r); };
+      assert(await u.turn('I ask Daisy about the Spa.'), 'the turn did not finish');
+      assert.deepEqual(lines(u).filter((l) => l.label !== 'Words').map((l) => l.text), ['the Spa takes a change back a step at a time'], 'the explanation is listed: ' + JSON.stringify(lines(u)));
+      u.click('#undo'); assert(await u.idle(20000), 'the undo did not finish'); await u.settle(100, 4000);
+      assert.deepEqual(lines(u).filter((l) => l.label !== 'Words').map((l) => l.text), ['Nothing explained yet.'], 'undo leaves the explanation listed: ' + JSON.stringify(lines(u)));
+      assert.equal(text(u, '#learnedCount'), '', 'undo leaves it counted');
+      clean(u);
+    } finally { u.close(); }
   },
 };
 

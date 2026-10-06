@@ -48,7 +48,7 @@ async function main() {
         events: t.events, beats: t.beats.map((b) => b + ' (turn ' + (25 + k) + ')'), facts: t.facts, exposures: t.exposures || [], kinds_met: [], bond_shifts: [], spa_reset: [] });
     };
     for (let i = 0; i < 6; i++) {
-      const beatsBefore = advDoc().memory.beats.slice(), turnsBefore = stored(), foldsBefore = folds.length;
+      const beatsBefore = advDoc().memory.beats.slice(), turnsBefore = stored(), foldsBefore = folds.length, memBefore = JSON.parse(JSON.stringify(advDoc().memory));
       assert(await h.turn(real[i].action, { max: 30000 }), 'turn ' + (26 + i) + ' did not finish: ' + h.$('#status').textContent);
       const p = promptOf(h.mock.sampleCalls.filter((c) => c.label === 'turn').at(-1)), n = 26 + i;
       assert(B(p) <= CAP, 'turn ' + n + ': the prompt is ' + B(p) + ' bytes, over ' + CAP);
@@ -62,6 +62,11 @@ async function main() {
       assert(recent.includes(prev.narrative.split(/\n+/).filter((q) => q.trim()).at(-1)), 'turn ' + n + ': the turn before it keeps at least its last paragraph');
       assert.match(block(p, 'lore'), /<entry name="species: cow">/, 'turn ' + n + ': the lore of the kind changing the player stays');
       assert(block(p, 'style_examples').trim(), 'turn ' + n + ': at least one style example');
+      // What the memory holds reaches the writer however hard the prompt is cut: the end of the summary, the newest fact and the
+      // newest event on the timeline.
+      assert(block(p, 'summary').includes(memBefore.summary.slice(-60)), 'turn ' + n + ': the summary is sent, at least its end');
+      assert(block(p, 'facts').includes(String(memBefore.facts.at(-1)).slice(0, 40)), 'turn ' + n + ': the newest fact is sent');
+      assert(block(p, 'timeline').split('\n').includes(memBefore.events.at(-1)), 'turn ' + n + ': the newest event is on the timeline');
       // The beats not yet in the summary, each once: those of turns sent whole are in their narration, the rest (a turn cut to its
       // last paragraphs or its tail included) in <earlier_turns>.
       const lineOf = new Map(block(p, 'earlier_turns').split('\n').map((l) => [Number((/^Turn (\d+) \(/.exec(l) || [])[1]), l]));

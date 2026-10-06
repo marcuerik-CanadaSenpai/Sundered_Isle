@@ -43,11 +43,12 @@ const clean = (h, fail, label) => { if (h.errors.length || h.mock.violations.len
 
 // 1. Two devices take a turn from the same save at the same moment. Each page that ends without its turn in the store must say
 //    so (the "saved from another device" choice) by the time it is next looked at; neither may report "saved" over a lost turn.
-//    Run with both writes landing together, and with B's writes slow so that A finishes first.
+//    Run with both writes landing together, with B's writes slow so that A finishes first, and with A's record write slow so the
+//    store is left with A's record over B's block unless A checks the block too.
 async function twoDevices(fail) {
-  for (const slow of [0, 150]) {
+  for (const slow of [0, 150, 'record']) {
     const store = realSave();
-    const A = await open(store, 'A-'), B = await open(store, 'B-', (w, m) => { if (slow) m.dbDelay = (op) => (op === 'set' ? slow : 0); });
+    const A = await open(store, 'A-', (w, m) => { if (slow === 'record') m.dbDelay = (op, p) => (op === 'set' && p === DOC ? 300 : 0); }), B = await open(store, 'B-', (w, m) => { if (slow && slow !== 'record') m.dbDelay = (op) => (op === 'set' ? slow : 0); });
     A.$('#action').value = 'A: say nothing'; A.click('#send'); B.$('#action').value = 'B: ask her about the barn'; B.click('#send');
     await Promise.all([A.idle(30000), B.idle(30000)]);
     for (const h of [A, B]) { h.window.dispatchEvent(new h.window.Event('focus')); await h.settle(300, 8000); }
@@ -56,6 +57,7 @@ async function twoDevices(fail) {
       if (!actions.includes(act) && !/saved from another device/.test(statusOf(h))) fail('two devices (B slow ' + slow + ' ms): ' + who + '\'s turn is not in the store and ' + who + ' does not say so (status "' + statusOf(h).slice(0, 120) + '", note "' + h.$('#summaryNote').textContent + '")');
     }
     if (record(store).turnCount !== storedTurns(store).length) fail('two devices: the record says ' + record(store).turnCount + ' turns, the blocks hold ' + storedTurns(store).length);
+    if (record(store).lastTurnId !== storedTurns(store).at(-1).id) fail('two devices (' + slow + '): the record and the newest block are two pages\' (record by ' + record(store).by + ', last turn "' + storedTurns(store).at(-1).action + '")');
     clean(A, fail, 'two devices A'); clean(B, fail, 'two devices B'); A.close(); B.close();
   }
 }

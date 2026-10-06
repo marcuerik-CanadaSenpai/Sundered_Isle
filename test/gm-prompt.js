@@ -3,6 +3,7 @@
 // the scene needs them. Run one scenario by name: node gm-prompt.js closedPlaces
 // Against another build: WL_HTML=<index.html> WL_WORLDS=<worlds dir> node gm-prompt.js
 const assert = require('node:assert/strict');
+const fs = require('fs'), path = require('path'), vm = require('vm');
 const { boot } = require('./boot');
 
 let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
@@ -10,6 +11,7 @@ const bytes = (s) => Buffer.byteLength(s, 'utf8');
 const turnCalls = (h) => h.mock.sampleCalls.filter((c) => /^turn/.test(c.label));
 const promptOf = (c) => (Array.isArray(c.input) ? c.input.map((m) => m.content).join('\n') : String(c.input));
 const sec = (p, tag) => { const m = p.match(new RegExp('\\n<' + tag + '[ >][\\s\\S]*?\\n</' + tag + '>')); assert(m, '<' + tag + '> is in the prompt'); return m[0]; };
+const loadWorld = () => { const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds'), 'sundered.js'), 'utf8'), ctx); return ctx.window.WINDLASS_WORLDS.sundered; };
 const PLACES = ['Wrath', 'Pride', 'Envy', 'Greed', 'Lust', 'Gluttony', 'Sloth'];
 const placeLine = (gm, sin) => (gm.match(new RegExp('^- ' + sin + ' \\(key [a-z]+\\)[^\\n]*', 'm')) || [''])[0];
 
@@ -66,7 +68,7 @@ const S = {
     } finally { h.close(); }
   },
 
-  // 2. The passing oddities rotate, a few each turn, and all nine come round; the keeper and her rules are kept whole.
+  // 2. The passing oddities rotate, a few each turn, and every one comes round; the keeper and her rules are kept whole.
   async oddityRotation() {
     const h = await begin();
     try {
@@ -74,7 +76,7 @@ const S = {
       for (let i = 0; i < 4; i++) { const gm = sec(await play(h, 'I look around the room. ' + 'x'.repeat(i)), 'gm_only'); const block = (gm.match(/Oddities[^\n]*\n((?:- [^\n]*\n?)+)/) || [, ''])[1]; sets.push(block.split('\n').filter(Boolean)); }
       assert(sets.every((s) => s.length >= 1 && s.length <= 3), 'a few oddities each turn: ' + JSON.stringify(sets.map((s) => s.length)));
       assert.notDeepEqual(sets[0], sets[1], 'the oddities change from turn to turn');
-      assert.equal(new Set(sets.flat()).size, 9, 'all nine oddities come round in four turns: ' + JSON.stringify(sets));
+      assert.equal(new Set(sets.flat()).size, loadWorld().secrets.hints.length, 'every oddity comes round in four turns: ' + JSON.stringify(sets));
       const gm = sec(await play(h, 'I look around the room.'), 'gm_only');
       for (const f of ['human once', 'could not pass them', 'only to what is still human', 'chimera of everything she took', 'cannot be it', 'collects the humans who see through glamours', 'hoping without expecting', 'tells nobody what they have not earned', 'in her sight or hearing', 'finds a closed place, faces a guardian, shows unusual courage, restraint or kindness', 'sideways', 'never an explanation', 'some doors are closed for good reasons', 'means it kindly', 'never says what she is or what she hopes']) assert(gm.replace(/\s+/g, ' ').includes(f), 'the keeper still says: ' + f);
     } finally { h.close(); }
@@ -116,7 +118,7 @@ const S = {
       assert(!/\bYou are |\byou saw\b|This evening is the cross-species mixer/.test(w), 'the narrator is not told "You are" or that it is still the first evening');
       const flat = w.replace(/\s+/g, ' ');
       for (const f of ['Mythaven University', 'goblins, harpies, werewolves, fox, cat and rabbit mythkin, merfolk, dryads, fairies and bovine mythkin', 'most humans go their whole lives without knowingly meeting one', 'live among humans under glamours', 'Owen Pryce is nineteen and human, the only human first-year this year, invited as the others were', 'is up to the player',
-        'appears on no chart', 'four miles long', 'a lake in its middle', 'a cliff path with a rail', 'weather of its own', 'twice a day', 'a mile out', 'an hour', 'not to look down', 'older than its records', 'a wall with doors bricked up', 'a tower with no door at all', 'a bell that is never rung by hand',
+        'appears on no chart', 'four miles long', 'a lake in its middle', 'a cliff path with a rail', 'weather of its own', 'twice a day', 'a mile out', 'an hour', 'not to look down', 'older than its records', 'a wall with doors bricked up', 'a tower with no door at all', 'a bell nobody rings, which keeps no hours',
         'the Aerie, a roofless harpy tower where nobody sleeps lying down', 'rooms half underwater', 'the Greenhouse Quarter', 'fairy rings are mown into the lawns', 'goblin arcade under the old chapel, a market every Monday night', 'the Creamery, run by the bovine students', 'the Moon Field', 'the Edge, where the cliff path meets the cloud',
         'taken for tall people, odd people, people with hats', 'lost it in the Sundering', 'A few dozen humans', 'upper-years', 'letter from the Dean\'s office', 'none knows why they were asked', 'decided how human to stay', 'sensitive to mythkin magic', 'laissez-faire', 'Restoration Spa reverses any change, free and without limit',
         'rivalries are personal and cross kind', 'not a species-wide personality or obligation', 'draw close in their own ways, or not at all', 'seen the changes come to someone']) assert(flat.includes(f), '<world> still says: ' + f);
