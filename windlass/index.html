@@ -173,7 +173,7 @@
   .castlist button .k { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
   .castform { display: grid; gap: 10px; }
   .castform textarea { min-height: 48px; }
-  @media (max-width: 700px) { .cast { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .cast { grid-template-columns: 1fr; } .castdraw button { min-height: 40px; flex: 1 1 auto; } }
   .ovr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; }
   .ovr-grid label { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; font-size: 0.85rem; }
   .ovr-grid input[type="number"] { width: 5rem; }
@@ -207,26 +207,38 @@
     .topbtns { display: none; width: 100%; margin: 0; padding-top: 4px; border-top: 1px solid var(--line); }
     .topbar.menu-open .topbtns { display: flex; }
     .topbtns button { min-height: 40px; }
-    /* Suggestions: one swipeable row of cards, the next card peeking in from the right. */
-    .suggestions { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -12px; padding: 0 12px; -webkit-overflow-scrolling: touch; }
+    /* Suggestions: one swipeable row of cards, the next card peeking in from the right. The row never wraps or grows taller;
+       a sideways swipe scrolls it natively and does not chain into the page (no back-swipe, no page pan). */
+    .suggestions { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -12px; padding: 0 12px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+    .suggestions:empty { display: none; }
     .suggestions::-webkit-scrollbar { display: none; }
-    .suggestions button { flex: 0 0 84%; scroll-snap-align: start; min-height: 44px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .suggestions button { flex: 0 0 84%; scroll-snap-align: start; min-height: 44px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; touch-action: pan-x pan-y; }
     @media (min-width: 600px) { .suggestions button { flex-basis: 46%; } }
-    textarea#action { min-height: 44px; height: 44px; }
+    /* The action box is two rows and scrolls inside itself; it never pushes the bar taller. */
+    textarea#action { min-height: 0; height: calc(2.9em + 16px); max-height: calc(2.9em + 16px); overflow-y: auto; resize: none; }
+    details.director textarea { max-height: 6em; resize: none; }
+    .director summary { min-height: 28px; display: flex; align-items: center; }
     .director summary .long { display: none; }
     .director summary .short { display: inline; }
-    /* While reading down a long turn the bar tucks away; it comes back at the end of the story, on a scroll up, or with the tab.
-       The tab works both ways: "Hide ▾" on the open bar puts it away and keeps it away until "Actions ▴" is tapped. */
-    .actionbar { transition: transform 0.18s ease; }
-    .actionbar.tucked { transform: translateY(100%); }
+    /* Open, the bar takes at most 45% of the screen and scrolls inside itself, so the story above stays readable and scrollable. */
+    .actionbar { display: flex; flex-direction: column; max-height: 45vh; max-height: 45dvh; padding-left: 0; padding-right: 0; }
+    .actionbar .inner { width: 100%; min-height: 0; padding: 3px 12px; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+    /* While reading down a long turn the bar tucks away to its tab and the suggestion row, which stays swipeable and tappable
+       (a tap puts the suggestion in the action box and opens the bar); it comes back at the end of the story, on a scroll up, with
+       the tab or a suggestion. The tab works both ways: "Hide ▾" on the open bar tucks it and keeps it tucked until "Actions ▴",
+       a suggestion or the action box brings it back. */
+    .actionbar.tucked { padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+    .actionbar.tucked .inner > :not(.suggestions) { display: none; }
     .actionbar .handle { display: inline-flex; position: absolute; left: 50%; top: -28px; transform: translateX(-50%); height: 28px; padding: 0 14px; align-items: center; font-size: 0.8rem; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: 10px 10px 0 0; }
     .actionbar.tucked .handle { top: -34px; height: 34px; padding: 0 16px; font-size: 0.85rem; color: var(--ink); box-shadow: 0 -4px 12px rgba(0,0,0,0.14); }
     select, textarea, input[type="text"], input[type="number"] { font-size: 16px; }
-    /* Secondary turn buttons live behind More. */
+    /* Secondary turn buttons live behind More. Take turn and More share one row; More opens its buttons as a row of their own
+       under it, inside the bar's scroll, so the capped bar never clips them. */
     .turnrow { position: relative; }
     .turnrow button { min-height: 42px; }
-    .morebtn { display: inline-block; }
-    .turnmore { display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; flex-direction: column; gap: 4px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+    .turnrow #send { flex: 1 1 auto; }
+    .morebtn { display: inline-block; flex: 0 0 auto; }
+    .turnmore { display: none; flex: 1 0 100%; order: 10; flex-wrap: wrap; gap: 6px; }
     .turnmore.open { display: flex; }
     .turnmore button { text-align: left; }
   }
@@ -381,6 +393,7 @@
       </div>
       <div class="grid2">
         <div class="field"><label for="cPace">Pace of change</label><select id="cPace"><option value="slow">slow</option><option value="standard">standard</option><option value="fast">fast</option><option value="unbounded">unbounded (testing)</option></select><span class="small" id="cPaceNote"></span></div>
+        <div class="field"><label for="cInventTier">Tier that invents your roommate and the cast</label><select id="cInventTier"><option value="quick">quick · fastest</option><option value="default">default</option><option value="complex">complex · most capable</option></select></div>
         <div class="field"><label for="cDensity">Narrative density</label><select id="cDensity"><option value="auto">auto · by scene</option><option value="terse">terse</option><option value="standard">standard</option><option value="rich">rich</option></select></div>
       </div>
       <div class="field"><label for="cTitle">Save title</label><input type="text" id="cTitle"></div>
@@ -403,8 +416,6 @@
           <select id="setWindow"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></div>
         <div class="field"><label for="setAutoFit">Fit length automatically when outside the band</label>
           <select id="setAutoFit"><option value="1" selected>on</option><option value="0">off</option></select><span class="small" id="setAutoFitNote">Romance and body-change scenes are trimmed by the same writer, which takes longer.</span></div>
-        <div class="field"><label for="setInventTier">Tier that invents the people of a new adventure begun from this one</label>
-          <select id="setInventTier"><option value="quick" selected>quick</option><option value="default">default</option><option value="complex">complex</option></select></div>
         <div class="field"><label for="setThoughts">Inward thoughts in italics</label>
           <select id="setThoughts"><option value="1" selected>on · one or two a turn, between asterisks</option><option value="0">off</option></select></div>
         <div class="field"><label for="setPace">Pace of change</label>
@@ -474,6 +485,11 @@
             <div class="field"><label for="cfWhere">Usually found (when no time of day has its own)</label><input type="text" id="cfWhere"></div>
           </div>
           <p class="small" id="cfOwnTimes" hidden></p>
+          <div class="row castdraw">
+            <button id="cfRedraw" class="quiet">Redraw</button>
+            <button id="cfFill" class="quiet">Fill in the blanks</button>
+          </div>
+          <p class="small" id="cfRedrawSays"></p>
           <div class="row">
             <button id="cfSave" class="primary">Save</button>
             <button id="cfReset" class="quiet">Reset to how this adventure first wrote them</button>
@@ -581,7 +597,16 @@
   function defaultPlayer() {
     return { name: W.player.name, first: W.player.name.split(' ')[0], last: W.player.name.split(' ').slice(1).join(' '), gender: 'nonbinary', noun: 'person', pronouns: NB, background: '', strengths: [], weakness: '', stats: clone(W.player.stats), description: W.player.description };
   }
+  // A preset or draft from before the glimpse had its own field carries both in the background's label: it is read as the town and,
+  // unless a glimpse was given, the glimpse it told.
+  function splitOldBackground(Wc, c) {
+    const cr = (Wc && Wc.creation) || {}, typed = String((c && c.background) || '').trim().toLowerCase();
+    const key = typed && Object.keys(cr.backgroundsBefore || {}).find((k) => k.toLowerCase() === typed); if (!key) return c || {};
+    const old = cr.backgroundsBefore[key], bg = (cr.backgrounds || []).find((b) => b.key === old.background), gl = (cr.glimpses || []).find((b) => b.key === old.glimpse);
+    return Object.assign({}, c, { background: bg ? bg.label : c.background, glimpse: String(c.glimpse || '').trim() ? c.glimpse : gl ? gl.label : c.glimpse });
+  }
   function buildPlayer(c) {
+    c = splitOldBackground(W, c);
     const cr = W.creation || {}; const g = genderDef(c.gender);
     const name = tidyName(c.name || cr.nameDefault || W.player.name) || W.player.name;
     const stats = {}; for (const k of Object.keys(W.player.stats)) stats[k] = 3;
@@ -614,12 +639,21 @@
     const cued = gs.filter((x) => x.kind && (x.cues || []).some(has)).map((x) => x.kind);
     return { key: 'custom', kind: named.length ? one(named) : one(cued), text: t.slice(0, 300) };
   }
-  // The person the player saw: someone of the glimpse's kind in the generated cast (never the roommate), else a minor figure.
-  // Only then is there a secret to keep, and the flag the narrator sets the turn it comes out.
+  // The person the player saw: someone of the glimpse's kind, never of another. The roommate is one of the people drawn among
+  // when the roommate is of that kind; else someone of the kind in the cast, else a minor figure of it, else a minor figure of the
+  // kind drawn for it. Only then is there a secret to keep, and the flag the narrator sets the turn it comes out.
   function seedGlimpse(gen) {
     const g = adv.player && adv.player.glimpse; if (!g || !g.kind || !gen) return;
     const r = adv.roommate, fits = (c) => c.species === g.kind && !(r && r.replaces === c.key);
-    const chars = gen.characters.filter(fits), who = pick(chars.length ? chars : (gen.minors || []).filter(fits));
+    const chars = gen.characters.filter(fits).concat(r && r.species === g.kind ? [r] : []);
+    let who = pick(chars.length ? chars : (gen.minors || []).filter(fits));
+    if (!who && speciesPool(W, g.kind)) {
+      const parts = (n) => String(n || '').toLowerCase().split(/\s+/).filter(Boolean);
+      const used = new Set([].concat(gen.characters, gen.minors || [], r ? [r] : [], adv.player ? [adv.player] : []).flatMap((c) => parts(c.first).concat(parts(c.last))));
+      let p = null; for (let i = 0; i < 40; i++) { p = genPerson(W, { species: g.kind, dressRole: 'student' }); if (![p.first, p.last].flatMap(parts).some((w) => used.has(w))) break; }
+      who = { key: 'glimpsed', name: p.name, first: p.first, last: p.last, race: p.race, species: p.species, gender: p.gender, pronouns: p.pronouns, text: 'a student, around campus', looks: p.looks, looksV: p.looksV, senses: p.senses, dress: p.dress };
+      gen.minors = (gen.minors || []).concat([who]);
+    }
     if (who) { g.who = who.key; adv.state.flags.glimpse_told = false; }
   }
   function glimpsePerson() {
@@ -816,9 +850,12 @@
   // A labelled look read back by its labels ("Height", "Hair" ...); an unlabelled one (written in the Cast editor) is itself.
   const looksField = (looks, label) => { const m = new RegExp('(?:^|\\s)' + label + ': ([^]*?)\\.(?=\\s+[A-Z][A-Za-z\' ]{1,30}: |\\s+No [a-z]|\\s*$)').exec(String(looks || '')); return m ? m[1] : ''; };
   const looksLabelled = (looks) => /^Height: /.test(String(looks || ''));
+  // Run together without labels, a hair or eyes part that does not name itself (a Cast edit's "Eyes: green") keeps its noun, so
+  // the colour is never read as a tint of the hair before it.
   function looksBrief(looks) {
     if (!looksLabelled(looks)) return String(looks || '');
-    const build = looksField(looks, 'Build'); return [looksField(looks, 'Height') + (build ? (/, with /.test(build) ? ', ' : ', with ') + build : ''), looksField(looks, 'Hair'), looksField(looks, 'Eyes')].filter(Boolean).join('; ');
+    const own = (label) => { const t = looksField(looks, label), noun = label.toLowerCase(); return t && !new RegExp('\\b' + noun.replace(/s$/, '') + 's?\\b', 'i').test(t) ? noun + ' ' + t : t; };
+    const build = looksField(looks, 'Build'); return [looksField(looks, 'Height') + (build ? (/, with /.test(build) ? ', ' : ', with ') + build : ''), own('Hair'), own('Eyes')].filter(Boolean).join('; ');
   }
   // A look for a person the last turn already showed: the brief run together without its labels, then every other part as the look
   // gives it and the closing must-nots, so the line is shorter to read as a whole and no part or absence of the body is lost.
@@ -1075,25 +1112,59 @@
     return room + bed + '\n\nYour roommate comes in behind you and stops in the doorway' + appearance + '. "' + r.name + '," ' + pr.they + ' ' + says + '. "Second-year, ' + g.course + '." ' + (g.hello ? cap(pr.they) + ' reaches out, stops, and folds the hand back in, the way people do when a greeting is on offer and optional. ' : '') + '"Mixer\'s at seven. I\'ll walk you down, if you like. It\'s loud."';
   }
   // The structural draws for a cast (the kind, the gender and the variant of every role), made once so that the invention
-  // call and the build that follows agree on who each person is.
-  function castPlan(Wc, kind) {
+  // call and the build that follows agree on who each person is. A role's species list says only which kinds it allows (order
+  // and repeats mean nothing more). The kinds are dealt for balance: the list roles, in a random order, each take the allowed kind
+  // seen least so far (the fixed roles and the roommate's kind, rmKind, counted), no kind more than twice among the list roles
+  // while another is allowed; then any kind a list allows that is still nowhere is swapped into a role that allows it, from a
+  // kind held more than once. Every draw is Math.random's, so a seeded creation deals the same cast again.
+  function castPlan(Wc, kind, rmKind) {
     if (!Wc.castRoles || !Wc.genPools) return null;
-    const one = (role) => { const species = Array.isArray(role.species) ? pick(role.species) : (role.species || null); const sp = speciesPool(Wc, species); const genders = sp ? sp.genders : ['female', 'male', 'nonbinary']; const variant = role.variants && role.variants.length ? pick(role.variants) : null; const want = role.gender || (variant && variant.gender); const gender = genders.includes(want) ? want : pick(genders); return { key: role.key, species, gender, variant }; };
-    const plan = { characters: Wc.castRoles.map(one), minors: (Wc.minorRoles || []).map(one) };
-    // Someone of the kind the player saw is in the cast: if the draw left the kind out, one role that can be it is drawn as it.
-    if (kind && ![].concat(plan.characters, plan.minors).some((x) => x.species === kind)) {
-      const can = (roles) => roles.map((r, i) => i).filter((i) => Array.isArray(roles[i].species) && roles[i].species.includes(kind));
-      const ci = can(Wc.castRoles), mi = can(Wc.minorRoles || []);
-      if (ci.length) { const i = pick(ci); plan.characters[i] = one(Object.assign({}, Wc.castRoles[i], { species: kind })); }
-      else if (mi.length) { const i = pick(mi); plan.minors[i] = one(Object.assign({}, Wc.minorRoles[i], { species: kind })); }
+    const one = (role, species) => { const sp = speciesPool(Wc, species); const genders = sp ? sp.genders : ['female', 'male', 'nonbinary']; const variant = role.variants && role.variants.length ? pick(role.variants) : null; const want = role.gender || (variant && variant.gender); const gender = genders.includes(want) ? want : pick(genders); return { key: role.key, species, gender, variant }; };
+    const roles = Wc.castRoles.concat(Wc.minorRoles || []), nCast = Wc.castRoles.length;
+    const allows = roles.map((r) => (Array.isArray(r.species) ? [...new Set(r.species.filter(Boolean))] : null));
+    const kinds = roles.map((r, i) => (allows[i] ? null : r.species || null));
+    const total = {}, listed = {}; const add = (o, k, n) => { if (k) o[k] = (o[k] || 0) + n; };
+    kinds.forEach((k) => add(total, k, 1)); add(total, rmKind, 1);
+    const drawable = roles.map((r, i) => i).filter((i) => allows[i] && allows[i].length);
+    for (const i of shuffled(drawable)) {
+      const under = allows[i].filter((k) => (listed[k] || 0) < 2), opts = under.length ? under : allows[i];
+      const low = Math.min(...opts.map((k) => total[k] || 0)), k = pick(opts.filter((x) => (total[x] || 0) === low));
+      kinds[i] = k; add(total, k, 1); add(listed, k, 1);
     }
-    return plan;
+    // In the cast and minors (the roommate not counted): the glimpse's kind needs a person there, never only the roommate.
+    const inCast = (k) => (total[k] || 0) - (rmKind === k ? 1 : 0);
+    const short = (k) => (k === kind ? inCast(k) < 1 : !(total[k] > 0));
+    const spare = (k) => (total[k] || 0) > 1 && !(k === kind && inCast(k) < 2);
+    const needed = [...new Set(drawable.flatMap((i) => allows[i]))];
+    for (const k of shuffled(needed).sort((a, b) => (b === kind) - (a === kind))) {
+      if (!short(k)) continue;
+      const can = drawable.filter((i) => allows[i].includes(k));
+      // The glimpse's kind goes to a cast role before a minor one, the way the one seen is looked for.
+      const pool = k === kind && can.some((i) => i < nCast) ? can.filter((i) => i < nCast) : can;
+      const safe = pool.filter((i) => spare(kinds[i]));
+      const fewest = (xs) => { const top = Math.max(...xs.map((i) => listed[kinds[i]] || 0)); return xs.filter((i) => (listed[kinds[i]] || 0) === top); };
+      const i = safe.length ? pick(fewest(safe)) : (k === kind && pool.length ? pick(pool) : null);
+      if (i == null) continue;
+      add(total, kinds[i], -1); add(listed, kinds[i], -1); kinds[i] = k; add(total, k, 1); add(listed, k, 1);
+    }
+    // A role dealt into a corner (every kind it allows already twice) trades: another role holding one of those kinds moves to a
+    // kind it allows that is held less than twice, and this role takes the place it left.
+    for (const i of drawable) {
+      if ((listed[kinds[i]] || 0) <= 2) continue;
+      const swaps = [];
+      for (const k of allows[i]) if (k !== kinds[i]) for (const j of drawable) if (j !== i && kinds[j] === k) for (const m of allows[j]) if (m !== k && m !== kinds[i] && (listed[m] || 0) < 2) swaps.push([k, j, m]);
+      if (!swaps.length) continue;
+      const [k, j, m] = pick(swaps);
+      add(total, kinds[i], -1); add(listed, kinds[i], -1); kinds[i] = k; kinds[j] = m; add(total, m, 1); add(listed, m, 1);
+    }
+    const plan = roles.map((r, i) => one(r, kinds[i]));
+    return { characters: plan.slice(0, nCast), minors: plan.slice(nCast) };
   }
   // The cast for worlds with castRoles: the role is the world's, the person is drawn fresh for this adventure, and where the
   // invention call wrote the person (given), its names and lines are used; the pools fill whatever it left out.
   function generateCast(plan, given) {
     if (!W.castRoles || !W.genPools) return null;
-    plan = plan || castPlan(W, adv.player && adv.player.glimpse && adv.player.glimpse.kind); given = given || {};
+    plan = plan || castPlan(W, adv.player && adv.player.glimpse && adv.player.glimpse.kind, adv.roommate && adv.roommate.species); given = given || {};
     const G = W.genPools;
     // Names compared word by word, ignoring case: "MIRA" or "Holt Lane" collides with a player called Mira Holt.
     const parts = (n) => String(n || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -1346,6 +1417,15 @@
       const o = adv.cast && adv.cast.overrides && adv.cast.overrides[c.key]; if (o && (o.looks === old || o.looks === fill(old))) o.looks = fresh;
     };
     mend(adv.roommate); if (genCast) [].concat(genCast.characters || [], genCast.minors || []).forEach(mend);
+    // A save keeps the close-up lines its people were drawn with, and four older ones handed the narration a phrase it then
+    // repeated every turn (unhurried, sweet grass, let go of last, felt in the breastbone): those read as the world has them now.
+    const senses = (c) => { if (c && c.senses) c.senses = String(c.senses).replace(/ unhurried voice that carries across a room without rising; when \w+ leans? in, the breath smells of sweet grass/g, ' voice that carries across a room without rising').replace(/ that does not shift when leaned on; a hug from (\w+) comes slowly, holds, and is let go of last/g, ' to lean on; a hug from $1 comes slowly and holds').replace(/, low and unhurried;/g, ', low and slow;').replace(/the low notes are felt in the breastbone before they are heard/g, 'the glasses on the shelf ring'); };
+    // So do the hand rows the lore has since pinned (a bovine hand is two hooved fingers and a hooved thumb, a harpy's a thumb and two
+    // clawed fingers), in the looks of everyone drawn with the old ones, whose looksV keeps them from being composed again.
+    const hands = [[/four fingers, each tipped with a small hoof/gi, 'two fingers and a thumb, each ending in a small thin hoof'], [/two heavy digits hooved to the first joint/gi, 'two heavy fingers and a thumb, all hooved to the first joint'],
+      [/\bfour clawed fingers/gi, 'a thumb and two short clawed fingers'], [/\ba thumb and one strong clawed finger\b/gi, 'a thumb and two strong clawed fingers, the claws long and curved']];
+    const looks = (c) => { if (c && typeof c.looks === 'string') c.looks = hands.reduce((s, [re, to]) => s.replace(re, (m) => (m[0] === m[0].toUpperCase() ? to[0].toUpperCase() : to[0]) + to.slice(1)), c.looks); };
+    [adv.roommate, adv.roommate && adv.roommate.gen].concat(genCast ? [].concat(genCast.characters || [], genCast.minors || []) : [], Object.values((adv.cast && adv.cast.overrides) || {})).forEach((c) => { senses(c); looks(c); if (c && c.gen) looks(c.gen); });
     // Saves from before v20 called the Keel flag choice_made, which the narrator took for an ordinary choice; it is keel_choice_made now and only counts once the Keel is open.
     if (adv.state && adv.state.flags && 'choice_made' in adv.state.flags) { const open = W.dungeons && dungeonsCleared(adv.state).length === W.dungeons.length; adv.state.flags.keel_choice_made = !!(adv.state.flags.choice_made && open); delete adv.state.flags.choice_made; }
     // Saves from before v17 did not track the kinds met: derive them from everyone who has been present so far.
@@ -1558,7 +1638,7 @@
         // A closed place found or passed stays so, is found or passed only above the humanity line, and is found by being passed.
         const dm = W.dungeons && /^dungeon_(\w+)_(found|cleared)$/.exec(key);
         if (dm && !b && state.flags[key]) { notes.push('ignored unsetting ' + key + ' (a place found or passed stays so)'); continue; }
-        if (dm && b && !state.flags[key] && W.transformation && humanity(state) < HUMANITY_LINE) { notes.push('ignored ' + key + ' (humanity ' + humanity(state) + ', below the line of ' + HUMANITY_LINE + ')'); continue; }
+        if (dm && b && !state.flags[key] && W.transformation && humanity(state) < humanityLine()) { notes.push('ignored ' + key + ' (humanity ' + humanity(state) + ', below the line of ' + humanityLine() + ')'); continue; }
         if (dm && b && dm[2] === 'cleared') { const fk = 'dungeon_' + dm[1] + '_found'; if (hasOwn(state.flags, fk) && !state.flags[fk]) { rec('flags.' + fk, false, true); state.flags[fk] = true; } }
         rec(path, state.flags[key], b); state.flags[key] = b;
       }
@@ -3378,7 +3458,15 @@
   const dungeonsFound = (S) => (W.dungeons || []).filter((d) => S.flags && S.flags['dungeon_' + d.key + '_found']);
   const dungeonsCleared = (S) => (W.dungeons || []).filter((d) => S.flags && S.flags['dungeon_' + d.key + '_cleared']);
   // What is still human: on tracks, 100 less every kind's body total; on a ladder, fifteen points a settled change; the trials answer only above the line. The Spa gives it back.
-  const HUMANITY_LINE = 40;
+  // The line is set per pace so a game stays above it for about as many turns on every pace. The pace factors (PACE_PER_DAY:
+  // slow 5, standard 10, fast 20, unbounded no cap a day; PACE_STEP_SCALE: 2, 1, 0.5, 0 between body steps) were measured on the
+  // mock with fresh games of hourly intimate contact. Turns until humanity first fell below each line, one kind / two kinds:
+  // standard below 40 at 79 / 31; fast below 40 at 74 / 34 and below 35 at 77 / 44; slow below 60 at 79 / 31 (two kinds: below
+  // 70 at 59); unbounded below 40 at 37 / 17 and below 15 at 62 / 38. So: slow 60, standard 40, fast 35, unbounded 15. On
+  // unbounded humanity falls every turn rather than every story day, so no line keeps it open as long as standard; 15 keeps the
+  // closed places answering for the first thirty-odd turns of hard contact instead of under twenty.
+  const HUMANITY_LINES = { slow: 60, standard: 40, fast: 35, unbounded: 15 };
+  const humanityLine = () => { const v = HUMANITY_LINES[adv && adv.settings && adv.settings.pace]; return v == null ? 40 : v; };
   function humanity(S) { if (W.transformation && W.transformation.tracks && S.tf) return Math.max(0, 100 - Object.keys(W.transformation.species).reduce((a, k) => a + kindTotal(S.tf, k), 0)); const settled = ((S.tf && S.tf.traits) || []).filter((t) => t.settled !== false).length; return Math.max(0, 100 - 15 * settled); }
   // lean (near the prompt cap): one passing oddity is kept. Partial knowledge goes only with the people in the scene, who alone
   // can let it slip. Hints rotate, a few of them each turn (one when lean), since one may surface only every few turns. A closed
@@ -3387,13 +3475,16 @@
   function gmBlock(S, first, lean, play, turnNo) {
     const out = []; const sec = W.secrets || {}; const found = dungeonsFound(S), cleared = dungeonsCleared(S);
     const inScene = (k) => { const c = charByKey(k); return !!c && S.present.some((pn) => String(pn).toLowerCase().includes(String(givenName(c)).toLowerCase())); };
-    if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (' + (W.transformation.tracks ? '' : 'each settled change takes fifteen; ') + 'the Spa restores it). ' + (h >= HUMANITY_LINE ? 'Above ' + HUMANITY_LINE + ' the closed places answer.' : 'Below the line of ' + HUMANITY_LINE + ': no closed place will open and no guardian can be faced until the Spa gives enough back. At a closed place ' + first + ' can feel it refuse (cold, still, deaf to a knock); nobody says why.')); }
+    if (W.dungeons && W.transformation) { const h = humanity(S); out.push(first + '\'s humanity: ' + h + ' of 100 (' + (W.transformation.tracks ? '' : 'each settled change takes fifteen; ') + 'the Spa restores it). ' + (h >= humanityLine() ? 'Above ' + humanityLine() + ' the closed places answer.' : 'Below the line of ' + humanityLine() + ': no closed place will open and no guardian can be faced until the Spa gives enough back. At a closed place ' + first + ' can feel it refuse (cold, still, deaf to a knock); nobody says why.')); }
     if (sec.rule) out.push(fill(sec.rule));
     if (sec.hints && sec.hints.length) out.push((lean ? 'An oddity' : 'Oddities') + ' that may surface in passing, at most one every few turns, never explained:\n' + sec.hints.filter((h, i) => (lean ? i === turnNo % sec.hints.length : i % 4 === turnNo % 4)).map((h) => '- ' + fill(h)).join('\n'));
     if (sec.keeper) { const c = charByKey(sec.keeper.key); out.push('The keeper: ' + (c ? c.name : sec.keeper.key) + ' ' + fill(sec.keeper.text)); }
-    // Who the player saw, until it is out, while that person is in play (the line costs nothing in a scene without them).
+    // Who the player saw, until it is out: the person and the kind while that person is in play; in a scene without them, only
+    // the kind and that nobody here is it, so the glimpse is never moved onto someone else present.
     const seen = S.flags && S.flags.glimpse_told === false && glimpsePerson(), gn = seen && givenName(seen), them = adv.player.pronouns.them;
-    if (seen && keyHit(gn, play.all)) out.push('Who ' + first + ' saw (<player>): ' + seen.name + ' (' + String(seen.race || seen.species).toLowerCase() + '), a secret. ' + gn + ' may recognise ' + them + ', avoid or seek ' + them + ' out, never forced; once ' + gn + ' admits it or ' + first + ' sees it again, set flags.glimpse_told.');
+    const seenKind = seen && String(seen.race || seen.species).toLowerCase();
+    if (seen && keyHit(gn, play.all)) out.push('Who ' + first + ' saw (<player>): ' + seen.name + ' (' + seenKind + '), a secret. ' + gn + ' may recognise ' + them + ', avoid or seek ' + them + ' out, never forced; once ' + gn + ' admits it or ' + first + ' sees it again, set flags.glimpse_told. Nobody else is the one ' + first + ' saw.');
+    else if (seen) out.push('What ' + first + ' saw (<player>): ' + (/^[aeiou]/.test(seenKind) ? 'an ' : 'a ') + seenKind + ', a secret, and nobody in this scene.');
     const partialKeys = sec.partial ? Object.keys(sec.partial).filter(inScene) : [];
     if (partialKeys.length) out.push('Partial knowledge, which only they can let slip:\n' + partialKeys.map((k) => { const c = charByKey(k); return '- ' + (c ? c.name : k) + ' ' + fill(sec.partial[k]); }).join('\n'));
     if (W.dungeons) out.push('The seven closed places. Set flags.dungeon_<key>_found the turn ' + first + ' gets inside, and flags.dungeon_<key>_cleared the turn the trial is passed and the guardian faced. A place not marked found or passed is only a location and a rumour:\n' + W.dungeons.map((d) => {
@@ -3404,7 +3495,7 @@
       if (!near) return head + fill(d.at || d.where) + '.';
       // The next event that can open it, while the humanity line lets it open at all (below it no chance is offered).
       const chance = W.calendar && nextEvent(S, (e) => e.opens === d.key);
-      let line = head + fill(d.where) + '. Opens ' + fill(d.opens) + (chance && !f && humanity(S) >= HUMANITY_LINE ? ' Next chance: ' + fill(chance.e.name) + ', Day ' + chance.day + '.' : '');
+      let line = head + fill(d.where) + '. Opens ' + fill(d.opens) + (chance && !f && humanity(S) >= humanityLine() ? ' Next chance: ' + fill(chance.e.name) + ', Day ' + chance.day + '.' : '');
       if (f) line += '\n  Inside: ' + fill(d.trial) + '\n  Guardian: ' + fill(d.guardian);
       return line;
     }).join('\n'));
@@ -4375,13 +4466,15 @@
       const porter = ((adv.cast && adv.cast.generated && adv.cast.generated.minors) || []).find((m) => m.key === 'porter');
       const porterBit = porter ? (porter.race === 'Human' ? 'the porter, who is human, across a desk an hour ago' : porter.name + ' the porter (' + porter.race.toLowerCase() + ') across a desk an hour ago, which was startling enough') : 'the porter across a desk an hour ago';
       const kind = r.race.toLowerCase();
+      // The glimpse reaches this prompt only when the roommate is the one seen; otherwise the roommate is simply a stranger.
+      const seenRm = !!(p.glimpse && p.glimpse.who === r.key && adv.state && adv.state.flags.glimpse_told === false);
       const kindArticle = /^[aeiou]/i.test(kind) ? 'an' : 'a';
       const prompt = [
         xml('task', 'Write the roommate\'s first appearance for the opening of an interactive story: 220 to 340 words, second person present tense addressed to ' + p.first + ', plain prose in two to four paragraphs, no heading and no preamble. It drops into the middle of the opening scene: ' + p.first + ' has just walked into room 4B of Kettle Hall at Mythaven University at 17:40 on orientation Monday and looked out of the window; a closing paragraph about lanterns outside follows your text. Do not describe the window or the lanterns.'),
         xml('setting', fill(W.premise)),
         xml('room', 'What ' + p.first + ' sees of the roommate\'s side of the room: ' + (g.room || 'it is already lived in, arranged for a body that is not ' + (p.pronouns.theirs || 'theirs'))),
         xml('roommate', 'Full name: ' + r.name + ' (' + r.race + ', ' + r.pronouns.they + '/' + r.pronouns.them + '), second-year, ' + g.course + '. Say this exact full name, including every part of it, when the roommate introduces themself. Temperament: ' + g.temperament + '. Habit: ' + g.quirk + '.' + (g.speech ? ' Speech: ' + g.speech + '.' : '') + (g.looks ? ' Looks: ' + g.looks.replace(/\.$/, '') + '.' + (absentText(W, r.species, r) ? ' Not on this body: ' + absentText(W, r.species, r) + '.' : '') : '') + ' Dress: ' + dressLine(r, adv.state ? slotInfo(adv.state).cur.slot : '', '') + '.' + (g.senses ? ' Close up: ' + g.senses + '.' : '') + (kindWays(W, r.species, r) ? ' Ways of the kind, shown and never explained: ' + kindWays(W, r.species, r) + '.' : '') + (g.hello ? ' Greeting custom of ' + (r.speciesName || kind + 's') + ': ' + g.hello + '; offered and left optional, never forced on a human.' : '') + ' Wants from a roommate: ' + g.want + '. Manner in this first meeting: ' + g.greeting + '. Knows the mixer is on the quad at seven and offers to walk ' + p.first + ' down. Must not mention: ' + g.privateMatter + '.'),
-        xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen so far: something in the world below three weeks ago that made no sense, shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ', and nothing about it is ordinary to ' + p.pronouns.them + ' yet; ' + p.first + ' has no word for any of it and has been told nothing.'),
+        xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen so far: shapes across the ferry deck, and ' + porterBit + '. This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ', and nothing about it is ordinary to ' + p.pronouns.them + ' yet; ' + p.first + ' has no word for any of it and has been told nothing.' + (seenRm ? '\nA secret, kept in this scene: ' + r.first + ' is the one ' + p.first + ' saw three weeks before, in the world below (' + p.first + '\'s words: ' + p.glimpse.text + '). ' + r.first + ' may recognise ' + p.pronouns.them + ' and says nothing of it.' : '')),
         xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
         xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, the non-human parts in particular (Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. No word of the Isle\'s in the narration (glamour, mythkin, kind, a kind\'s name): the body is seen in ' + p.first + '\'s own plain words, as scales or fur or a tail, and only the roommate may name ' + r.pronouns.their + ' kind, in ' + r.pronouns.their + ' own mouth, or not. Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. The body is exactly what Looks gives and nothing else: add no part, covering, colour, by-sex feature, size or comparison it does not give, nothing under Not on this body, and end each covering where Looks ends it; the height is as Looks gives it, never measured against ' + p.first + '. The clothes are yours to choose by the Dress line, within what the body allows. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].join('\n\n');
@@ -4874,8 +4967,8 @@
     if (dirty || saveError) setSaveNote('');
     dirty = false; saveError = null;
     const c = choices || {};
-    // The settings the creation screen showed (the game on screen's, or this device's), with the pace and density picked there.
-    const settings = normaliseSettings(Object.assign(newGameSettings(), c.pace ? { pace: c.pace } : {}, c.density ? { density: c.density } : {}, { testNote: '' }));
+    // The settings the creation screen showed (the game on screen's, or this device's), with the pace, density and invention tier picked there.
+    const settings = normaliseSettings(Object.assign(newGameSettings(), c.pace ? { pace: c.pace } : {}, c.density ? { density: c.density } : {}, c.inventTier ? { inventTier: c.inventTier } : {}, { testNote: '' }));
     adv = { id: uid('adv'), title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), settings, player: null, roommate: null, opening: null, creation: c, cast: { overrides: {}, added: [], hidden: [] }, state: null, memory: null, pendingNotes: [], turns: [] };
     prep = prep || {}; const given = prep.given || {};
     adv.player = buildPlayer(c); adv.roommate = buildRoommate(c, prep.roommate || null, given.roommate || null);
@@ -5065,7 +5158,7 @@
     const premise = String(Wc.premise || '').replace(/\{name\}/g, (Wc.player && Wc.player.name) || 'the student');
     const splitAt = premise.indexOf('. You are ');
     const setting = (splitAt >= 0 ? premise.slice(0, splitAt + 1) : premise).replace(/\.?$/, '.');
-    const lines = slots.map((sl) => '- ' + sl.key + ': ' + sl.race + ', ' + genderWord(sl.gender) + (sl.year ? ', ' + sl.year : '') + (sl.course ? ', studies ' + sl.course + ' (fixed)' : '') + '. ' + (sl.role ? 'Role: ' + plain(sl.role).replace(/\.?$/, '.') + ' ' : '') + 'Name: first name starting with ' + sl.initials[0] + ', ' + sl.syllables + ' syllable' + (sl.syllables > 1 ? 's' : '') + '; surname starting with ' + sl.initials[1] + (sl.style ? '; ' + sl.style : '') + '.' + (sl.fields.includes('detail') ? ' Detail seed: ' + sl.seed + '.' : '') + ' Fields: ' + sl.fields.join(', ') + '.');
+    const lines = slots.map((sl) => '- ' + sl.key + ': ' + sl.race + ', ' + genderWord(sl.gender) + (sl.year ? ', ' + sl.year : '') + (sl.course ? ', studies ' + sl.course + ' (fixed)' : '') + '. ' + (sl.role ? 'Role: ' + plain(sl.role).replace(/\.?$/, '.') + ' ' : '') + (sl.kept && sl.kept.length ? 'Already set, kept word for word (write around them; never change or repeat them): ' + sl.kept.map(([k, v]) => k + ': "' + plain(v).replace(/\s+/g, ' ').replace(/"/g, "'").replace(/\.$/, '') + '"').join('; ') + '. ' : '') + (sl.fields.includes('first') ? 'Name: first name starting with ' + sl.initials[0] + ', ' + sl.syllables + ' syllable' + (sl.syllables > 1 ? 's' : '') + '; surname starting with ' + sl.initials[1] + (sl.style ? '; ' + sl.style : '') + '.' : '') + (sl.fields.includes('detail') ? ' Detail seed: ' + sl.seed + '.' : '') + ' Fields: ' + sl.fields.join(', ') + '.');
     const rules = [
       'Names: the initial letters and the syllable count of the first name are binding. Names are pronounceable and may come from anywhere in the world, in the fashion given for the kind; no two people share a first name or a surname; none of these, which are taken: ' + (avoid.names.length ? avoid.names.join(', ') : 'none yet') + '; and never these overused ones: ' + OVERUSED_NAMES.join(', ') + '.',
       G.courses && G.courses.length ? 'course: what they study, three words at most. The university teaches ordinary subjects and (' + ex(G.courses, 10) + '); range widely, invent plausible ones in the same vein, no two people the same unless the role fixes it, and not: ' + (avoid.courses.join(', ') || 'none yet') + '.' : '',
@@ -5118,7 +5211,8 @@
   // The limit counts from the first words, not from the call: the runtime shows its consent dialog and may take a minute or two before
   // the first text, and the player's way out of that wait is Begin now.
   const INVENT_TIMEOUT_MS = 60000, INVENT_BATCH = 3;
-  const inventTier = () => (adv && adv.settings && ['quick', 'default', 'complex'].includes(adv.settings.inventTier)) ? adv.settings.inventTier : 'quick';
+  // The people are invented before the new adventure exists, so while the creation screen is open the tier is the one picked there.
+  const inventTier = () => { const tiers = ['quick', 'default', 'complex'], picked = $('#dlgCreate').open ? $('#cInventTier').value : ''; return tiers.includes(picked) ? picked : (adv && adv.settings && tiers.includes(adv.settings.inventTier)) ? adv.settings.inventTier : 'quick'; };
   // opts.signal stops the call (the player pressing Begin now, or the dialog closing); opts.onProgress hears how many people
   // have arrived as the reply streams. A reply cut short by a stop or the timeout still yields the people it had finished.
   // The stop and the timeout are raced against the call itself, so they work even if the runtime ignores the abort signal.
@@ -5169,7 +5263,7 @@
   // were given is remembered so the next save gets different people.
   async function prepareCreation(Wc, c, signal, onProgress) {
     if (!Wc.genPools) return null;
-    const prep = { roommate: roommatePlan(Wc, c), cast: castPlan(Wc, (glimpseFor(Wc, c.glimpse) || {}).kind), given: {}, notes: [] };
+    const rmp = roommatePlan(Wc, c), prep = { roommate: rmp, cast: castPlan(Wc, (glimpseFor(Wc, c.glimpse) || {}).kind, rmp.species), given: {}, notes: [] };
     const G = Wc.genPools; const styleOf = (k) => { const sp = speciesPool(Wc, k); return (sp && sp.nameStyle) || G.nameStyle || ''; };
     const vfill = (text, v) => v ? String(text || '').replace(/\{v_([a-z_]+)\}/g, (m, k) => (k in v ? v[k] : m)) : String(text || '');
     const slots = [];
@@ -5226,7 +5320,7 @@
     if (rm) { $('#cRmSpecies').placeholder = Wc.genPools ? 'One of the ' + roommateSpeciesKeys(Wc).length + ' kinds the ▾ lists' : 'Any species; ' + roommateSpeciesKeys(Wc).length + ' have full templates'; fillRmGenders(Wc); }
     $('#cTitle').value = ''; $('#cNote').textContent = '';
     // A new adventure starts from the settings of the game on screen (this device's last ones before any game), shown here.
-    const base = newGameSettings(); $('#cPace').value = base.pace; $('#cDensity').value = base.density; paceNote();
+    const base = newGameSettings(); $('#cPace').value = base.pace; $('#cDensity').value = base.density; $('#cInventTier').value = base.inventTier; paceNote();
     rmNameTouched = false; rmNamePool = '';
     randomAll(); // everything starts randomised; each field stays editable
     closeCombo();
@@ -5301,7 +5395,7 @@
   function newGameSettings() { return normaliseSettings(adv && !isPlaceholder() ? adv.settings : loadLocalSettings()); }
   function paceNote() { $('#cPaceNote').textContent = $('#cPace').value === 'unbounded' ? 'For testing: no daily limit, a step can be told every turn, and nothing eases back.' : ''; }
   function creationChoices() {
-    return { name: tidyName($('#cName').value), gender: $('#cGender').value, background: $('#cBackground').value, glimpse: $('#cGlimpse').value, personality: $('#cPersonality').value, strengths: Array.from(document.querySelectorAll('#cStrengths input:checked')).map((i) => i.value), weakness: $('#cWeakness').value, rmSpecies: $('#cRmSpecies').value, rmGender: $('#cRmGender').value, rmName: tidyName($('#cRmName').value), title: $('#cTitle').value, pace: $('#cPace').value, density: $('#cDensity').value, body: $('#cBody').value };
+    return splitOldBackground(creationWorld(), { name: tidyName($('#cName').value), gender: $('#cGender').value, background: $('#cBackground').value, glimpse: $('#cGlimpse').value, personality: $('#cPersonality').value, strengths: Array.from(document.querySelectorAll('#cStrengths input:checked')).map((i) => i.value), weakness: $('#cWeakness').value, rmSpecies: $('#cRmSpecies').value, rmGender: $('#cRmGender').value, rmName: tidyName($('#cRmName').value), title: $('#cTitle').value, pace: $('#cPace').value, density: $('#cDensity').value, inventTier: $('#cInventTier').value, body: $('#cBody').value });
   }
   function previewStats(Wc) {
     const saveW = W; W = Wc;
@@ -5351,13 +5445,13 @@
     $('#cPresetDelete').hidden = !selectedId; $('#cPresetNote').hidden = true;
   }
   function applyPreset(x) {
-    const Wc = creationWorld(); const c = x.choices || {};
+    const Wc = creationWorld(); const c = splitOldBackground(Wc, x.choices || {});
     cancelPlayerInvention(); ['cName', 'cBackground', 'cPersonality'].forEach((id) => cTouched.add(id)); $('#cNote').textContent = '';
     const setSel = (id, v) => { const el = $('#' + id); if (v != null && Array.from(el.options).some((o) => o.value === v)) el.value = v; };
     $('#cName').value = c.name || $('#cName').value; setSel('cGender', c.gender); followBody(); setSel('cBody', c.body);
     $('#cBackground').value = c.background || ''; if (c.glimpse != null) $('#cGlimpse').value = c.glimpse; $('#cPersonality').value = c.personality || '';
     document.querySelectorAll('#cStrengths input').forEach((b) => { b.disabled = false; b.checked = (c.strengths || []).includes(b.value); });
-    setSel('cWeakness', c.weakness || ''); setSel('cPace', c.pace); setSel('cDensity', c.density); paceNote();
+    setSel('cWeakness', c.weakness || ''); setSel('cPace', c.pace); setSel('cDensity', c.density); setSel('cInventTier', c.inventTier); paceNote();
     if ((Wc.creation || {}).roommate) { $('#cRmSpecies').value = c.rmSpecies || ''; fillRmGenders(Wc); setSel('cRmGender', c.rmGender); $('#cRmName').value = c.rmName || ''; rmNameTouched = !!c.rmName; }
     enforceStrengths(); previewStats(Wc);
   }
@@ -5415,6 +5509,8 @@
   // or saved; castArmed names the discarding action asked for once.
   const CAST_FORM_FIELDS = ['#cfName', '#cfAliases', '#cfSpecies', '#cfGender', '#cfAttitude', '#cfLooks', '#cfBrief', '#cfSheet', '#cfSpeech', '#cfAim', '#cfWhere'];
   let castShown = null, castArmed = '';
+  // What Fill in the blanks drew that has no field on the form, kept for Save; fillSeq drops a fill that comes back to another person.
+  let castFill = null, fillSeq = 0;
   const castSnapshot = () => CAST_FORM_FIELDS.map((id) => $(id).value).join('\u0000');
   const castDirty = () => castShown != null && !$('#castForm').hidden && castSnapshot() !== castShown;
   // True when the discarding action may go ahead: at once with nothing unsaved, or asked for a second time.
@@ -5454,6 +5550,8 @@
     $('#cfOwnTimes').textContent = 'These times of day keep their own, whatever is set above. ' + [ownAims.length ? 'Aim, ' + ownAims.join('; ') + '.' : '', ownWhere.length ? 'Found, ' + ownWhere.join('; ') + '.' : ''].filter(Boolean).join(' ');
     $('#cfReset').hidden = isAdded; $('#cfRemove').textContent = cs.hidden.includes(c.key) ? 'Restore to the story' : 'Remove from the story';
     $('#cfNote').textContent = isAdded ? 'Added in this adventure.' : (cs.overrides[c.key] ? 'Edited in this adventure.' : '');
+    castFill = null; fillSeq += 1;
+    $('#cfRedraw').hidden = !W.genPools; $('#cfRedrawSays').hidden = !W.genPools; $('#cfRedrawSays').textContent = W.genPools ? redrawSays(c) : ''; showFillButton();
     castShown = castSnapshot();
   }
   // A renamed (or reset) person stays present however the scene lists them: by full name, given name, surname or the
@@ -5499,9 +5597,11 @@
     const o = { name, first: parts.first, last: parts.last, gender: gender.key, pronouns: gender.pronouns, aliases: $('#cfAliases').value.split(',').map((x) => x.trim()).filter(Boolean).map(swapAlias).filter((a, i, arr) => a && arr.indexOf(a) === i), race: $('#cfSpecies').value.trim() || raceOf(c), looks: field('#cfLooks', c.looks), brief: field('#cfBrief', c.brief), sheet: field('#cfSheet', c.sheet), aims, where };
     // The way of speaking, left as shown, stays the pool's (its pronouns follow a change of gender); edited, it is kept as typed.
     if (fieldChanged('#cfSpeech', speechOf(c))) o.speech = $('#cfSpeech').value.trim(); else if ('speech' in c) o.speech = c.speech;
+    // What Fill in the blanks drew that has no field (traits, clothes, the kind's key) is kept with the fields it filled.
+    if (castFill && castFill.key === key) Object.assign(o, castFill.extras); castFill = null;
     if (adv.roommate && adv.roommate.key === key) { cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, { speciesName: $('#cfSpecies').value.trim() || adv.roommate.speciesName }); }
     else if (cs.added.some((a) => a.key === key)) { Object.assign(cs.added.find((a) => a.key === key), o); }
-    else cs.overrides[key] = o;
+    else cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o);
     renamePresent(c, { name, first: parts.first, last: parts.last });
     if (att != null) castEditState((s) => { s.attitudes[key] = Math.max(0, Math.min(10, Math.round(att))); });
     renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); $('#cfNote').textContent = saved ? 'Saved.' : 'Changes are not saved yet.';
@@ -5524,6 +5624,205 @@
     const cs = castState(); let base = 'npc' + (cs.added.length + 1); let key = base; let n = 1; while (activeCharacters().some((c) => c.key === key) || cs.hidden.includes(key)) key = base + '_' + (++n);
     const c = { key, name: 'New character', gender: 'nonbinary', pronouns: genderDef('nonbinary').pronouns, aliases: [], race: '', looks: '', brief: 'A new face on campus.', sheet: '', aims: { default: 'go about their own business' }, where: { default: 'around campus' }, attitude: 5 };
     cs.added.push(c); castEditState((s) => { s.attitudes[key] = 5; }); castSel = key; renderAll(); renderCastList(); renderCastForm(); const saved = await persist(); if (!saved) $('#cfNote').textContent = 'Character added here, but the change is not saved yet.';
+  }
+
+  // ---------- Cast: Redraw and Fill in the blanks ----------
+  // An added person starts with these lines, which Fill in the blanks and Redraw read as blank.
+  const ADDED_START = { name: 'New character', brief: 'A new face on campus.', aim: 'go about their own business', where: 'around campus' };
+  // The kind with pools a typed kind names ("werewolf", "Kitsune", "fox mythkin", "a harpy", "cow"), or null.
+  function poolKindOf(text) {
+    const strip = (x) => String(x || '').trim().toLowerCase().replace(/^(?:a|an|the)\s+/, '').replace(/\s+mythkin$/, '');
+    const t = strip(text); if (!t || !W.genPools) return null;
+    const forms = [t, t.replace(/ies$/, 'y'), t.replace(/ves$/, 'f'), t.replace(/es$/, ''), t.replace(/s$/, '')];
+    for (const k of Object.keys(W.genPools.species || {})) {
+      const sp = W.transformation && W.transformation.species && W.transformation.species[k];
+      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].filter(Boolean).map(strip);
+      if (forms.some((f) => names.includes(f))) return k;
+    }
+    return null;
+  }
+  // What the story has told of a person: their name (in the opening, an action, a narration or the memory) and whether they have been
+  // on the page in a scene (present at any turn, now included), where they were seen and heard: body, clothes and voice.
+  function castTold(c) {
+    const story = [openingTurn().narrative].concat((adv.turns || []).map((t) => (t.action || '') + ' ' + (t.narrative || ''))).concat(JSON.stringify(adv.memory || {})).join(' ').toLowerCase();
+    const names = c.name === ADDED_START.name ? [] : nameHandles(c).map((n) => String(n).toLowerCase()).filter((n) => n.length >= 3);
+    const lists = [(adv.state && adv.state.present) || []].concat((adv.turns || []).flatMap((t) => [((t && t.stateBefore) || {}).present || [], ((t && t.stateAfter) || {}).present || []]));
+    const present = lists.some((l) => Array.isArray(l) && l.some((pn) => names.some((n) => wordIn(String(pn).toLowerCase(), n))));
+    return { story, named: names.some((n) => wordIn(story, n)), present };
+  }
+  // Everyone else in the story, whose names and habits a person drawn here does not repeat while the pools allow.
+  function castOthers(key) { const gen = adv.cast && adv.cast.generated; return activeCharacters().concat((gen && gen.minors) || []).filter((x) => x.key !== key); }
+  const nameWords = (n) => String(n || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const castTaken = (key) => new Set(castOthers(key).flatMap((x) => [x.first, x.last]).concat(adv.player ? [adv.player.first, adv.player.last] : []).flatMap(nameWords));
+  function castAvoid(key) {
+    const others = castOthers(key), g = (x) => x.gen || {}, keys = (xs) => new Set(xs.filter(Boolean).map(habitKey));
+    return { temperaments: keys(others.map((x) => g(x).temperament)), quirks: keys(others.map((x) => g(x).quirk)), speech: keys(others.map((x) => g(x).speechT || g(x).speech)), courses: keys(others.map((x) => g(x).course)) };
+  }
+  const roleTitle = (role, gender) => { const t = role && role.title; return !t ? '' : typeof t === 'object' ? (t[gender] || '') : t; };
+  // One person drawn from the pools of a kind (none: the world's plain names, no body), as creation draws them (genPerson): a name
+  // nobody else answers to, and, with o.unlike, looks and a taste in clothes other than that person's while the pools allow.
+  function castDraw(key, kind, gender, o) {
+    o = o || {}; const taken = castTaken(key), avoid = castAvoid(key); let p = null;
+    for (let i = 0; i < 12; i++) {
+      p = genPerson(W, { species: kind, gender, given: o.given || null, dressRole: o.dressRole || 'student', wants: W.genPools.castWants, avoid, course: o.course || undefined, speciesText: o.speciesText || '' });
+      if (![p.first, p.last].flatMap(nameWords).some((w) => taken.has(w)) && !(o.unlike && p.looks && p.looks === o.unlike.looks)) break;
+    }
+    const was = o.unlike && o.unlike.dress && o.unlike.dress.taste, tastes = dressTastes(W).filter((t) => t !== was);
+    if (was && tastes.length) p.dress.taste = pick(tastes);
+    return p;
+  }
+  const genOf = (p, staff) => ({ course: staff ? '' : p.course, temperament: p.temperament, quirk: p.quirk, speech: p.speech, speechT: p.speechT, want: p.want, privateMatter: p.privateMatter, invented: !!p.invented });
+  // A brief or a sheet written from a person's traits, told again with the new ones: the role, the year and anything typed around them stay.
+  function castRetell(text, from, to) {
+    let t = String(text || '');
+    for (const f of ['temperament', 'quirk', 'want', 'privateMatter']) { const a = from && from[f], b = to[f]; if (a && b && a !== b) t = t.split(cap(a)).join(cap(b)).split(a).join(b); }
+    if (from && from.course && to.course && from.course !== to.course) t = t.split(', ' + from.course).join(', ' + to.course);
+    return t;
+  }
+  // The brief and the sheet of a person with no role (one added here), from their traits; a brief typed by the player leads both.
+  function castCompose(g, typed) {
+    const lead = typed ? String(typed).trim().replace(/([^.!?])$/, '$1.') : 'Student' + (g.course ? ', ' + g.course : '') + '.';
+    return { brief: typed ? String(typed).trim() : lead + ' ' + cap(g.temperament) + '.', sheet: lead + ' ' + cap(g.temperament) + '; ' + g.quirk + '. Wants ' + g.want + '. Does not say at first: ' + g.privateMatter + '.' };
+  }
+  const aimOfWant = (want) => String(want || '').replace(/^to\s+/i, '').replace(/\.$/, '');
+  // Where a person with no role of their own is found: one of the world's haunts open to their kind (a kind's own day places are the
+  // roommate's, room 4B among them).
+  function castWhere(kind) {
+    const haunts = ((W.genPools && W.genPools.haunts) || []).filter((h) => h && h.where && h.where.default && (!h.kinds || h.kinds.includes(kind || 'human')));
+    return haunts.length ? pick(haunts).where.default : ADDED_START.where;
+  }
+  // What Redraw keeps and draws for a person: the role and the kind (the kind typed in the Cast panel, else theirs), the gender, a name
+  // edited by hand or already in the story, and what a scene has shown (looks, clothes, way of speaking).
+  function redrawPlan(c) {
+    const cs = castState(), base = baseCharacter(c.key) || c, isAdded = cs.added.some((a) => a.key === c.key), o = cs.overrides[c.key] || {};
+    const role = (!isAdded && (W.castRoles || []).find((r) => r.key === c.key)) || null, staff = !!role && /staff/.test(String(role.year || ''));
+    const typedRm = c.key === 'roommate' && !!adv.creation && !!String(adv.creation.rmName || '').trim() && String(adv.creation.rmName).trim() === String(c.name || '').trim();
+    const nameEdited = isAdded ? !!String(c.name || '').trim() && c.name !== ADDED_START.name : ((!!o.name && o.name !== base.name) || typedRm);
+    const seen = castTold(c), kind = poolKindOf(raceOf(c)) || (speciesPool(W, c.species) ? c.species : null);
+    return { base, isAdded, role, staff, kind, nameEdited, seen, keepName: nameEdited || seen.named || seen.present, keepBody: seen.present };
+  }
+  // The panel's line on what Redraw will and will not change for this person.
+  function redrawSays(c) {
+    const P = redrawPlan(c), who = c.name === ADDED_START.name ? 'this person' : givenName(c);
+    const draws = [P.keepName ? '' : 'the name', P.keepBody ? '' : (P.kind ? 'looks' : ''), P.keepBody ? '' : 'clothes', P.keepBody ? '' : 'way of speaking', 'temperament', 'habit', 'wants', 'what they keep to themselves', P.role && P.role.course ? '' : 'course'].filter(Boolean);
+    const keeps = [P.role || c.key === 'roommate' ? 'the role' : (P.isAdded && String(c.brief || '').trim() && c.brief !== ADDED_START.brief ? 'the brief as typed' : ''), P.kind ? 'the kind' : '', 'the gender', P.keepName ? 'the name (' + (P.nameEdited ? 'edited by hand' : 'already in the story') + ')' : '', P.keepBody ? 'the looks, clothes and way of speaking (already seen in a scene)' : '', 'the attitude', 'where they are found'].filter(Boolean);
+    const last = (xs) => xs.length > 1 ? xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1] : xs.join('');
+    return 'Redraw draws ' + who + ' again from the pools: ' + last(draws) + '. It keeps ' + last(keeps) + ', and anything the story has already said of them. It saves at once' + (P.isAdded ? '.' : '; Reset puts back how this adventure first wrote them.');
+  }
+  // One person drawn again (Redraw). Seeded by the adventure, the person and the redraw count, so the same redraw draws the same
+  // person on every load and device; what it returns is merged into the Cast edit (an added person's own entry).
+  function redrawPerson(c, P) {
+    const old = c.gen || {}, gender = c.gender;
+    const p = castDraw(c.key, P.kind, gender, { dressRole: (c.dress && c.dress.role) || (P.role && P.role.dress) || (P.staff ? 'staff' : 'student'), course: P.role && P.role.course, unlike: c, speciesText: raceOf(c) });
+    const g = genOf(p, P.staff); g.invented = false;
+    if (P.role && P.role.private && old.privateMatter) g.privateMatter = old.privateMatter;
+    if (P.role && P.role.course) g.course = old.course != null ? old.course : P.role.course;
+    // A trait the story has already told stays as told.
+    for (const f of ['temperament', 'quirk', 'want', 'privateMatter', 'course']) if (old[f] && P.seen.story.includes(String(old[f]).toLowerCase())) g[f] = old[f];
+    if (P.keepBody) { g.speech = old.speech; g.speechT = old.speechT; if (!('speech' in old)) { delete g.speech; delete g.speechT; } }
+    const out = { gen: Object.assign({}, old, g) };
+    if (!P.keepBody) {
+      out.dress = p.dress;
+      if (P.kind) Object.assign(out, { looks: p.looks, looksV: p.looksV, senses: p.senses, species: P.kind });
+      if (p.gender !== gender) Object.assign(out, { gender: p.gender, pronouns: p.pronouns });
+    }
+    if (!P.keepName) {
+      const t = roleTitle(P.role, p.gender);
+      Object.assign(out, { name: (t ? t + ' ' : '') + p.name, first: p.first, last: p.last, aliases: [p.first, p.last].concat(t ? [t + ' ' + p.last] : []).filter(Boolean) });
+    }
+    const typed = String(c.brief || '').trim() && c.brief !== ADDED_START.brief ? c.brief : '';
+    if (c.gen) { out.brief = castRetell(c.brief, old, out.gen); out.sheet = castRetell(c.sheet, old, out.gen); }
+    else Object.assign(out, castCompose(out.gen, typed));
+    if (P.isAdded && c.aims && c.aims.default === ADDED_START.aim) out.aims = Object.assign({}, c.aims, { default: aimOfWant(out.gen.want) });
+    if (P.isAdded && c.where && c.where.default === ADDED_START.where) out.where = Object.assign({}, c.where, { default: castWhere(P.kind) });
+    return out;
+  }
+  async function redrawCast() {
+    if (busy || !W.genPools || !castMayDrop('redraw', 'tap Redraw')) return;
+    const cs = castState(), key = castSel, c = activeCharacters().find((x) => x.key === key) || baseCharacter(key); if (!c) return;
+    const P = redrawPlan(c); cs.redraws = cs.redraws || {}; const n = (cs.redraws[key] || 0) + 1;
+    const out = withSeed(adv.id + ':' + key + ':redraw:' + n, () => redrawPerson(c, P));
+    cs.redraws[key] = n;
+    const target = cs.added.find((a) => a.key === key) || (cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}));
+    Object.assign(target, out);
+    // A way of speaking typed in the Cast panel gives way to the drawn one, which follows the pronouns.
+    if (!P.keepBody) delete target.speech;
+    if (out.name) renamePresent(c, out);
+    renderAll(); renderCastList(); renderCastForm(); const saved = await persist();
+    $('#cfNote').textContent = saved ? 'Redrawn and saved.' : 'Redrawn here, but the change is not saved yet.';
+  }
+  // The fields of the form left blank (an added person's starting lines count as blank), and the parts with no field that a person
+  // added here lacks (traits, clothes).
+  function castBlanks(c) {
+    const isAdded = castState().added.some((a) => a.key === c.key), v = (id) => $(id).value.trim(), blank = (id, start) => !v(id) || (isAdded && start != null && v(id) === start);
+    return { name: blank('#cfName', ADDED_START.name), aliases: blank('#cfAliases'), kind: blank('#cfSpecies'), looks: blank('#cfLooks'), brief: blank('#cfBrief', ADDED_START.brief), sheet: blank('#cfSheet'), speech: blank('#cfSpeech'), aim: blank('#cfAim', ADDED_START.aim), where: blank('#cfWhere', ADDED_START.where), traits: !c.gen, dress: !c.dress };
+  }
+  function showFillButton() {
+    const c = castSel && (activeCharacters().find((x) => x.key === castSel) || baseCharacter(castSel));
+    $('#cfFill').hidden = !W.genPools || !c || !Object.values(castBlanks(c)).some(Boolean);
+  }
+  // Fill in the blanks: the blank fields get a person drawn for them, and nothing typed is touched. With Claude, one invention call
+  // (the cast invention's prompt and parser, this one person) invents the name and the traits around what is set, which it is told
+  // to keep word for word; the look is the engine's, composed from the kind's lines (composeLooks), never the model's, and the way
+  // of speaking is the pool's. Without Claude the pools fill the blanks. The result lands in the fields, and Save keeps it.
+  async function fillCast() {
+    if (busy || !W.genPools) return;
+    const cs = castState(), key = castSel, c = activeCharacters().find((x) => x.key === key) || baseCharacter(key); if (!c) return;
+    const B = castBlanks(c), wanted = Object.keys(B).filter((k) => B[k]);
+    if (!wanted.length) { $('#cfNote').textContent = 'Nothing here is blank.'; return; }
+    const seq = ++fillSeq, P = redrawPlan(c), base = P.base, role = P.role, gender = $('#cfGender').value, old = c.gen || null;
+    const typedKind = B.kind ? '' : $('#cfSpecies').value.trim();
+    const d = withSeed(adv.id + ':' + key + ':fill:' + ((cs.redraws || {})[key] || 0), () => {
+      const fits = (k) => !!speciesPool(W, k) && speciesPool(W, k).genders.includes(gender);
+      const kind = B.kind ? ((speciesPool(W, c.species) ? c.species : null) || pick(roommateSpeciesKeys(W).concat(['human']).filter(fits)) || null) : poolKindOf(typedKind);
+      const body = !!kind && fits(kind);
+      const given = old ? { temperament: old.temperament, quirk: old.quirk, want: old.want, private: old.privateMatter, course: old.course } : null;
+      const p = castDraw(key, body ? kind : null, gender, { given, dressRole: (c.dress && c.dress.role) || (role && role.dress) || (P.staff ? 'staff' : 'student'), course: role && role.course, speciesText: typedKind });
+      const look = B.looks ? (body ? p.looks : '') : $('#cfLooks').value.trim();
+      const fields = (B.name ? ['first', 'last'] : []).concat(old ? [] : CAST_FIELDS.filter((f) => f !== 'first' && f !== 'last' && !(f === 'course' && (P.staff || (role && role.course))) && !(f === 'private' && role && role.private)));
+      const roleText = !B.brief ? $('#cfBrief').value.trim() : (role ? fill(base.brief || '') : '');
+      const kept = [['Name', B.name ? '' : $('#cfName').value.trim()], ['Looks (the world\'s own, fixed)', look], ['Way of speaking', B.speech ? '' : $('#cfSpeech').value.trim()], ['Aim', B.aim ? '' : $('#cfAim').value.trim()], ['Usually found', B.where ? '' : $('#cfWhere').value.trim()]]
+        .concat(old ? [['temperament', old.temperament], ['quirk', old.quirk], ['want', old.want], ['private', old.privateMatter]] : []).filter((x) => x[1]);
+      const sp = speciesPool(W, kind), style = (sp && sp.nameStyle) || W.genPools.nameStyle || '';
+      const slot = fields.length ? Object.assign(inventSlot(key, { race: kind ? speciesRace(W, kind) : (typedKind || 'human'), gender, year: role ? role.year : '', course: role && role.course, role: roleText, style, fields }), { kept }) : null;
+      const where = role ? fill((base.where && base.where.default) || '') : castWhere(kind);
+      return { kind, body, p, look, slot, where };
+    });
+    const btn = $('#cfFill'), label = btn.textContent; let source = 'the pools';
+    btn.disabled = true; btn.textContent = 'Filling in…';
+    $('#cfNote').textContent = d.slot && sample ? 'Filling in the blanks: asking Claude (' + inventTier() + ' tier)…' : 'Filling in the blanks from the pools…';
+    let g2 = {};
+    try {
+      if (d.slot && sample) { const inv = await inventCall(W, [d.slot], 'cast invention'); g2 = (inv && inv.given && inv.given[key]) || {}; if (Object.keys(g2).length) source = 'Claude, the look from the kind and the way of speaking from the pools'; else source = 'the pools (Claude gave nothing usable)'; }
+    } finally { btn.disabled = false; btn.textContent = label; }
+    if (seq !== fillSeq || castSel !== key || !$('#dlgCast').open) return;
+    // The invented name, unless someone else answers to it, and the traits; a habit naming a body part the kind lacks is dropped.
+    const p = d.p, sp = speciesPool(W, d.kind);
+    if (g2.first && g2.last && ![g2.first, g2.last].flatMap(nameWords).some((w) => castTaken(key).has(w))) { p.first = g2.first; p.last = g2.last; p.name = g2.first + ' ' + g2.last; }
+    if (g2.temperament) p.temperament = g2.temperament;
+    if (g2.quirk && anatomyFits(g2.quirk, kindAnatomy(W, d.kind, sp, gender))) p.quirk = g2.quirk;
+    if (g2.want) p.want = g2.want; if (g2.private) p.privateMatter = g2.private; if (g2.course && !(role && role.course)) p.course = g2.course;
+    const g = Object.assign({}, old || {}, old ? {} : genOf(p, P.staff)); if (B.speech) { g.speech = p.speech; g.speechT = p.speechT; }
+    if (role && role.course) g.course = role.course;
+    const t = roleTitle(role, gender), name = (t ? t + ' ' : '') + p.name;
+    const finalName = B.name ? name : $('#cfName').value.trim(), words = finalName.replace(/^(?:dean|professor|prof\.|doctor|dr\.?|madam|master|mr\.?|mrs\.?|ms\.?|mx\.?)\s+/i, '').split(/\s+/).filter(Boolean);
+    const typedBrief = B.brief ? '' : $('#cfBrief').value.trim();
+    const texts = c.gen && (base.brief || base.sheet) ? { brief: fill(castRetell(base.brief, base.gen || {}, g)), sheet: fill(castRetell(base.sheet, base.gen || {}, g)) } : castCompose(g, typedBrief);
+    const put = { name: B.name && finalName, aliases: B.aliases && [words[0], words.slice(1).join(' ')].filter(Boolean).join(', '), kind: B.kind && (d.kind ? speciesRace(W, d.kind) : ''), looks: B.looks && d.look, brief: B.brief && texts.brief, sheet: B.sheet && texts.sheet,
+      speech: B.speech && p.speech, aim: B.aim && (role || c.key === 'roommate' ? fill((base.aims && base.aims.default) || '') || aimOfWant(g.want) : aimOfWant(g.want)), where: B.where && d.where };
+    const ids = { name: '#cfName', aliases: '#cfAliases', kind: '#cfSpecies', looks: '#cfLooks', brief: '#cfBrief', sheet: '#cfSheet', speech: '#cfSpeech', aim: '#cfAim', where: '#cfWhere' }, filled = [];
+    // A field typed into while the call ran is not blank any more, and is left as typed.
+    const still = castBlanks(c);
+    for (const [k, id] of Object.entries(ids)) if (put[k] && still[k]) { $(id).value = put[k]; filled.push($('label[for=' + id.slice(1) + ']').textContent.split(' (')[0]); }
+    const extras = {};
+    if (!c.gen || B.speech) extras.gen = g;
+    if (!c.dress) extras.dress = p.dress;
+    if (d.body && put.looks && filled.length && still.looks) { extras.looksV = p.looksV; if (!c.senses) extras.senses = p.senses; }
+    if (d.kind && (B.kind || !c.species)) extras.species = d.kind;
+    castFill = { key, extras };
+    const noBody = B.looks && !d.body ? (d.kind ? ' Looks left blank: this world gives the ' + speciesRace(W, d.kind) + ' no body for ' + (genderDef(gender).label || gender).toLowerCase() + '; choose a gender the kind has and fill again.' : ' Looks left blank: the kind is not one this world describes.') : '';
+    $('#cfNote').textContent = (filled.length ? 'Filled in from ' + source + ': ' + filled.join(', ') + '. Check them, then Save.' : Object.keys(extras).some((k) => k !== 'species') ? 'Traits and clothes drawn from ' + source + '; Save keeps them.' : 'Nothing filled in.') + noBody;
+    showFillButton();
   }
 
   // ---------- rendering ----------
@@ -5711,7 +6010,8 @@
     const sug = adv.turns.length ? adv.turns[adv.turns.length - 1].suggestions : ((adv.opening && adv.opening.suggestions) || W.opening.suggestions).map((s) => fill(s));
     // On a touch screen a tap fills the action without focusing it, so the keyboard stays down and Take turn is one more tap away.
     const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    (sug || []).forEach((s) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = s; b.onclick = () => { $('#action').value = s; if (!touch) $('#action').focus(); }; el.appendChild(b); });
+    // On a phone the chips stay out while the bar is tucked; a tap there also opens the bar, with the suggestion in the box.
+    (sug || []).forEach((s) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = s; b.onclick = () => { $('#action').value = s; if ($('#actionbar').classList.contains('tucked')) { progScrollUntil = performance.now() + 500; setTucked(false); } if (!touch) $('#action').focus(); }; el.appendChild(b); });
     el.scrollLeft = 0;
   }
   // What the engine has told so far. A part under way has told > 0 and no trait until it finishes (the track model keeps none), so
@@ -5802,7 +6102,7 @@
       let v = S.items[d.key]; if (typeof v === 'boolean') v = v ? 'yes' : 'no';
       rows.push([d.label, d.type === 'text' ? itemEntries(v) : v, d.visibility === 'ai' || !!d.spoiler, typeof v === 'string' ? Infinity : ITEM_OPEN]);
     }
-    if (showHidden && W.dungeons) { rows.push(['Closed places', dungeonsFound(S).length + '/' + W.dungeons.length + ' found · ' + dungeonsCleared(S).length + '/' + W.dungeons.length + ' passed', true]); if (W.transformation) rows.push(['Humanity', humanity(S) + '/100 (doors answer at ' + HUMANITY_LINE + '+)', true]); }
+    if (showHidden && W.dungeons) { rows.push(['Closed places', dungeonsFound(S).length + '/' + W.dungeons.length + ' found · ' + dungeonsCleared(S).length + '/' + W.dungeons.length + ' passed', true]); if (W.transformation) rows.push(['Humanity', humanity(S) + '/100 (doors answer at ' + humanityLine() + '+)', true]); }
     if (showHidden) { rows.push(['Flags', Object.keys(S.flags).filter((k) => S.flags[k]).join(', ') || 'none', true]); if ((adv.pendingNotes || []).length) rows.push(['Engine notes for next turn', adv.pendingNotes.join(' '), true]); }
     for (const [k, v, hidden, open] of rows) items.insertAdjacentHTML('beforeend', '<dt>' + esc(k) + '</dt><dd class="' + (hidden ? 'hidden-item' : '') + '">' + itemHtml(v, open || ITEM_OPEN) + '</dd>');
     // Words, what was learned, the line for an old save or an empty list, then (spoilers on) the secrets, so that line is not read as theirs.
@@ -5831,7 +6131,7 @@
   }
   function renderSettingsForm() {
     const wsel = $('#setWindow'), wv = String(adv.settings.window); if (![...wsel.options].some((o) => o.value === wv)) wsel.add(new Option(wv, wv));   // a save can hold a window the menu does not list
-    $('#setNarrTier').value = adv.settings.narrTier; $('#setUtilTier').value = adv.settings.utilTier; $('#setDensity').value = adv.settings.density; $('#setWindow').value = wv; $('#setAutoFit').value = adv.settings.autoFit ? '1' : '0'; $('#setThoughts').value = adv.settings.thoughts === false ? '0' : '1'; $('#setInventTier').value = inventTier(); $('#setPace').value = adv.settings.pace in PACE_PER_DAY ? adv.settings.pace : 'standard';
+    $('#setNarrTier').value = adv.settings.narrTier; $('#setUtilTier').value = adv.settings.utilTier; $('#setDensity').value = adv.settings.density; $('#setWindow').value = wv; $('#setAutoFit').value = adv.settings.autoFit ? '1' : '0'; $('#setThoughts').value = adv.settings.thoughts === false ? '0' : '1'; $('#setPace').value = adv.settings.pace in PACE_PER_DAY ? adv.settings.pace : 'standard';
     // What the two settings do, read from the tables the engine uses so the words cannot drift from them.
     const T = W.transformation || {}, per = T.maxPerTurn || 18, minutes = (m) => (m < 120 ? m + ' minutes' : (m / 60) + ' hours'), dur = (h) => (h % 24 === 0 ? (h / 24) + (h === 24 ? ' day' : ' days') : h + ' hours');
     const pace = $('#setPace').value, sc = PACE_STEP_SCALE[pace], day = PACE_PER_DAY[pace];
@@ -5890,15 +6190,17 @@
     try { await navigator.clipboard.writeText(text); setStatus('Save JSON copied to the clipboard.'); }
     catch (e) { $('#exportText').focus(); $('#exportText').select(); setStatus('Copy was blocked by the browser; the save JSON is selected for manual copying.', true); }
   };
-  // Phone layout: the action bar tucks away while reading down a long turn and comes back at the end of the story, on a
-  // scroll up, on a tap of its tab, or when the action box is focused. The action box starts one line tall and grows as typed.
+  // Phone layout: the action bar tucks down to its tab and the suggestion row while reading down a long turn and comes back at
+  // the end of the story, on a scroll up, on a tap of its tab or a suggestion, or when the action box is focused. The action box
+  // is two rows and scrolls inside itself, so the open bar stays within its cap.
   const mobileMq = window.matchMedia('(max-width: 900px)');
   // A hide asked for with the tab is sticky: no scroll brings the bar back until the tab is tapped or the action box is focused.
   let tucked = false, stickyTucked = false, lastY = window.scrollY;
   function setTucked(v, opts) {
     if (!mobileMq.matches) v = false;
     if (!v) stickyTucked = false; else if (opts && opts.sticky) stickyTucked = true;
-    if (v !== tucked) { tucked = v; $('#actionbar').classList.toggle('tucked', v); $('#actionbar .inner').toggleAttribute('inert', v); }
+    // Tucked, only the tab and the suggestion row show; everything else in the bar is hidden and inert.
+    if (v !== tucked) { tucked = v; $('#actionbar').classList.toggle('tucked', v); for (const c of $('#actionbar .inner').children) c.toggleAttribute('inert', v && c.id !== 'suggestions'); }
     const h = $('#actionHandle'); h.textContent = v ? 'Actions ▴' : 'Hide ▾'; h.setAttribute('aria-label', v ? 'Show the action bar' : 'Hide the action bar to read'); h.setAttribute('aria-expanded', String(!v));
   }
   const feedEndVisible = () => $('#feed').getBoundingClientRect().bottom <= window.innerHeight + 8;
@@ -5912,13 +6214,11 @@
   }, { passive: true });
   $('#actionHandle').onclick = () => { progScrollUntil = performance.now() + 500; if (tucked) setTucked(false); else setTucked(true, { sticky: true }); };
   $('#action').addEventListener('focus', () => setTucked(false));
-  function growAction() { const a = $('#action'); if (!mobileMq.matches) { a.style.height = ''; return; } a.style.height = 'auto'; a.style.height = Math.max(44, Math.min(a.scrollHeight + 2, Math.round(window.innerHeight * 0.3))) + 'px'; }
-  function applyMobileMode() { $('#action').rows = mobileMq.matches ? 1 : 2; growAction(); setTucked(false); }
-  $('#action').addEventListener('input', growAction);
+  function applyMobileMode() { $('#action').rows = 2; $('#action').style.height = ''; setTucked(false); }
   mobileMq.addEventListener('change', applyMobileMode); applyMobileMode();
   // Phone layout: the top-bar buttons drop down from Menu; Regenerate, Regenerate with changes and Undo sit behind More.
   const setMenu = (open) => { $('.topbar').classList.toggle('menu-open', open); $('#menuBtn').setAttribute('aria-expanded', String(open)); };
-  const setMore = (open) => { $('#turnMore').classList.toggle('open', open); $('#moreBtn').setAttribute('aria-expanded', String(open)); };
+  const setMore = (open) => { $('#turnMore').classList.toggle('open', open); $('#moreBtn').setAttribute('aria-expanded', String(open)); if (open && mobileMq.matches && $('#turnMore').scrollIntoView) $('#turnMore').scrollIntoView({ block: 'nearest' }); };
   $('#menuBtn').onclick = () => setMenu(!$('.topbar').classList.contains('menu-open'));
   const setRail = (open) => {
     const was = $('#rail').classList.contains('open'), sheet = open && mobileMq.matches;
@@ -5957,16 +6257,18 @@
   $('#cfReset').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await resetCast(); } finally { castDispatching = false; } };
   $('#cfRemove').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await toggleRemoveCast(); } finally { castDispatching = false; } };
   $('#castAdd').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await addCast(); } finally { castDispatching = false; } };
+  $('#cfRedraw').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await redrawCast(); } finally { castDispatching = false; } };
+  $('#cfFill').onclick = async () => { if (castDispatching || busy) return; castDispatching = true; try { await fillCast(); } finally { castDispatching = false; } };
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => closeDlg(b.dataset.close); });
   // The Cast screen keeps unsaved edits (see castMayDrop): Close asks first, a back gesture or Esc is refused, and a screen the
   // browser closed anyway comes back as it was. A deliberate Close forgets the rendered form, so the close event lets it go.
   $('#dlgCast [data-close]').onclick = () => { if (!castMayDrop('close', 'tap Close')) return; castShown = null; closeDlg('dlgCast'); };
   $('#dlgCast').addEventListener('cancel', (e) => { if (!castDirty()) return; if (e.cancelable) e.preventDefault(); $('#cfNote').textContent = 'Unsaved edits. Save them, or tap Close to leave.'; });
   $('#dlgCast').addEventListener('close', () => { if (!castDirty()) return; openDlg('dlgCast'); $('#cfNote').textContent = 'Unsaved edits kept. Save them, or tap Close to leave.'; });
-  $('#castForm').addEventListener('input', () => { if (castArmed) { castArmed = ''; $('#cfNote').textContent = ''; } });
-  ['setNarrTier', 'setUtilTier', 'setDensity', 'setWindow', 'setAutoFit', 'setPace', 'setThoughts', 'setInventTier'].forEach((id) => {
+  $('#castForm').addEventListener('input', () => { if (castArmed) { castArmed = ''; $('#cfNote').textContent = ''; } showFillButton(); });
+  ['setNarrTier', 'setUtilTier', 'setDensity', 'setWindow', 'setAutoFit', 'setPace', 'setThoughts'].forEach((id) => {
     $('#' + id).onchange = async () => {
-      adv.settings.narrTier = $('#setNarrTier').value; adv.settings.utilTier = $('#setUtilTier').value; adv.settings.density = $('#setDensity').value; adv.settings.window = Number($('#setWindow').value); adv.settings.autoFit = $('#setAutoFit').value === '1'; adv.settings.pace = $('#setPace').value; adv.settings.thoughts = $('#setThoughts').value === '1'; adv.settings.inventTier = $('#setInventTier').value;
+      adv.settings.narrTier = $('#setNarrTier').value; adv.settings.utilTier = $('#setUtilTier').value; adv.settings.density = $('#setDensity').value; adv.settings.window = Number($('#setWindow').value); adv.settings.autoFit = $('#setAutoFit').value === '1'; adv.settings.pace = $('#setPace').value; adv.settings.thoughts = $('#setThoughts').value === '1';
       saveLocalSettings(); renderSettingsForm(); await persist();
     };
   });

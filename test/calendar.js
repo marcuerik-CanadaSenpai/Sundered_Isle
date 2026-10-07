@@ -243,7 +243,7 @@ const S = {
     try {
       const gm = sec(await play(h, 'I sit down.'), 'gm_only');
       assert(/humanity: [0-3]?\d of 100/.test(gm), 'humanity is below the line: ' + (gm.match(/humanity: [^\n]{0,40}/) || [''])[0]);
-      assert(/Below the line of 40: [^\n]*At a closed place \w+ can feel it refuse \(cold, still, deaf to a knock\); nobody says why\./.test(gm), 'below the line a closed place is felt to refuse: ' + gm.slice(0, 400));
+      assert(/Below the line of 15: [^\n]*At a closed place \w+ can feel it refuse \(cold, still, deaf to a knock\); nobody says why\./.test(gm), 'below the line a closed place is felt to refuse: ' + gm.slice(0, 400));
       assert(!/stay shut/.test(gm), 'the doors do not simply stay shut');
       // Below the line no chance is offered: <gm_only> does not say both that no place opens and when the next one could.
       const gm2 = sec(await play(h, 'I ask the cook about the pantry and the cold room behind it.'), 'gm_only');
@@ -251,6 +251,37 @@ const S = {
       assert(!/Next chance/.test(gm2), 'below the line no next chance is named: ' + (gm2.match(/Gluttony[^\n]*/) || [''])[0]);
       clean(h);
     } finally { h.close(); }
+  },
+
+  // The humanity line is set by the pace, so the closed places answer for a like share of the game on every pace: a fresh game on the
+  // unbounded pace, an hour of intimate contact with two kinds every turn, keeps them answering on most of its first thirty turns
+  // (with the standard pace's line it fell below at turn seventeen), and the standard pace keeps its line of 40.
+  async closedPlacesEveryPace() {
+    const lineIn = (gm) => { const m = /humanity: (\d+) of 100[^\n]*?(?:Above (\d+) the closed places answer|Below the line of (\d+):)/.exec(gm); assert(m, 'the humanity line is in <gm_only>: ' + gm.slice(0, 300)); return { h: +m[1], line: +(m[2] || m[3]) }; };
+    for (const pace of ['standard', 'unbounded']) {
+      const h = await boot({ seed: 11 });
+      try {
+        assert(await h.settle(150, 6000), 'boot did not settle');
+        h.type('#cName', 'Tom Ashby'); h.$('#cGender').value = 'male'; h.$('#cGender').dispatchEvent(new h.window.Event('change'));
+        h.type('#cRmSpecies', 'cow'); h.type('#cRmName', 'Daisy Holm');
+        h.$('#cPace').value = pace; h.$('#cPace').dispatchEvent(new h.window.Event('change'));
+        h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish'); await h.settle(150, 6000);
+        assert.equal(advDoc(h).data.settings.pace, pace, 'the pace is set on the creation form');
+        h.mock.sampleHandler = (input, o, call) => {
+          const out = h.mock.defaultHandler(input, o, call);
+          if (!/^turn/.test(call.label)) return out;
+          const r = JSON.parse(out); r.time_advance_minutes = 60; r.exposures = ['cow', 'wolf'].map((k) => ({ species: k, method: 'the evening with Daisy', intensity: 4 }));
+          r.state_updates = [{ key: 'present', op: 'append', value: ['Daisy Holm'] }]; return JSON.stringify(r);
+        };
+        const seen = [];
+        for (let i = 0; i < (pace === 'standard' ? 2 : 30); i++) { assert(await h.turn('I spend the evening with Daisy.'), 'turn ' + (i + 1)); seen.push(lineIn(sec(promptOf(turnCalls(h).at(-1)), 'gm_only'))); }
+        if (pace === 'standard') { assert.equal(seen[0].line, 40, 'the standard pace keeps the line of 40'); continue; }
+        const open = seen.filter((x) => x.h >= x.line).length;
+        assert(open >= 20, 'on the unbounded pace the closed places answer on most of thirty turns: ' + open + ' of 30 (' + seen.map((x) => x.h + '/' + x.line).join(' ') + ')');
+        assert(seen.every((x) => x.line < 40), 'the unbounded pace uses a lower line: ' + seen[0].line);
+        clean(h);
+      } finally { h.close(); }
+    }
   },
 };
 

@@ -39,6 +39,7 @@ async function begin(o) {
   if (o.rmSpecies) h.type('#cRmSpecies', o.rmSpecies);
   if (o.rmName) h.type('#cRmName', o.rmName);
   if (o.rmGender) { h.$('#cRmGender').value = o.rmGender; h.$('#cRmGender').dispatchEvent(new h.window.Event('change')); }
+  if (o.glimpse != null) h.type('#cGlimpse', o.glimpse);
   h.click('#cBegin');
   assert(await h.idle(30000), 'creating the adventure did not finish'); await h.settle(150, 6000);
   return h;
@@ -978,7 +979,7 @@ const S = {
     const T = ctx.window.WINDLASS_WORLDS.sundered.transformation;
     const textOf = (sp) => sp.ladder.flatMap((r) => [].concat(r.steps, r.women || [], r.sex || [])).concat(sp.habits || []).join('\n');
     const lines = {
-      wolf: [/dusk is the best light there is/, /the jaw muscle standing at the hinge/], cow: [/let down by warmth, touch or strong feeling/, /heel wants to lift and resists coming down/],
+      wolf: [/dusk is the best light there is/, /the jaw muscle standing at the hinge/], cow: [/let down by warmth, touch, arousal or strong feeling/, /heel wants to lift and resists coming down/],
       fox: [/what the asker wants and what they are hiding/, /rims of the human ears gone thin and hot/], cat: [/swivel apart to follow two voices at once/, /slow wave for thought, a lash for temper/],
       rabbit: [/every room is entered knowing where its doors are/, /faint sounds sharpen/], harpy: [/whistles and trills come by themselves/, /opened into pins, then into soft down/],
       mer: [/the cold tap in the morning does not bite/, /toes feel long in their shoes/], dryad: [/fine rootlets creep from the soles/, /knows from across the Isle when it is thirsty/],
@@ -2454,6 +2455,176 @@ const S = {
     for (const [key, e] of Object.entries(F)) if (typeof e === 'object') for (const c of [].concat(...Object.values(e))) assert.doesNotMatch(c, acts, key + ' has the body do what nobody asked: ' + c);
   },
 
+  // 21b. Every part of the body is felt from the moment it starts to change, and felt once: each body track of every kind (all but
+  // its ways, which _ways covers) has a felt entry of its own, not the shared "_", whose first-waypoint sensation reaches the note
+  // trackNote builds, and each kind's mid options hold a pleasant one as well as the aches. The stage line, sent every turn while the
+  // part is under way, stays the fact: the sensations are told once, by the note, not again in every Body block.
+  async bodyChangesFelt() {
+    const Wd = loadWorld(), TR = Wd.transformation.tracks, F = Wd.transformation.felt, src = fs.readFileSync(HTML, 'utf8');
+    const a = src.indexOf('  // What the body does as a waypoint arrives'), b = src.indexOf('  function sexTrackNote');
+    assert(a > 0 && b > a, 'feltOf and trackNote not found in the page');
+    const looksKind = (W, k) => W.genPools.looks.kinds[k] || null;
+    const { trackNote } = new Function('W', 'looksKind', 'trackModel', 'firstName', 'pathFill', 'pathDrawn', 'extentHeld', 'extentText', 'fill', 'pick',
+      src.slice(a, b) + '\nreturn { feltOf, trackNote };')(Wd, looksKind, (k) => TR.species[k], () => 'Tom', (tf, k, s) => s, () => '', () => true, () => '', (s) => s, (x) => x[0]);
+    const own = (k, key) => { let e = F[k + '.' + key] || F[key]; if (typeof e === 'string') e = F[e]; return e; };
+    const pleasant = /\bgood\b|pleasure|comfort|relief|\bease|soothing|warm and steadying|cool and easy/i;
+    const flat = [], unfelt = [], sour = []; let parts = 0;
+    for (const [k, m] of Object.entries(TR.species)) {
+      const ways = (looksKind(Wd, k) || {}).ways || []; let mids = [];
+      for (const t of m) {
+        if (ways.includes(t.key)) continue; parts += 1;
+        const e = own(k, t.key);
+        if (!e || !(e.on || []).length || !(e.mid || []).length || !(e.end || []).length) { flat.push(k + '.' + t.key); continue; }
+        mids = mids.concat(e.mid);
+        const note = trackNote({ influence: {} }, k, t, 1, { tracks: {} }, false);
+        if (!note.includes(e.on[0])) unfelt.push(k + '.' + t.key);
+      }
+      if (m.some((t) => !ways.includes(t.key)) && !mids.some((s) => pleasant.test(s))) sour.push(k);
+    }
+    assert(parts >= 120, 'the body tracks are all checked: ' + parts);
+    assert.deepEqual(flat, [], 'body tracks with no felt entry of their own (on, mid and end)');
+    assert.deepEqual(unfelt, [], 'body tracks whose first-waypoint note does not carry their sensation');
+    assert.deepEqual(sour, [], 'kinds whose changes under way are all discomfort');
+    const eyes = Object.keys(TR.species).map((k) => F[k + '.eyes']).filter(Boolean).flatMap((e) => [].concat(e.on, e.mid));
+    assert(eyes.filter((s) => /\bstings?\b/.test(s)).length <= 1, 'the eye lines vary, not a sting for every kind: ' + eyes.filter((s) => /sting/.test(s)).join(' / '));
+    // The note carries the stage line and the felt phrase together, so no felt option restates the line it is paired with (on with the
+    // first stage, mid with those between, end and touch with the last): no run of four words and no three content words in common,
+    // compared by stem so an inflection ("the fingers feeling long" / "The fingers feel long") does not hide a repeat.
+    const stop = new Set('a an the and or but of to in on at by for with from as is are was be it its this that these those each every one two any all no not nor more most less than then so if when while into onto out up down over under off through after before about there here what which who whom whose how where again only own same very just too still also new now first last like until some such their them they his her him he she you your our has have had do does did can will would should may might must being been were itself'.split(' '));
+    const words = (s) => String(s).toLowerCase().replace(/\{[^}]*\}/g, ' ').match(/[a-z']+/g) || [];
+    const stem = (w) => (/..ies$/.test(w) ? w.slice(0, -3) + 'y' : w.replace(/^(.{3,}?)(?:ingly|edly|ing|ed|ly|es|s)$/, '$1')).replace(/^(.{3,})e$/, '$1').replace(/([b-df-hj-np-tv-z])\1$/, '$1');
+    const runs = (s) => { const w = words(s).map(stem); return new Set(w.slice(3).map((x, i) => w.slice(i, i + 4).join(' '))); };
+    const twice = [];
+    const pairUp = (id, e, st) => {
+      const n = st.length, opt = (ph) => (e[ph] && e[ph].length ? e[ph] : e.mid) || [], pairs = [];
+      for (const o of opt('on')) pairs.push(['on', o, st[0]]);
+      for (let j = 2; j < n; j++) for (const o of e.mid || []) pairs.push(['mid', o, st[j - 1]]);
+      for (const o of opt('end').concat(e.touch || [])) pairs.push(['end', o, st[n - 1]]);
+      for (const [ph, o, s] of pairs) {
+        const content = (x) => new Set(words(x).filter((w) => !stop.has(w) && w.length > 2).map(stem)), cs = content(s), shared = [...content(o)].filter((w) => cs.has(w));
+        const rs = runs(s), run = [...runs(o)].find((g) => rs.has(g));
+        if (shared.length >= 3 || run) twice.push(id + ' ' + ph + ': "' + o + '" / "' + s + '"');
+      }
+    };
+    for (const [k, m] of Object.entries(TR.species)) for (const t of m) { const ways = (looksKind(Wd, k) || {}).ways || []; pairUp(k + '.' + t.key, own(k, t.key) || (ways.includes(t.key) && F._ways) || F._, t.stages); }
+    for (const side of ['woman', 'man']) for (const t of TR[side]) pairUp(side + '.' + t.key, own(side, t.key) || F._, t.stages);
+    assert.deepEqual(twice, [], 'felt options that restate the stage line they share a note with');
+  },
+
+  // 21c. The world data agrees with itself. Every hand row keeps the hand the lore pins (a bovine hand is two hooved fingers and a
+  // hooved thumb, a harpy's a thumb and two clawed fingers), the lore leaves room for what the ranges draw (a wolf's muzzle, a cat's
+  // two to four further pairs), the hand the kitsune shares with the werewolf names no build, and no backstory gives a kind what it
+  // lacks. The lore says what the milk track implies; a fox's magic is fire, not glamour, and brewing is water and earth work; the
+  // ferry, the mer tail, the choir lead, the course count and the shoes agree with the rest of the file; every hope reads after
+  // "hopes, in time, for"; no close-up line hands over a phrase the narration repeated; a kind's lore entry stays short enough to
+  // share the shed budget with one other kind's, and its keys are its own (a chimera's horns never pull in the bovine lore).
+  async worldDataAgrees() {
+    const Wd = loadWorld(), TR = Wd.transformation.tracks, byKey = (k, key) => TR.species[k].find((t) => t.key === key);
+    const lore = (k) => Wd.lore.find((l) => l.species === k);
+    for (const row of Object.values(byKey('cow', 'hands').range)) assert.match(row, /^Two (?:\w+ )*fingers and a (?:\w+ )*thumb/, 'every bovine hand row is two fingers and a thumb: ' + row);
+    for (const row of Object.values(byKey('harpy', 'hands').range)) assert.match(row, /^A thumb and two (?:\w+ )*clawed fingers/, 'every harpy hand row is a thumb and two clawed fingers: ' + row);
+    assert.match(lore('cow').text, /hands of two hooved fingers and a hooved thumb/); assert.match(lore('harpy').text, /a thumb and two clawed fingers/);
+    if (/muzzle/.test(JSON.stringify(byKey('wolf', 'nose_and_face').range))) assert.doesNotMatch(lore('wolf').text, /human-faced/, 'the wolf lore leaves room for the muzzle the face range draws');
+    const pairs = byKey('cat', 'further_pairs').range; if (pairs.least !== pairs.most) assert.doesNotMatch(lore('cat').text, /has three more pairs/, 'the cat lore leaves room for the pairs the range draws');
+    const shared = byKey('fox', 'hands').stages.at(-1); assert.doesNotMatch(shared, /strong|blunt/, 'the hand the kitsune shares with the werewolf names no build: ' + shared);
+    const bgs = Wd.creation.backgrounds.map((b) => b.text).join(' '); assert.doesNotMatch(bgs, /second row of teeth|gills[^.;]*throat/, 'no backstory gives a kind what it lacks');
+    assert.match(lore('cow').text, /Bovine men have no udder and no milk/);
+    assert.match(lore('cow').text, /none of it is expected, and each offers and welcomes what they choose/, 'the bovine lore says touch and milk are offered, not expected');
+    // The world rule that a bovine woman in milk lets it down when aroused is in the stage line that brings the milk, the last stage,
+    // the lore and the felt line, so the narration has it without being asked; none of them decides that she is aroused.
+    const milkT = byKey('cow', 'milk'), F2 = Wd.transformation.felt['cow.milk'];
+    assert.match(milkT.stages.find((x) => /first milk/i.test(x)), /\barousal\b/, 'the first-milk stage names arousal among what lets the milk down');
+    assert.match(milkT.stages[milkT.stages.length - 1], /\barousal\b/, 'the in-milk stage names arousal as a let-down');
+    assert.match(lore('cow').text, /in milk, which arousal lets down/, 'the bovine lore says arousal lets the milk down');
+    assert(F2 && F2.end.some((x) => /\baroused\b/.test(x)), 'the milk track\'s end is felt at arousal too');
+    assert(!/\b(she|the player|{first}) (is|gets|grows) aroused\b/.test(JSON.stringify(milkT.stages) + lore('cow').text), 'nothing decides that she is aroused');
+    assert.doesNotMatch(JSON.stringify(byKey('fox', 'guile')), /glamour/i, 'a fox\'s guile is not glamour (fire is its element)');
+    assert.doesNotMatch(Wd.skills.alchemy.text, /Dryads/, 'brewing is water and earth work'); assert.match(Wd.skills.alchemy.text, /bovine and rabbit/);
+    const ev = Wd.memorySeed.events, at = (re) => { const m = ev.find((e) => re.test(e)).match(/Day 1 (\d\d):(\d\d)/); return Number(m[1]) * 60 + Number(m[2]); };
+    assert.equal(at(/lands/) - at(/boards/), 60, 'the crossing takes an hour'); assert.equal(at(/lands/), 17 * 60, 'and comes in at seventeen bells');
+    assert.doesNotMatch(ev.find((e) => /boards/.test(e)), /Sallow Pier/, 'the ferry is boarded on the coast; Sallow Pier is where it comes in');
+    assert.doesNotMatch(lore('mer').text, /in the lake, and only there/, 'the mer tail comes in any deep water, as the tail track says');
+    assert.doesNotMatch(Wd.minorRoles.find((r) => r.key === 'choir_lead').text, /roost-sister/, 'the choir person may be no harpy');
+    assert.doesNotMatch(JSON.stringify(Wd.lore), /one ordinary course/, 'the lore counts two ordinary courses everywhere');
+    for (const k of ['rabbit', 'goblin', 'dryad']) assert.match(Wd.genPools.looks.kinds[k].dress.all.join(' '), /shoes|feet go bare/, k + ' feet rule out ordinary shoes in the dress lines');
+    for (const k of Object.keys(TR.species).filter((x) => TR.species[x].some((t) => /^leg_and_hip_(?:coat|pelt)$/.test(t.key)))) assert(Wd.genPools.looks.kinds[k].dress.all.includes('a coated kind runs warm and dresses lightly'), k + ' is a coated kind and dresses lightly');
+    const hopes = Object.entries(Wd.genPools.species).map(([k, s]) => [k, s.hope]).concat(Wd.castRoles.map((r) => [r.key, r.hope])).filter(([, h]) => h);
+    for (const [k, h] of hopes) assert.doesNotMatch(h, /^to |^\{first\} |\{first\}.*\{first\}/, k + ' hope reads after "hopes, in time, for" and names the player once: ' + h);
+    for (const r of Wd.castRoles) for (const v of r.variants || []) if (v.stopped) assert.doesNotMatch(v.stopped, /^down\b/, 'reads after "stopped at": ' + v.stopped);
+    const tics = /\bunhurried|\bthe low notes? |sweet[- ]grass|does not shift|let go of last|felt in the breastbone|hum in the breastbone/i;
+    for (const [k, s] of Object.entries(Wd.genPools.species)) for (const line of s.senses || []) assert.doesNotMatch(line, tics, k + ' close-up line hands over a phrase the narration repeated: ' + line);
+    assert.doesNotMatch(byKey('cow', 'voice').endsAs, /hum/, 'nor the bovine voice line');
+    const told = Object.entries(TR.species).flatMap(([k, m]) => m.map((t) => [k + '.' + t.key, t])).concat(TR.woman.map((t) => ['woman.' + t.key, t]), TR.man.map((t) => ['man.' + t.key, t]));
+    for (const [id, t] of told) for (const s of t.stages.concat(t.endsAs || [])) assert.doesNotMatch(s, tics, id + ' hands over a phrase the narration repeated: ' + s);
+    for (const [id, e] of Object.entries(Wd.transformation.felt)) assert.doesNotMatch(JSON.stringify(e), tics, 'felt ' + id + ' hands over a phrase the narration repeated');
+    assert.doesNotMatch(JSON.stringify(byKey('mer', 'voice')), /quiets a room/, 'the mer voice\'s consent line names the power it describes');
+    const kinds = Wd.lore.filter((l) => l.species);
+    for (const l of kinds) assert(l.text.length <= 800, l.species + ' lore is ' + l.text.length + ' characters: with the kind changing the player it must fit the shed budget');
+    const word = (k, s) => (k.endsWith('*') ? new RegExp('\\b' + k.slice(0, -1) + '\\w*', 'i') : new RegExp('\\b' + k + '\\b', 'i')).test(s);
+    // A key that names a part of the body pulls the kind's lore into any scene that names that part, so no other kind may have it.
+    const parts = /^(?:udder|teat|hoof|hooves|horns?|talon|fluke|bark|whisker)\*?$/i;
+    for (const l of kinds) for (const key of l.keys.filter((x) => parts.test(x))) for (const [k2, s] of Object.entries(Wd.genPools.species)) if (k2 !== l.species) assert(!word(key, JSON.stringify([s.body || [], Wd.genPools.looks.kinds[k2] || {}])), l.species + ' lore key "' + key + '" names a part of the ' + k2 + ' body, so a ' + k2 + ' scene would pull in the ' + l.species + ' lore');
+  },
+
+  // 21d. The world's lines leave the player's side to the player. A season, a flowering or a rhythm says what the body does, not
+  // what it wants; no stage line names "the player" or a stand-in for it; a mer's voice does not soften people; third-person pool
+  // and lore lines say no "you"; and no bond line decides what the player does.
+  async worldLeavesPlayerSide() {
+    const Wd = loadWorld(), TR = Wd.transformation.tracks;
+    const lists = Object.entries(TR.species).flatMap(([k, m]) => m.map((t) => [k, t])).concat(TR.woman.map((t) => ['woman', t]), TR.man.map((t) => ['man', t]));
+    for (const [k, t] of lists) {
+      const text = t.stages.concat([t.endsAs || '']).join(' ');
+      assert.doesNotMatch(text, /the player|bearer|one who carries/, k + ' ' + t.key + ' names no engine word for the player');
+      assert.doesNotMatch(text, /\bwanting\b(?! warm and sweet)|wants? contact|most of thought|no wish for it|softens them|draws people nearer|hard to stop listening|Curiosity pulls/, k + ' ' + t.key + ' leaves the wanting to the player: ' + text.slice(0, 160));
+    }
+    const P = Wd.genPools, third = [P.species.cat.where.night].concat(P.greetings, ...Object.values(P.species).map((s) => s.hello || []));
+    for (const s of third) assert.doesNotMatch(s, /\byou(?:r)?\b/i, 'a third-person pool line says no "you": ' + s);
+    for (const k of ['harpy', 'goblin']) assert.doesNotMatch(Wd.lore.find((l) => l.species === k).text, /\byou\b/i, k + ' lore says no "you"');
+    assert.doesNotMatch(JSON.stringify(TR.bond), /You can do the same|a thing you do/, 'no bond line decides what the player does');
+  },
+
+  // 21e. A stage line is plain words the narrator can reuse: none says how the engine draws the body ("as far as the draw sets",
+  // "at the drawn length", "At the standard"), since the engine adds how far a part goes on this body at its last waypoint.
+  async stageLinesPlain() {
+    const TR = loadWorld().transformation.tracks, engine = /draw sets|the drawn \w+|the draw allows|wherever the draw|at the standard\b/i;
+    const hits = [];
+    for (const [k, m] of Object.entries(TR.species)) for (const t of m) for (const s of t.stages.concat(t.endsAs || [])) if (engine.test(s)) hits.push(k + '.' + t.key + ': ' + s.match(engine)[0]);
+    for (const side of ['woman', 'man']) for (const t of TR[side]) for (const s of t.stages) if (engine.test(s)) hits.push(side + '.' + t.key);
+    assert.deepEqual(hits, [], 'stage lines that speak the engine\'s words');
+  },
+
+  // 21f. A saved game keeps the close-up lines its people were drawn with, so a line the world has since rewritten reaches an old
+  // save only by its migration: a bovine roommate saved with the two lines whose phrases the narration repeated every turn ("a low
+  // unhurried voice ... sweet grass", "does not shift ... let go of last") loads with them as the world has them now, and the turn
+  // prompt carries neither. So do the hand rows the lore has since pinned: the roommate saved with a bovine hand of four hoof-tipped
+  // fingers (or two heavy hooved digits) and a harpy edited in the Cast with four clawed fingers (or one strong one) load with two
+  // fingers and a thumb, case and all, in the looks, the generated record and the Cast edit alike.
+  async oldSensesMigrated() {
+    const first = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' }); let store;
+    try { assert(await first.turn('I unpack.')); store = new Map([...first.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))])); } finally { first.close(); }
+    const key = [...store.keys()].find((k) => /^adventures\/[^/]+$/.test(k)), doc = store.get(key).data;
+    const old = 'a steady warm weight that does not shift when leaned on; a hug from her comes slowly, holds, and is let go of last; a low unhurried voice that carries across a room without rising; when she leans in, the breath smells of sweet grass';
+    doc.roommate.senses = old; if (doc.roommate.gen) doc.roommate.gen.senses = old;
+    doc.roommate.looks = String(doc.roommate.looks || '') + ' Hands: four fingers, each tipped with a small hoof.';
+    doc.roommate.gen = Object.assign(doc.roommate.gen || {}, { looks: 'Hands: Two heavy digits hooved to the first joint; still hands that grip and hold.' });
+    doc.cast = doc.cast || {}; doc.cast.overrides = Object.assign(doc.cast.overrides || {}, { choir_lead: { looks: 'Hands: Four clawed fingers at each wrist. When she lands: a thumb and one strong clawed finger take the rail.' } });
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 8000), 'the older save did not load'); await h.idle(10000); await h.settle(100, 4000);
+      assert(await h.turn('I sit beside Daisy.'), 'a turn on the older save');
+      const rm = onlyAdv(h.mock.store).data.roommate, tics = /unhurried|sweet grass|does not shift|let go of last/;
+      assert.doesNotMatch(rm.senses, tics, 'the stored close-up line reads as the world has it now: ' + rm.senses);
+      assert.match(rm.senses, /a low voice that carries across a room without rising/, 'and keeps what it still says');
+      if (rm.gen) assert.doesNotMatch(String(rm.gen.senses || ''), tics, 'the generated record follows it');
+      assert.doesNotMatch(promptOf(lastTurn(h)), tics, 'the turn prompt carries neither phrase');
+      const oldHands = /four fingers, each tipped|two heavy digits|four clawed fingers|one strong clawed finger/i, cast = onlyAdv(h.mock.store).data.cast.overrides.choir_lead;
+      assert.match(rm.looks, /Hands: two fingers and a thumb, each ending in a small thin hoof\./, 'the stored bovine hand reads as the lore has it: ' + rm.looks);
+      assert.match(rm.gen.looks, /^Hands: Two heavy fingers and a thumb, all hooved to the first joint; still hands/, 'the generated record follows it, its capital kept');
+      assert.equal(cast.looks, 'Hands: A thumb and two short clawed fingers at each wrist. When she lands: a thumb and two strong clawed fingers, the claws long and curved take the rail.', 'and so does the Cast edit');
+      assert.doesNotMatch(promptOf(lastTurn(h)), oldHands, 'the turn prompt carries no old hand row');
+    } finally { h.close(); }
+  },
+
   // 22. The narrator keeps no Discoveries list (it capped at twelve, dropped the oldest finds first, and held changes the engine never
   // announced): the engine knows every waypoint told. Condition is how the body feels now, short and replaced each turn, and a
   // discovery the narrator still sends is ignored with a note, not stored.
@@ -3068,13 +3239,13 @@ const S = {
       assert(await h.turn('I walk along the old wall.'));
       const gm = (/<gm_only[^>]*>([\s\S]*?)<\/gm_only>/.exec(promptOf(lastTurn(h))) || [])[1] || '';
       const line = gm.split('\n').find((l) => /humanity: \d+ of 100/.test(l)) || '';
-      assert.match(line, /Below the line of 40/, 'the player is below the line: ' + line);
+      assert.match(line, /Below the line of 15/, 'the player is below the line: ' + line);
       assert.match(line, /At a closed place Tom can feel it refuse/, 'a closed place refuses in a way the player can feel: ' + line);
       // 31. Nor can the narrator mark a place found below the line.
       patchTurns(h, (r) => { r.state_updates = [{ key: 'flags.dungeon_wrath_found', op: 'set', value: true }]; });
       assert(await h.turn('I climb the bell tower.'));
       assert.equal(onlyAdv(h.mock.store).data.state.flags.dungeon_wrath_found, false, 'a place is not found below the line');
-      assert(storedTurns(h.mock.store, id).at(-1).notes.some((n) => /ignored dungeon_wrath_found \(humanity \d+, below the line of 40\)/.test(n)), 'and the turn says why');
+      assert(storedTurns(h.mock.store, id).at(-1).notes.some((n) => /ignored dungeon_wrath_found \(humanity \d+, below the line of 15\)/.test(n)), 'and the turn says why');
       clean(h);
     } finally { h.close(); }
   },
@@ -3185,18 +3356,21 @@ const S = {
   },
 
   // 29. A new adventure takes its settings from the game on screen, not from whatever this device last changed: the creation screen
-  // shows the pace and density it will use, the pace picked there is the one saved, and the cast is invented on the open game's tier.
+  // shows the pace, density and invention tier it will use, and what is picked there is what is saved and what invents the cast.
   async creationSettings() {
     const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
     try {
       h.click('#btnSettings');
-      for (const [sel, v] of [['#setPace', 'slow'], ['#setDensity', 'terse'], ['#setInventTier', 'complex']]) { h.$(sel).value = v; h.$(sel).dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000)); }
+      assert(!h.$('#setInventTier'), 'the invention tier is not a setting of a game already begun; it is picked on the creation screen');
+      for (const [sel, v] of [['#setPace', 'slow'], ['#setDensity', 'terse']]) { h.$(sel).value = v; h.$(sel).dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000)); }
       h.click('[data-close="dlgSettings"]');
       h.window.localStorage.setItem('windlass.settings', JSON.stringify({ pace: 'unbounded', density: 'rich', inventTier: 'quick' }));
       const first = onlyAdv(h.mock.store).id;
       h.click('#btnAdventures'); h.click('#newAdv'); await h.settle(150, 4000);
       assert(h.$('#cPace') && h.$('#cDensity'), 'the creation screen shows the pace and the density');
       assert.equal(h.$('#cPace').value, 'slow', 'the pace shown is the open game\'s'); assert.equal(h.$('#cDensity').value, 'terse');
+      assert(h.$('#cInventTier'), 'the creation screen shows the tier that invents the people'); assert.equal(h.$('#cInventTier').value, 'quick', 'the tier shown is the open game\'s');
+      h.$('#cInventTier').value = 'complex'; h.$('#cInventTier').dispatchEvent(new h.window.Event('change'));
       h.$('#cPace').value = 'unbounded'; h.$('#cPace').dispatchEvent(new h.window.Event('change'));
       assert.match(h.$('#cPaceNote').textContent, /testing/i, 'unbounded says it is for testing');
       h.$('#cPace').value = 'fast'; h.$('#cPace').dispatchEvent(new h.window.Event('change'));
@@ -3205,9 +3379,9 @@ const S = {
       const doc = advDocs(h.mock.store).map(([, v]) => v.data).find((d) => d.id !== first);
       assert(doc, 'the new adventure was saved');
       assert.equal(doc.settings.pace, 'fast', 'the pace picked on the form is saved'); assert.equal(doc.settings.density, 'terse', 'the density shown is the one saved');
-      assert.equal(doc.settings.inventTier, 'complex', 'the new game keeps the open game\'s invention tier');
+      assert.equal(doc.settings.inventTier, 'complex', 'the new game keeps the tier picked on the creation screen');
       const invent = h.mock.sampleCalls.slice(before).filter((c) => c.label === 'cast invention');
-      assert(invent.length && invent.every((c) => c.opts.modelTier === 'complex'), 'the cast is invented on the tier the new game keeps: ' + invent.map((c) => c.opts.modelTier).join(','));
+      assert(invent.length && invent.every((c) => c.opts.modelTier === 'complex'), 'the cast is invented on the tier picked on the creation screen: ' + invent.map((c) => c.opts.modelTier).join(','));
       clean(h);
     } finally { h.close(); }
   },
@@ -3275,6 +3449,7 @@ const S = {
       await h.sleep(200);
       h.$('#dlgCreate').setAttribute('open', ''); h.$('#cBegin').disabled = false; h.click('#cBegin');
       assert.match(h.$('#cNote').textContent, /introduction is still being written/, 'a second Begin names what is running: ' + h.$('#cNote').textContent);
+      if (process.env.DUMP) { console.log('OLD:', before); console.log('LINE:', line); const pr = promptOf(lastTurn(h)); for (const w of ['green', oldEyes]) { let i = -1; while ((i = pr.indexOf(w, i + 1)) >= 0) console.log('HIT', w, ':', pr.slice(Math.max(0, i - 200), i + 80).replace(/\n/g, ' / ')); } }
       store = new Map([...h.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
     } finally { h.close(); }
     const R = await boot({ setup(w, m) { m.store = store; } });
@@ -3353,6 +3528,34 @@ const S = {
     }
   },
 
+  // 35b. The cast's kinds are dealt for balance, not drawn role by role: over forty seeded creations every kind a role's list allows
+  // is someone (the roommate and the fixed roles counted), no kind is drawn more than twice among the list roles, the werewolves
+  // come out at least one a game on average, and bovines no more than the Creamery's, the roommate's and two more.
+  async castKindsBalanced() {
+    const W0 = loadWorld(), roles = W0.castRoles.concat(W0.minorRoles || []), listed = new Set(roles.filter((r) => Array.isArray(r.species)).map((r) => r.key));
+    const drawable = [...new Set(roles.filter((r) => Array.isArray(r.species)).flatMap((r) => r.species))];
+    const fixedCow = roles.filter((r) => r.species === 'cow').length;
+    const setup = (w, m) => { m.sampleHandler = (input, o, call) => { if (call.label === 'cast invention') throw { code: 'overloaded', message: 'pools only' }; return m.defaultHandler(input, o, call); }; };
+    const RUNS = 40, base = (global.__WL_SEED || 1) >>> 0; let wolves = 0, cows = 0, cowCap = 0;
+    for (let run = 0; run < RUNS; run++) {
+      // Most games take the default roommate (a bovine); every fourth names a fox, so the roommate's kind is seen to count.
+      const h = await begin(Object.assign({ setup, seed: (base + run * 7919) >>> 0 }, run % 4 === 3 ? { rmSpecies: 'fox' } : {}));
+      try {
+        const d = onlyAdv(h.mock.store).data, gen = d.cast.generated, people = gen.characters.concat(gen.minors), rm = d.roommate.species;
+        const kinds = people.map((p) => p.species).concat([rm]), count = (k, xs) => xs.filter((x) => x === k).length;
+        const missing = drawable.filter((k) => !kinds.includes(k));
+        assert.deepEqual(missing, [], 'run ' + run + ': a kind the lists allow is nobody: ' + missing + ' (' + kinds.join(', ') + ')');
+        const drawn = people.filter((p) => listed.has(p.key)).map((p) => p.species);
+        const over = [...new Set(drawn)].filter((k) => count(k, drawn) > 2);
+        assert.deepEqual(over, [], 'run ' + run + ': drawn more than twice among the list roles: ' + over.map((k) => k + ' x' + count(k, drawn)).join(', '));
+        wolves += count('wolf', people.map((p) => p.species)); cows += count('cow', kinds); cowCap += fixedCow + (rm === 'cow' ? 1 : 0) + 2;
+        clean(h);
+      } finally { h.close(); }
+    }
+    assert(wolves / RUNS >= 1, 'werewolves average at least one a game in the cast: ' + (wolves / RUNS).toFixed(2));
+    assert(cows / RUNS <= cowCap / RUNS, 'bovines average at most the Creamery, the roommate and two: ' + (cows / RUNS).toFixed(2) + ' > ' + (cowCap / RUNS).toFixed(2));
+  },
+
   // 36. The plain stand-in for the roommate's introduction agrees with its room (no card on a bed the room has already slept on or
   // put a towel on), shows the kind's own body (ears, tail, hands) in phrases, not "label: value" lines and never "the person's own" face,
   // and gives the full name once, with no fixed barbed line.
@@ -3399,7 +3602,8 @@ const S = {
   // 38. A roommate introduction that gives the body a line of another column than this person's (four hooved fingers where Looks gives
   // two and a thumb) is asked for again, naming the phrase; the second draft, true to Looks, is the one used.
   async introKeepsToLooks() {
-    const hands = ['Four fingers, each tipped with a small hoof', 'Two hooved fingers and a hooved thumb', 'Two heavy digits hooved to the first joint'];
+    // The three columns of the cow's hand row, as the world gives them now; the mock picks one the roommate's Looks does not have.
+    const hands = Object.values(loadWorld().transformation.tracks.species.cow.find((t) => t.key === 'hands').range);
     let wrong = '';
     const setup = (w, m) => { m.sampleHandler = (input, o, call) => {
       if (call.label !== 'roommate introduction' || /Your draft said/.test(input)) return m.defaultHandler(input, o, call);
@@ -3689,8 +3893,9 @@ const S = {
   },
 
   // 28. What the player thinks they saw is a creation choice: a short list, at most one glimpse per kind, with "not sure any more",
-  // and typed words kept. The person seen is drawn from the cast to fit the kind, never the roommate; the narrator is told who in
-  // <gm_only> while that person is in play, and <player> carries only the line the player remembers, never the name.
+  // and typed words kept. The person seen is drawn to fit the kind (the roommate among them when the roommate is of it); the narrator
+  // is told who in <gm_only> while that person is in play, only the kind otherwise, and <player> carries only the line the player
+  // remembers, never the name.
   async glimpseSeeded() {
     const W0 = loadWorld(), gs = W0.creation.glimpses || [];
     assert(gs.some((g) => g.key === 'unsure' && !g.kind && /not sure any more/i.test(g.label)), 'the list has "not sure any more"');
@@ -3711,16 +3916,16 @@ const S = {
       h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish'); await h.settle(150, 6000);
       const d = onlyAdv(h.mock.store).data, g = d.player.glimpse;
       assert.equal(g && g.key, 'ears', 'the choice is kept with the player');
-      const gen = d.cast.generated, who = gen.characters.concat(gen.minors).find((c) => c.key === g.who);
+      const gen = d.cast.generated, who = gen.characters.concat(gen.minors, d.roommate ? [d.roommate] : []).find((c) => c.key === g.who);
       assert(who, 'someone in the cast is the one seen: ' + JSON.stringify(g));
-      assert.equal(who.species, 'fox', 'the one seen fits the glimpse\'s kind');
-      assert(d.roommate && who.name !== d.roommate.name && g.who !== d.roommate.replaces, 'never the roommate (a fox too), nor the one the roommate stands in for');
+      assert.equal(who.species, 'fox', 'the one seen fits the glimpse\'s kind (the roommate, a fox too, may be the one)');
+      assert(!d.roommate || g.who !== d.roommate.replaces, 'never the one the roommate stands in for');
       assert.equal(d.state.flags.glimpse_told, false, 'the secret is not out');
       // In play is what the engine reads: the place, who is present, the action and the recent story.
       const named = (s) => new RegExp('\\b' + who.first + '\\b', 'i').test(String(s || '')), here = [d.state.location].concat(d.state.present || []);
       assert(await h.turn('I unpack.'), 'turn did not finish');
       const p0 = promptOf(lastTurn(h)), sec0 = (t) => (new RegExp('\\n<' + t + '(?: [^>]*)?>\\n([\\s\\S]*?)\\n</' + t + '>').exec(p0) || [])[1];
-      if (!here.some(named) && !['action', 'recent_turns', 'earlier_turns'].map(sec0).some(named)) assert(!/(Who|What) Owen saw/.test(gmOf(p0)), 'a scene without ' + who.first + ' pays nothing for the secret');
+      if (!here.some(named) && !['action', 'recent_turns', 'earlier_turns'].map(sec0).some(named)) assert(!/Who Owen saw/.test(gmOf(p0)) && !named(gmOf(p0)) && gmOf(p0).includes('What Owen saw (<player>): a kitsune, a secret, and nobody in this scene.'), 'a scene without ' + who.first + ' pays only for the kind, never the name');
       assert(await h.turn('I go and find ' + who.first + '.'), 'turn did not finish');
       const p = promptOf(lastTurn(h));
       const gm = (/<gm_only[^>]*>\n([\s\S]*?)\n<\/gm_only>/.exec(p) || [])[1] || '', pl = (/<player[^>]*>\n([\s\S]*?)\n<\/player>/.exec(p) || [])[1] || '';
@@ -3754,8 +3959,8 @@ const S = {
         h3.type('#cGlimpse', t); h3.click('#cBegin'); assert(await h3.idle(30000), 'creating did not finish: ' + t); await h3.settle(150, 6000);
         const d = advDocs(h3.mock.store).map(([, v]) => v.data).find((x) => x.player.glimpse && x.player.glimpse.text === t), g = d && d.player.glimpse;
         assert.equal(g && g.kind, kind, JSON.stringify(t) + ' is ' + (kind || 'nobody') + ': ' + JSON.stringify(g));
-        const who = g.who && d.cast.generated.characters.concat(d.cast.generated.minors).find((c) => c.key === g.who);
-        assert(kind ? !g.who || (who && who.species === kind) : !g.who, 'the one seen fits: ' + JSON.stringify(g));
+        const who = g.who && d.cast.generated.characters.concat(d.cast.generated.minors, d.roommate ? [d.roommate] : []).find((c) => c.key === g.who);
+        assert(kind ? who && who.species === kind : !g.who, 'the one seen fits: ' + JSON.stringify(g));
       }
       clean(h3);
     } finally { h3.close(); }
@@ -3820,6 +4025,130 @@ const S = {
       assert(!d.player.glimpse && !('glimpse_told' in d.state.flags), 'no glimpse, no person, no flag');
       clean(h);
     } finally { h.close(); }
+  },
+
+  // 31. The kind decides who was seen. Typed words naming a werewolf, with a bovine roommate: the one seen is a wolf-kind person of
+  // the cast, so never the bovine roommate; the roommate's introduction is told nothing of what was seen; the narrator holds the
+  // person and the kind in <gm_only> (in a scene without them, the kind and that nobody present is it), and <player> keeps the words.
+  async glimpseKindNotRoommate() {
+    const t = 'I saw a werewolf on the night bus';
+    const h = await begin({ name: 'Owen Pryce', gender: 'male', rmSpecies: 'bovine', rmName: 'Daisy Clover', rmGender: 'female', glimpse: t });
+    try {
+      const d = onlyAdv(h.mock.store).data, g = d.player.glimpse, gen = d.cast.generated, people = gen.characters.concat(gen.minors);
+      assert.equal(d.roommate.species, 'cow', 'the roommate is bovine');
+      assert.equal(g && g.kind, 'wolf', 'a werewolf is the wolf kind: ' + JSON.stringify(g));
+      assert(people.some((c) => c.species === 'wolf'), 'the cast holds a wolf-kind person');
+      const who = people.find((c) => c.key === g.who);
+      assert(who && who.species === 'wolf', 'the one seen is wolf-kind: ' + JSON.stringify(g) + ' ' + (who && who.species));
+      assert(g.who !== 'roommate' && who.name !== d.roommate.name, 'so not the bovine roommate');
+      const intro = h.mock.sampleCalls.find((c) => c.label === 'roommate introduction'), ip = intro ? promptOf(intro) : '';
+      assert(ip, 'the roommate introduction was asked for');
+      const ipl = blockOf(ip, 'player');
+      // (a porter who happens to be a werewolf is met across a desk, openly: only the sighting itself must stay out of the prompt)
+      assert(!ip.includes(t) && !/saw a werewolf|night bus/i.test(ipl) && !/three weeks|made no sense/i.test(ipl), 'the roommate introduction is not told what was seen: ' + ipl);
+      assert(await h.turn('I unpack.'), 'turn did not finish');
+      const p0 = promptOf(lastTurn(h)), gm0 = gmOf(p0), pl0 = blockOf(p0, 'player');
+      assert(pl0.includes('Owen remembers seeing: ' + t), 'the player block keeps the words: ' + pl0.slice(-200));
+      if (!gm0.includes('Who Owen saw')) {
+        assert(gm0.includes('What Owen saw (<player>): a werewolf, a secret, and nobody in this scene.'), 'a scene without the one seen still holds the kind: ' + gm0.slice(0, 400));
+        assert(!gm0.includes(who.first), 'and never the name');
+      }
+      assert(!/Who Owen saw[^\n]*(Bovine|bovine|Daisy)/.test(gm0), 'the secret never names the bovine roommate');
+      assert(await h.turn('I go and find ' + who.first + '.'), 'turn did not finish');
+      const gm = gmOf(promptOf(lastTurn(h)));
+      assert(gm.includes('Who Owen saw (<player>): ' + who.name + ' (werewolf), a secret.'), 'the secret names the person and the kind: ' + gm.slice(0, 400));
+      assert.match(gm, /Nobody else is the one Owen saw\./, 'and that nobody else is');
+      assert(!/never the roommate/i.test(gm), 'no rule against the roommate as such');
+      clean(h);
+    } finally { h.close(); }
+    // A world where no role can be a werewolf: a minor figure of the kind is drawn to be the one seen, never someone of another kind.
+    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'wl-nowolf-'));
+    try {
+      for (const f of fs.readdirSync(WORLDS)) fs.copyFileSync(path.join(WORLDS, f), path.join(dir, f));
+      const src = fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), a = src.indexOf('  castRoles: ['), b = src.indexOf('  genPools: {');
+      fs.writeFileSync(path.join(dir, 'sundered.js'), src.slice(0, a) + src.slice(a, b).replace(/species: \[[^\]]*\]/g, (m) => m.replace(/'wolf', |, 'wolf'/g, '')) + src.slice(b));
+      const h2 = await boot({ worldsDir: dir });
+      try {
+        assert(await h2.settle(150, 6000)); h2.type('#cName', 'Owen Pryce'); h2.type('#cRmSpecies', 'bovine'); h2.type('#cGlimpse', t);
+        h2.click('#cBegin'); assert(await h2.idle(30000)); await h2.settle(150, 6000);
+        const d = onlyAdv(h2.mock.store).data, g = d.player.glimpse, gen = d.cast.generated;
+        assert.equal(g.kind, 'wolf');
+        const who = gen.characters.concat(gen.minors).find((c) => c.key === g.who);
+        assert(who && who.species === 'wolf' && gen.minors.includes(who), 'a minor figure of the wolf kind is drawn to be the one seen: ' + JSON.stringify(g) + ' ' + (who && who.species));
+        assert.equal(d.state.flags.glimpse_told, false, 'and the secret is kept');
+        clean(h2);
+      } finally { h2.close(); }
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  },
+
+  // 32. Every kind of the world has a listed glimpse (wolf, cow and rabbit included), each resolving to its kind by label, by key and
+  // in plain typed words (a wolfman, a minotaur, a bunny), and seeding a person of that kind.
+  async glimpseEveryKindListed() {
+    const W0 = loadWorld(), gs = W0.creation.glimpses || [], kinds = W0.creation.roommate.species;
+    for (const k of kinds) assert(gs.some((g) => g.kind === k), 'a listed glimpse for every kind: none for ' + k);
+    for (const [key, kind] of [['howl', 'wolf'], ['hooves', 'cow'], ['nose', 'rabbit']]) {
+      const g = gs.find((x) => x.key === key); assert(g && g.kind === kind && g.label && g.text, 'the ' + kind + ' glimpse is listed: ' + key);
+      for (const c of g.cues || []) assert(!gs.some((x) => x !== g && (x.cues || []).includes(c)), 'a cue only one glimpse has: ' + c);
+    }
+    const typed = { 'Someone who howled at the edge of the car park lights': 'wolf', 'Hooves under a long skirt on a station platform': 'cow', 'A nose that never stopped moving': 'rabbit', 'howl': 'wolf', 'A wolfman by the bins': 'wolf', 'Something howling at the full moon': 'wolf', 'A minotaur in the queue': 'cow', 'Hooves under her coat': 'cow', 'A bunny girl at the bus stop': 'rabbit', 'A man with a wolf\'s ears': 'wolf' };
+    const h = await boot({});
+    try {
+      assert(await h.settle(150, 6000));
+      for (const [t, kind] of Object.entries(typed)) {
+        if (!h.$('#dlgCreate').open) { h.click('#btnAdventures'); h.$('#newWorld').value = 'sundered'; h.click('#newAdv'); await h.settle(150, 6000); }
+        const had = new Set(advDocs(h.mock.store).map(([k]) => k));
+        h.type('#cGlimpse', t); h.click('#cBegin'); assert(await h.idle(30000), 'creating did not finish: ' + t); await h.settle(150, 6000);
+        const fresh = advDocs(h.mock.store).filter(([k]) => !had.has(k)); assert.equal(fresh.length, 1, 'one new adventure for ' + t);
+        const d = fresh[0][1].data, g = d.player.glimpse;
+        assert.equal(g && g.kind, kind, JSON.stringify(t) + ' is ' + kind + ': ' + JSON.stringify(g));
+        const who = [].concat(d.cast.generated.characters, d.cast.generated.minors, [Object.assign({}, d.roommate, { key: 'roommate' })]).find((c) => c.key === g.who);
+        assert(who && who.species === kind, JSON.stringify(t) + ' seeds a person of the kind: ' + JSON.stringify(g));
+      }
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // 33. Words naming two kinds seed nobody (a werewolf and a bunny is not a werewolf), and nothing of a secret reaches the narrator.
+  async glimpseTwoKindsNobody() {
+    for (const t of ['A werewolf and a bunny on the night bus', 'A werewolf and a cow at the station']) {
+      const h = await begin({ name: 'Owen Pryce', rmSpecies: 'cow', glimpse: t });
+      try {
+        const d = onlyAdv(h.mock.store).data, g = d.player.glimpse;
+        assert.equal(g && g.kind, '', JSON.stringify(t) + ' is nobody: ' + JSON.stringify(g));
+        assert(!g.who && !('glimpse_told' in d.state.flags), 'nobody seeded, no flag');
+        assert(await h.turn('I unpack.'));
+        const p = promptOf(lastTurn(h));
+        assert.doesNotMatch(gmOf(p), /(Who|What) Owen saw/, 'no secret line');
+        assert(blockOf(p, 'player').includes('Owen remembers seeing: ' + t), 'the words are kept');
+        clean(h);
+      } finally { h.close(); }
+    }
+  },
+
+  // 34. When the roommate is of the glimpse's kind, the roommate is one of the people the one seen is drawn from, at ordinary odds:
+  // typed words naming a bovine, with a bovine roommate, seed someone bovine every time, and over a few games the roommate at least once. Then
+  // the roommate's introduction holds the secret, with the player's words.
+  async glimpseRoommateSameKind() {
+    let rmSeen = 0, introOk = false; const kinds = [];
+    for (let i = 0; i < 10 && rmSeen < 1; i++) {
+      const h = await begin({ name: 'Owen Pryce', rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female', glimpse: 'A bovine woman on a station platform', seed: 9100 + i });
+      try {
+        const d = onlyAdv(h.mock.store).data, g = d.player.glimpse;
+        assert.equal(g && g.kind, 'cow');
+        const who = g.who === 'roommate' ? d.roommate : d.cast.generated.characters.concat(d.cast.generated.minors).find((c) => c.key === g.who);
+        assert(who && who.species === 'cow', 'the one seen is bovine: ' + JSON.stringify(g)); kinds.push(g.who);
+        if (g.who === 'roommate') {
+          rmSeen += 1;
+          const ip = promptOf(h.mock.sampleCalls.find((c) => c.label === 'roommate introduction'));
+          introOk = blockOf(ip, 'player').includes('A secret, kept in this scene: Daisy is the one Owen saw') && ip.includes(g.text);
+          assert(await h.turn('I say hello to Daisy.'));
+          assert(gmOf(promptOf(lastTurn(h))).includes('Who Owen saw (<player>): Daisy Clover (bovine mythkin), a secret.'), 'the secret names the roommate and the kind');
+        }
+        clean(h);
+      } finally { h.close(); }
+    }
+    assert(rmSeen >= 1, 'the bovine roommate is drawn as the one seen at least once in ten games: ' + kinds.join(','));
+    assert(introOk, 'the introduction of a roommate who is the one seen holds the secret and the player\'s words');
   },
 
   // 28. People sound different: every generated person has a way of speaking from the world's pool, written as a tendency, no two
@@ -4447,6 +4776,94 @@ const S = {
       for (const re of [/^ignored spa_visits \(code-owned\)$/, /^ignored unknown item "nonsense"$/, /^ignored unknown flag "nonsense"$/, /^ignored time \(clock is code-owned\)$/]) assert(last().notes.some((x) => re.test(x)), 'each refusal is noted (' + re + '): ' + JSON.stringify(last().notes));
       clean(h);
     } finally { h.close(); }
+  },
+  // A preset or draft saved before the glimpse had its own field carries the town and the thing seen in one background label. On
+  // load it is read as both: the town goes in Where you come from and the thing seen in What you think you saw, so the player's
+  // block names each once. A glimpse already given is kept.
+  async oldPresetSplitsTheGlimpse() {
+    const old = { v: 1, worldId: 'sundered', choices: { name: 'Owen Pryce', gender: 'male', background: 'The corner shop: the shopkeeper\'s ears', strengths: ['nerve', 'wits'], rmSpecies: 'cow' }, at: Date.now() };
+    const h = await boot({ setup(w) { w.localStorage.setItem('windlass.createDraft', JSON.stringify(old)); } });
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      assert(h.$('#dlgCreate').open, 'the draft restores the creation screen');
+      assert.equal(h.$('#cBackground').value, 'The city, over a corner shop', 'the old label is read as the town it named');
+      assert.equal(h.$('#cGlimpse').value, 'Green ears under a headscarf', 'and the glimpse it told');
+      h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish'); await h.settle(150, 6000);
+      assert(!h.$('#dlgCreate').open, 'Begin went ahead: ' + h.$('#cNote').textContent);
+      assert(await h.turn('I look around the room.'));
+      const p = promptOf(lastTurn(h));
+      assert(/two floors over a corner shop/.test(p) && !/shopkeeper's ears/.test(p), 'the player block carries the town, not the old combined line');
+      clean(h);
+    } finally { h.close(); }
+    const kept = { v: 1, worldId: 'sundered', choices: { name: 'Owen Pryce', gender: 'male', background: 'The river: a girl with gills', glimpse: 'Bark at a stranger\'s wrists', rmSpecies: 'cow' }, at: Date.now() };
+    const h2 = await boot({ setup(w) { w.localStorage.setItem('windlass.createDraft', JSON.stringify(kept)); } });
+    try {
+      assert(await h2.settle(150, 6000), 'boot did not settle');
+      assert.equal(h2.$('#cBackground').value, 'A river town'); assert.equal(h2.$('#cGlimpse').value, 'Bark at a stranger\'s wrists', 'a glimpse already given is kept');
+      h2.click('#dlgCreate [data-close]'); clean(h2);
+    } finally { h2.close(); }
+  },
+
+  // A hand-written Looks in the Cast editor is what the narrator reads, every turn. Changing only the eyes ("Eyes: green") must
+  // keep green on the eyes in each turn's sheet: the turn after one that showed her goes the short form, which ran Height, Build,
+  // Hair and Eyes together without labels, so a hand-written "Eyes: green" reached the narrator as a bare "; green" after the hair
+  // (black hair "with a green tint") and the eyes fell back on the old narration. A longer hand-written look with a line of its own
+  // goes whole while she is in the scene, survives a reload on the same store, and the Cast screen shows it again. Fails on f4aa689.
+  async castLooksEditReachesPrompt() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'May Tanaka', rmGender: 'female' });
+    const sheetOf = (hh) => (blockOf(promptOf(lastTurn(hh)), 'characters').split('\n').find((l) => /\[roommate\]/.test(l)) || '');
+    const looksOf = (line) => (/ Looks(?: \(shown last turn\))?: (.*?) (?:Not on this body:|Dress:)/.exec(line) || [])[1] || '';
+    const edit = async (hh, text) => {
+      hh.click('#btnCast'); await hh.sleep(20); assert.equal(hh.$('#cfName').value, 'May Tanaka', 'the Cast screen opens on the roommate');
+      const el = hh.$('#cfLooks'), before = el.value; el.value = text(before); el.dispatchEvent(new hh.window.Event('input', { bubbles: true }));
+      hh.click('#cfSave'); assert(await hh.idle(10000)); hh.click('[data-close="dlgCast"]'); return { before, after: el.value };
+    };
+    let store, edited;
+    try {
+      // She is on the page and named by every narration, so the second and third turns send the look as already shown.
+      patchTurns(h, (r) => { r.narrative = 'May Tanaka sits on her bed across the room. ' + r.narrative; });
+      assert(await h.turn('I say hello to May.'));
+      let oldEyes;
+      const e1 = await edit(h, (before) => { oldEyes = (/(?:^|\. )Eyes: ([^.]+)\./.exec(before) || [])[1]; return before.replace(/((?:^|\. )Eyes: )[^.]+\./, '$1green.'); });
+      assert(oldEyes && !/green/.test(oldEyes), 'the generated look has eyes of another colour: ' + e1.before.slice(0, 400));
+      assert.equal(onlyAdv(h.mock.store).data.cast.overrides.roommate.looks, e1.after, 'the edit is stored as typed');
+      for (const action of ['I look at May.', 'I unpack my bag.', 'I put the kettle on.']) {
+        assert(await h.turn(action));
+        const line = sheetOf(h), looks = looksOf(line);
+        if (process.env.DUMP) console.log('  [' + action + '] ' + (/ Looks \(shown last turn\): /.test(line) ? 'Looks (shown last turn): ' : 'Looks: ') + looks);
+        assert(looks, 'the roommate is sent a look on "' + action + '": ' + line.slice(0, 600));
+        assert(!looks.includes(oldEyes), 'not the old eyes (' + oldEyes + ') on "' + action + '": ' + looks);
+        assert.match(looks, /\beyes?\b[^.;]{0,12}\bgreen\b|\bgreen eyes\b/i, 'green stays on the eyes on "' + action + '": ' + looks);
+        assert.doesNotMatch(looks, /;\s*green\b/, 'and is never a bare word after the hair on "' + action + '": ' + looks);
+      }
+      // A long hand-written look with a line of its own goes whole the turn she is named.
+      edited = 'Height: about five foot eight. Build: slim, with a soft waist, hips and thighs. Bust: round full breasts, a D cup, high and close-set. ' +
+        'Hair: a single ponytail, black hair and fur trailing from her hair down the middle of the back to her tail. Eyes: pale violet with gold rims. ' +
+        'Hide: black and white like a holstein. Hands: two hooved fingers and a hooved thumb. Legs: hooves to hips, fading out at the navel. ' +
+        'Feet: two toes in a split hoof with dewclaws behind; heel raised, weight on the hooves. Tail: to the knee, tufted. Ears: cow ears out to the sides. ' +
+        'Face: a faint bovine shape, with a broad soft nose. Freckles: a scatter of copper freckles across both shoulders. No horns, no crest, no heavy neck.';
+      await edit(h, () => edited);
+      assert(await h.turn('I look at May again.'));
+      assert.equal(looksOf(sheetOf(h)), edited, 'the hand-written look goes whole while she is in the scene: ' + sheetOf(h).slice(0, 900));
+      // The turn after, shown last turn: every line still there, the eyes still the eyes.
+      assert(await h.turn('I sit down at the desk.'));
+      const short = looksOf(sheetOf(h));
+      assert(short.includes('copper freckles across both shoulders') && /eyes?:? pale violet with gold rims/i.test(short), 'the short form keeps the extra line and the eyes: ' + short);
+      store = new Map([...h.mock.store].map(([k, v]) => [k, JSON.parse(JSON.stringify(v))]));
+      clean(h);
+    } finally { h.close(); }
+    const g = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await g.settle(150, 8000)); await g.idle(10000); await g.settle(100, 4000);
+      g.click('#btnCast'); await g.sleep(20);
+      assert.equal(g.$('#cfLooks').value, edited, 'after a reload the Cast screen shows the edit');
+      g.click('[data-close="dlgCast"]');
+      assert(await g.turn('I ask May about her day.'));
+      assert.equal(looksOf(sheetOf(g)), edited, 'after a reload the turn prompt carries the edit: ' + sheetOf(g).slice(0, 900));
+      g.click('#btnCast'); await g.sleep(20); assert.equal(g.$('#cfLooks').value, edited, 'and the Cast screen still shows it after the turn re-renders');
+      g.click('[data-close="dlgCast"]');
+      clean(g);
+    } finally { g.close(); }
   },
 };
 

@@ -33,7 +33,7 @@ window.WINDLASS_WORLDS.sundered = {
     'Sensory variety: warmth and heat can be effective when distinctive, established or relevant in the moment, but do not let "radiating heat" or a warm body become a recurring default for closeness.',
     'Change and relationships: transformation is a continuing thread in bodily life, self-perception and relationships, not a checklist or a separate subplot. Its effects may complicate routines, clothes, touch or attention. The player decides whether those changes feel welcome, frightening, alien, comforting or meaningful; never assign that judgment or a new identity. NPCs have their own views and stakes: affection, curiosity, concern, attraction, disagreement or fear may coexist, vary by person, and create earned tension (over staying human, restoration or a romance\'s future) without making anyone a mouthpiece or coercing the player, who stays free to refuse, repair, leave or change course.',
     'Keep to the Looks: a person\'s body is exactly what their Looks give, and the Looks are the whole of it. Add no part, covering, colour, by-sex feature, size or comparison they do not give, and nothing listed as not on this body; a covering ends where the Looks say it ends (at the elbows; at the hips, fading out at the navel), and a by-sex feature of a kind belongs to that sex alone (a bovine man\'s horns, a wolf woman\'s further nipples). Every kind keeps working hands; nobody takes an animal\'s whole shape or changes with the moon; merfolk have legs on land. Clothes are not part of the Looks: each person dresses by their Dress line, in garments of your choosing that the body allows (a tail, hooves, wings or horns shape what can be worn), and nobody remarks on the fit; no two in one scene in the same main garment unless the setting gives a uniform; what comes off in a scene stays off until someone puts it back on.',
-    'Anatomical accuracy: anatomy and secondary sex traits are not inherently sexual. When a body is visible, touched or changing, describe its established features in neutral, precise terms (location, movement, texture, practical effect): a bovine woman\'s udder low on the belly with four teats, the bovine hand of two hooved fingers and a hooved thumb that grips, an established wolf woman\'s further pairs of small nipples down the belly below the breasts. Do not replace a named feature with generic warmth or euphemism. Genitals are only the parts the source gives a body (a man\'s penis and testicles; a woman\'s clitoris, labia and vagina), named when the action touches them: neutral outside sex, plain within it, in {first}\'s own words when the player used plain ones (cock, pussy, cum, fuck), never a euphemism; never infer anatomy or function from species, pronouns or appearance. Breasts differ from woman to woman as her sheet gives them (cup, nipple size, areola width, puffiness) and are described as given, never as stock small breasts; bovine women\'s are full and veined, with long thick nipples like teats. A body going from a man\'s to a woman\'s grows breasts by stages as the engine\'s steps give them (buds, the swell, the areola\'s mound, the grown shape), never all at once.',
+    'Anatomical accuracy: anatomy and secondary sex traits are not inherently sexual. When a body is visible, touched or changing, describe its established features in neutral, precise terms (location, movement, texture, practical effect): a bovine woman\'s udder low on the belly with four teats (in milk, it lets down when she is aroused), the bovine hand of two hooved fingers and a hooved thumb that grips, an established wolf woman\'s further pairs of small nipples down the belly below the breasts. Do not replace a named feature with generic warmth or euphemism. Genitals are only the parts the source gives a body (a man\'s penis and testicles; a woman\'s clitoris, labia and vagina), named when the action touches them: neutral outside sex, plain within it, in {first}\'s own words when the player used plain ones (cock, pussy, cum, fuck), never a euphemism; never infer anatomy or function from species, pronouns or appearance. Breasts differ from woman to woman as her sheet gives them (cup, nipple size, areola width, puffiness) and are described as given, never as stock small breasts; bovine women\'s are full and veined, with long thick nipples like teats. A body going from a man\'s to a woman\'s grows breasts by stages as the engine\'s steps give them (buds, the swell, the areola\'s mound, the grown shape), never all at once.',
     'Overlapping transformations: species paths can progress together on one body; they do not compete for a limited number of parts and one path never erases another. Keep every established feature unless a newly announced step changes that same structure; where paths affect the same structure, describe the latest established form there while preserving unrelated traits. Mixed traits are possible, but do not call {first} a chimera or invent a new structure; the player chooses any identity or label.',
     'Individuality: species customs, exposure methods, role descriptions, opening beats and recurring setting events are possibilities, not scripts for every person or scene. Let the generated person\'s temperament, want, attitude and actual history decide what they do; do not repeat a stock gesture, food or image as a required beat. A role or exposure method never dictates a person\'s personality, attraction or consent. The orientation mixer and the Dean\'s speech happen once, not again when their lore is mentioned.',
     'NPC agency: people have lives and may occasionally initiate a conversation, make an offer, or choose to join a public errand when their location, aim and relationship make it plausible. They do not wait passively for the player, but they also do not crowd, interrupt a focused or private scene, presume consent, or decide the player\'s response. Let disagreement and competing desires appear through character-specific behavior, with room for the player to accept, refuse or redirect.',
@@ -73,10 +73,18 @@ window.WINDLASS_WORLDS.sundered = {
       { key: 'hospital', label: 'A small town with one hospital', text: 'From a small town with one hospital and one bus out. Four days after what {first} saw, the letter came.' },
       { key: 'river', label: 'A river town', text: 'From a river town: a bridge, a lake upstream, not much else. Four days after what {first} saw, the letter came.' }
     ],
+    // Labels the backgrounds carried before the glimpse had its own field, each read as the town it named and the glimpse it told.
+    backgroundsBefore: {
+      'The night bus: a dryad beneath a hat': { background: 'bus', glimpse: 'bark' },
+      'The corner shop: the shopkeeper\'s ears': { background: 'shop', glimpse: 'green' },
+      'The hospital: bark at the wrists': { background: 'hospital', glimpse: 'bark' },
+      'The river: a girl with gills': { background: 'river', glimpse: 'lake' }
+    },
     // What {first} thinks {they} saw three weeks ago, one glimpse per kind, as {first} remembers it. The person seen is drawn from
-    // the cast (else a minor figure) of that kind and is a secret only the narrator and the Dean hold; 'unsure' seeds nobody.
+    // the people of that kind (the roommate among them when the roommate is of it; else a minor figure of the kind) and never from
+    // another kind; it is a secret only the narrator and the Dean hold; 'unsure' seeds nobody.
     // Typed text is kept as {first}'s words and matched to a kind by the kind's name (or names here), else by cues only one glimpse
-    // has; a part several kinds share (a tail, ears, wings) is no cue.
+    // has; a part several kinds share (a tail, ears, wings, whiskers, paws) is no cue.
     glimpses: [
       { key: 'tail', kind: 'cat', label: 'A tail under a coat on the night bus', text: 'A tail under someone\'s coat on the night bus. It moved, and then it was only a coat.' },
       { key: 'lake', kind: 'mer', label: 'Someone who walked into a lake and did not come up', text: 'Someone walked into the lake in their clothes and did not come up. Nobody else looked.', names: ['mermaid', 'merman', 'mermen'], cues: ['lake', 'gills'] },
@@ -85,6 +93,9 @@ window.WINDLASS_WORLDS.sundered = {
       { key: 'bark', kind: 'dryad', label: 'Bark at a stranger\'s wrists', text: 'Fine bark at a stranger\'s wrists, and leaves in the hair under the hat.', cues: ['bark', 'leaves'] },
       { key: 'green', kind: 'goblin', label: 'Green ears under a headscarf', text: 'Someone behind a shop counter, ears long and green, folded flat under a headscarf.', cues: ['green'] },
       { key: 'roof', kind: 'harpy', label: 'Someone who stepped off a roof and went up', text: 'Someone stepped off a roof at dusk and went up, not down.', cues: ['roof', 'feathers', 'flew'] },
+      { key: 'howl', kind: 'wolf', label: 'Someone who howled at the edge of the car park lights', text: 'Someone at the edge of the car park lights, ears tall and furred, who put back their head and howled.', names: ['werewolf', 'wolfman', 'wolf-man', 'lycanthrope'], cues: ['howl', 'howled', 'howling', 'full moon', 'pelt'] },
+      { key: 'hooves', kind: 'cow', label: 'Hooves under a long skirt on a station platform', text: 'Hooves, black and polished, under a long skirt on a station platform, and a click on the tiles with every step.', names: ['bovine', 'bull', 'minotaur'], cues: ['hoof', 'hooved', 'horns', 'udder'] },
+      { key: 'nose', kind: 'rabbit', label: 'A nose that never stopped moving', text: 'Someone at the next café table whose nose never stopped moving, and long ears pushed back under a hood.', names: ['bunny', 'hare'], cues: ['burrow', 'warren'] },
       { key: 'unsure', label: 'You are not sure any more', text: 'Something, three weeks ago. Not sure any more what.' }
     ],
     traits: { nerve: 'steady nerves', charm: 'easy charm', wits: 'quick wits', vigour: 'fit and tireless', empathy: 'a good listener' },
@@ -98,10 +109,10 @@ window.WINDLASS_WORLDS.sundered = {
   // cues are the words that reach the person by role in the action, the director note, the place or the people present
   // ("the nurse", "the infirmary"); the role's key and title reach them too.
   castRoles: [
-    { key: 'creamery', species: 'cow', year: 'second-year', course: 'dairy science', role: 'works the Creamery counter three afternoons a week and runs the cocoa stand at the mixer', tag: 'the Creamery counter and the mixer\'s cocoa stand', cues: ['creamery', 'cocoa'], hope: 'to feed {first} at the Creamery and, some day, a proper hug',
+    { key: 'creamery', species: 'cow', year: 'second-year', course: 'dairy science', role: 'works the Creamery counter three afternoons a week and runs the cocoa stand at the mixer', tag: 'the Creamery counter and the mixer\'s cocoa stand', cues: ['creamery', 'cocoa'], hope: 'a meal at the Creamery with {first} and, some day, a proper hug',
       where: { default: 'the Creamery', breakfast: 'the dining hall, a loud table near the door', lunch: 'the Creamery', class2: 'the Creamery counter', evening: 'the cocoa stand wherever the evening is', night: 'the rooms over the Creamery' },
       aims: { evening: 'press a cocoa on {first} at the mixer and a hug if allowed' }, attitude: [5, 7], knows: ['swim', 'human_society'] },
-    { key: 'moonrunners', species: ['wolf', 'wolf', 'rabbit', 'cow', 'human'], year: 'third-year', role: 'captain of the Moonrunners running club', tag: 'captain of the Moonrunners', cues: ['moonrunners', 'captain', 'running club', 'runners'], hope: 'to see whether {first} can keep a pace and, some day, invite {them} to run with the club',
+    { key: 'moonrunners', species: ['wolf', 'wolf', 'rabbit', 'cow', 'human'], year: 'third-year', role: 'captain of the Moonrunners running club', tag: 'captain of the Moonrunners', cues: ['moonrunners', 'captain', 'running club', 'runners'], hope: 'a test of {first}\'s pace and, some day, a place for {them} in the club',
       where: { default: 'the Moon Field or the gym', breakfast: 'the dining hall, early', evening: 'the Moon Field on Tuesdays; otherwise the dining hall or the gym', night: 'Fenwood, the upper-year hall by the Moon Field' },
       aims: { default: 'judge whether the human can keep up before wasting a run on them', evening: 'keep the Moonrunners from making fools of themselves over the new human' }, attitude: [3, 5], knows: ['runner_human', 'swim'] },
     { key: 'choir', species: ['harpy', 'harpy', 'wolf', 'goblin', 'dryad'], gender: 'female', year: 'second-year', course: 'music (voice)', role: 'sings in the Aerie choir and wants a duet partner', tag: 'sings in the Aerie choir; wants a duet partner', cues: ['choir', 'aerie', 'duet', 'singer'], hope: 'a duet and, some day, something more than singing',
@@ -110,26 +121,26 @@ window.WINDLASS_WORLDS.sundered = {
     { key: 'theatre', species: ['fairy', 'fox', 'cat', 'harpy', 'rabbit', 'wolf', 'cow'], year: 'first-year', course: 'Glamour', role: 'theatre society; wants a dance partner for the Friday ring', tag: 'theatre society; wants a partner for the Friday ring', cues: ['theatre', 'theater', 'fairy ring', 'dance partner'], hope: 'a dance in the ring and, some day, to be walked home from it',
       where: { default: 'the Greenhouse Quarter or the theatre', class2: 'the Glamour studio', evening: 'the fairy ring on Fridays; otherwise wherever the crowd is thickest', night: 'a bower in the Greenhouse Quarter' },
       aims: { evening: 'hopes to get the new human onto the dance floor, or at least laughing, before the evening ends' }, attitude: [5, 7], knows: ['choir', 'gardener'] },
-    { key: 'gamer', species: ['fox', 'goblin', 'cat', 'wolf', 'rabbit', 'mer'], year: 'second-year', course: 'illusion studies', role: 'plays every game for stakes and has a standing bet with friends about the new human', tag: 'plays every game for stakes; a standing bet about the new human', cues: ['gamer', 'arcade', 'gambler', 'wager', 'card game', 'dice'], hope: 'to win a game off {first} and, some day, to be owed something better than money',
+    { key: 'gamer', species: ['fox', 'goblin', 'cat', 'wolf', 'rabbit', 'mer'], year: 'second-year', course: 'illusion studies', role: 'plays every game for stakes and has a standing bet with friends about the new human', tag: 'plays every game for stakes; a standing bet about the new human', cues: ['gamer', 'arcade', 'gambler', 'wager', 'card game', 'dice'], hope: 'a game won off {first} and, some day, a debt better than money',
       where: { default: 'the library or a window table in the dining hall', class2: 'the Glamour studio', evening: 'the arcade on Mondays; otherwise wherever a game is being played', night: 'Fenwood, or someone else\'s room' },
       aims: { evening: 'find out what the human is bad at' }, attitude: [5, 7], knows: ['library', 'stall'] },
     { key: 'library', species: ['cat', 'fox', 'dryad', 'rabbit', 'wolf', 'goblin'], year: 'second-year', role: 'library assistant; keeps the quiet desk and naps on the south sun ledges', tag: 'library assistant; naps on the south sun ledges', cues: ['library', 'librarian', 'ledges'], hope: 'a warm lap and, some day, to be chosen over the sun',
       where: { default: 'the library, south ledges', evening: 'the library until it closes, then a windowsill', night: 'a windowsill somewhere warm' },
       aims: { default: 'be left alone in the sun, unless the human turns out to be warm', evening: 'skip the mixer' }, attitude: [4, 6], knows: ['gamer'] },
-    { key: 'swim', species: ['mer', 'mer', 'wolf', 'cow', 'fox'], year: 'second-year', course: 'biology', role: 'swim team; never far from water', tag: 'swim team; never far from water', cues: ['swim', 'swimming', 'swimmer', 'swim team', 'pool', 'pools', 'lakeshore'], hope: 'to get {first} into the water and, some day, under it',
+    { key: 'swim', species: ['mer', 'mer', 'wolf', 'cow', 'fox'], year: 'second-year', course: 'biology', role: 'swim team; never far from water', tag: 'swim team; never far from water', cues: ['swim', 'swimming', 'swimmer', 'swim team', 'pool', 'pools', 'lakeshore'], hope: 'a swim with {first} and, some day, a dive under the surface together',
       where: { default: 'the lakeshore pools', class1: 'the Anatomy theatre', evening: 'the lake on Thursdays; otherwise the shore', night: 'a pool room on the lakeshore, or Fenwood' },
       aims: { evening: 'find out whether the human can swim' }, attitude: [4, 6], knows: ['creamery', 'moonrunners'] },
     { key: 'gardener', species: 'dryad', year: 'third-year', course: 'botany', role: 'keeps a tree of their own at the edge of the Greenhouse Quarter and brews sap tea for people they like', tag: 'keeps a tree at the edge of the Greenhouse Quarter; brews sap tea', cues: ['gardener', 'greenhouse', 'greenhouses', 'sap tea'], hope: 'company under the tree at dusk and, some day, a night beneath it',
       where: { default: 'the Greenhouse Quarter, under the tree', class1: 'the botany glasshouses', evening: 'under the tree', night: 'in the tree' },
       aims: { default: 'offer tea and shade and see who stays', evening: 'watch the mixer from the edge of the quad' }, attitude: [4, 6], knows: ['theatre', 'historian'] },
-    { key: 'warren', species: 'rabbit', year: 'second-year', course: 'horticulture', role: 'keeps the warren allotments and sells greens and clover honey at the Monday market; runs the dawn race on the Moon Field on Thursdays', tag: 'the warren allotments; greens and honey at the Monday market; the Thursday dawn race', cues: ['warren', 'allotments', 'dawn race', 'clover honey'], hope: 'to get {first} out for a dawn race and, some day, into the warren pile',
+    { key: 'warren', species: 'rabbit', year: 'second-year', course: 'horticulture', role: 'keeps the warren allotments and sells greens and clover honey at the Monday market; runs the dawn race on the Moon Field on Thursdays', tag: 'the warren allotments; greens and honey at the Monday market; the Thursday dawn race', cues: ['warren', 'allotments', 'dawn race', 'clover honey'], hope: 'a dawn race with {first} and, some day, a place for {them} in the warren pile',
       where: { default: 'the warren allotments', breakfast: 'the dining hall, early, by the greens', free: 'the allotments', evening: 'the warren, or the market on Mondays', night: 'the warren' },
       aims: { evening: 'find {first} at the mixer with a jar of clover honey and an invitation to Thursday dawn' }, attitude: [5, 7], knows: ['gardener', 'moonrunners'] },
     { key: 'stall', species: ['goblin', 'goblin', 'fox', 'cat', 'rabbit'], year: 'third-year', course: 'engineering', role: 'runs the best stall in the Monday night market', tag: 'runs the best stall in the Monday night market', cues: ['night market', 'market stall', 'haggle'], hope: 'a bargain, then a friendship, and some day a charm on {first}\'s wrist',
       where: { default: 'the engineering workshop or the arcade', evening: 'the stall in the arcade on Mondays; otherwise the workshop', night: 'a bunk in the workshop under the engineering block' },
       aims: { evening: 'strike a small bargain with the new human at the mixer' }, attitude: [4, 6], knows: ['gamer', 'creamery'] },
     { key: 'runner_human', species: 'human', year: 'third-year', course: 'geography', role: 'human; chose the {v_path} path in first year and stopped at {v_stopped}; runs with the Moonrunners and has never used the Spa', tag: 'human; went the {v_path} way as far as {v_stopped}; runs with the Moonrunners', cues: ['geography'], looks: 'human, with {v_looks}, and no plan to go further',
-      variants: [{ path: 'wolf', stopped: 'ears, tail and night eyes', looks: 'wolf ears, a tail and eyes that shine in low light' }, { path: 'cat', stopped: 'ears, tail and slit pupils', looks: 'cat ears, a long tail and pupils that go to slits in the light' }, { path: 'fox', stopped: 'ears and one tail', looks: 'fox ears and one red tail, and a warmth that comes off them at arm\'s length' }, { path: 'harpy', stopped: 'down at the nape and a lighter step', looks: 'a fine grey down at the nape and collarbones, keen black eyes, a way of taking stairs two at a time' }],
+      variants: [{ path: 'wolf', stopped: 'ears, tail and night eyes', looks: 'wolf ears, a tail and eyes that shine in low light' }, { path: 'cat', stopped: 'ears, tail and slit pupils', looks: 'cat ears, a long tail and pupils that go to slits in the light' }, { path: 'fox', stopped: 'ears and one tail', looks: 'fox ears and one red tail, and a warmth that comes off them at arm\'s length' }, { path: 'harpy', stopped: 'a lighter step and down at the nape', looks: 'a fine grey down at the nape and collarbones, keen black eyes, a way of taking stairs two at a time' }],
       where: { default: 'the Moon Field or the geography block', evening: 'the dining hall with whoever ran that day', night: 'Fenwood' },
       aims: { default: 'mind their own business; answer honestly if asked' }, attitude: [4, 6], knows: ['moonrunners', 'human_society'] },
     { key: 'human_society', species: 'human', year: 'second-year', course: 'law', role: 'entirely human and intends to stay so; uses the Spa on principle after every accidental brush; runs the Human Society (eleven members, tea on Thursdays in the Kettle Hall common room); says the Society\'s view once and never nags', tag: 'entirely human; runs the Human Society (tea on Thursdays, Kettle Hall common room)', cues: ['human society', 'leaflet'],
@@ -156,7 +167,7 @@ window.WINDLASS_WORLDS.sundered = {
     { key: 'beastcraft_keeper', dress: 'staff', species: ['wolf', 'cat', 'human', 'cow'], title: 'Keeper', text: 'Beastcraft, elderly' },
     { key: 'cook', dress: 'trade', species: ['ogre', 'cow', 'goblin', 'dryad'], text: 'the dining hall cook, punctual and kind' },
     { key: 'porter', dress: 'trade', species: ['human', 'goblin', 'cat', 'wolf', 'ogre'], title: { male: 'Mr', female: 'Mrs', nonbinary: 'Mx' }, text: 'the Kettle Hall porter, who has seen everything' },
-    { key: 'choir_lead', species: 'harpy', gender: 'female', text: 'roost-sister of {npc_choir_first}, choir lead' },
+    { key: 'choir_lead', species: 'harpy', gender: 'female', text: 'choir lead, who runs the Wednesday rehearsals with {npc_choir_first}' },
     { key: 'arcade_landlord', dress: 'trade', species: 'goblin', text: 'the arcade landlord' },
     { key: 'ferryman', dress: 'trade', species: ['human', 'mer', 'ogre'], text: 'runs the cloud ferry, in at seven and at five' },
     { key: 'night_desk', species: ['cat', 'fox', 'human', 'rabbit'], text: 'library night desk' },
@@ -190,7 +201,7 @@ window.WINDLASS_WORLDS.sundered = {
     privates: ['is failing one course and has told nobody', 'has a sibling at the school who does not speak to {rm_them}', 'was sent here rather than chose it', 'is in love with someone in the choir', 'has never been to the human world', 'has been to the Spa once and will not say why', 'writes poetry and burns it', 'is afraid of the lake', 'has a job in town nobody knows about', 'is the first of {rm_their} family to study anything', 'left someone behind at home', 'has a rule about never crying in the room'],
     // How a person talks: a manner of speech, never an accent, written as a tendency and not a rule; one each, no two alike in a cast.
     speech: ['often short and blunt; seldom uses names', 'tends to long sentences and asides', 'often answers a question with a question', 'often uses people\'s names', 'tends to swear freely', 'tends to speak softly, so people lean in', 'often says less than {rm_they} mean{rm_s}', 'often finishes others\' sentences', 'tends to go quiet instead of arguing', 'often talks with {rm_their} hands', 'tends to correct other people\'s words', 'often thinks out loud', 'tends to speak slowly, each word chosen', 'often talks fast and trails off', 'often makes dry, deadpan jokes', 'tends to be formal, with few contractions', 'often asks question after question', 'tends to answer yes or no, unsoftened', 'sometimes laughs mid-sentence', 'often teases, and stops if it stings', 'often gives people nicknames', 'tends to apologise, then disagree', 'often says what {rm_they} want{rm_s}, plainly', 'often quotes people word for word'],
-    greetings: ['guarded and polite, warming by the end', 'frank and warm from the first word', 'teasing, testing how much you can take', 'shy, then a sudden rush of words', 'formal, then something cracks and a grin shows', 'businesslike, a list of house rules delivered kindly'],
+    greetings: ['guarded and polite, warming by the end', 'frank and warm from the first word', 'teasing, testing how much a person can take', 'shy, then a sudden rush of words', 'formal, then something cracks and a grin shows', 'businesslike, a list of house rules delivered kindly'],
     // What a woman's chest is, one line per woman, drawn once: cup, nipple, areola. Kinds that differ (bovine, harpy, fairy) keep a pool of their own.
     breasts: [
       'high breasts, a neat A cup, each fitting the hollow of a palm and quick to show the cold, with soft-edged areolae and pale nipples',
@@ -303,7 +314,7 @@ window.WINDLASS_WORLDS.sundered = {
           ways: ['greens', 'spring', 'watchfulness', 'warren', 'own_scent', 'year_round'],
           parts: ['hands', 'forearm_coat', 'leg_and_hip_coat', 'belly_fur', 'toes', 'hind_feet', 'spine_strip', 'bob_tail', 'ears', 'nose_and_lip', 'front_teeth', 'further_pairs'],
           unless: { belly_fur: 'belly fur' },
-          dress: { all: ['a tail needs an opening or a low waist', 'tall ears rule out hats and anything pulled over the head', 'a coated kind runs warm and dresses lightly'] } },
+          dress: { all: ['a tail needs an opening or a low waist', 'long furred feet rule out closed shoes', 'tall ears rule out hats and anything pulled over the head', 'a coated kind runs warm and dresses lightly'] } },
         harpy: { colour: 'Plumage', height: { female: [58, 65] },
           ways: ['voice_and_song', 'preening', 'appetite', 'heights_and_flock', 'own_scent', 'laying', 'brooding_and_moult'],
           sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear', 'a round rear'] } },
@@ -326,7 +337,8 @@ window.WINDLASS_WORLDS.sundered = {
           labels: { hands: 'Fingers and toes' },
           parts: ['hands', 'arm_bark', 'leg_and_hip_bark', 'feet_and_roots', 'spine_ridge', 'grain', 'leaves', 'ears', 'face', 'flowering', 'bark', 'catkins'],
           was: { 'Legs: over belly, ribs and back; all but the face and chest': 'Legs: bark from feet to hips and over belly, ribs and back; all but the face and chest' },
-          absent: { female: ['heavy shoulder bark', 'catkins'], male: ['flowers or fruit'], all: ['a tail'] } },
+          absent: { female: ['heavy shoulder bark', 'catkins'], male: ['flowers or fruit'], all: ['a tail'] },
+          dress: { all: ['the feet go bare'] } },
         goblin: { colour: 'Skin', colourTrack: 'green_skin', heightTrack: 'height',
           born: { height: { least: 'About four and a half feet' } },
           ways: ['stomach', 'collecting_and_the_deal', 'tinkering', 'heap', 'wiry_strength', 'voice', 'own_scent'],
@@ -335,7 +347,7 @@ window.WINDLASS_WORLDS.sundered = {
           build: { female: { hips: ['wide hips', 'broad hips', 'full hips'] }, male: { shoulders: ['wiry shoulders', 'narrow shoulders', 'bony shoulders'], chest: ['a lean chest', 'a narrow chest'], waist: ['a lean waist', 'a narrow waist'] } },
           parts: ['hands', 'feet', 'ears', 'nose_and_face', 'teeth', 'build'],
           absent: { female: ['tusks'], all: ['a tail'] },
-          dress: { all: ['goblins wear small sizes, cut for adults'] } },
+          dress: { all: ['goblins wear small sizes, cut for adults, and no shoes'] } },
         fairy: { colour: { male: 'Wing tint' }, colourSkip: 'clear', heightTrack: 'height',
           ways: ['lightness', 'sweet_tooth', 'warmth', 'promises', 'iron', 'voice', 'own_scent'],
           sexDraws: { woman: { rear: ['a small high rear', 'a narrow rear'] }, man: { beard: ['no beard'], bodyHair: ['smooth, with almost none'] } },
@@ -360,10 +372,10 @@ window.WINDLASS_WORLDS.sundered = {
         eyes: ['dark eyes, wide', 'eyes the brown of wet bark, long-lashed', 'soft hazel eyes, slow to blink', 'dark eyes with a faint blue cast'],
         hair: ['{colour} hair worn long and loose, parting of itself around the ears and falling to the shoulder blades', 'hair cropped as close as the hide and {colour} to match it, so that from behind the one runs straight into the other', 'a single thick plait, {colour}, down the middle of the back, heavy enough to knock against the spine when the head turns', 'hair {colour} as the hide, twisted up into a soft knot at the crown, a few strands loose at the nape', 'hair cut blunt at the jaw, {colour}, that falls forward when the head bends over a book and is pushed back with the back of the wrist'],
         breasts: ['full heavy breasts, a D cup and more, that sit high for their weight and are veined blue under the thin skin, with wide dark areolae; long thick nipples the length of a finger-joint', 'big soft breasts, an E cup, warm and veined and heavy enough to rest on the forearms when the arms fold, with broad areolae; the nipples long and thick as a thumb-end', 'heavy pale breasts, a DD, that shift when the shoulders turn and are veined blue at the slope; long dark nipples that stand out the length of a knuckle', 'round full breasts, a D cup, high and close-set, veined faintly blue toward wide areolae; the nipples long and dark, tilting a little upward'],
-        senses: ['smells of hay and a plain sweet soap, and of cut grass, which gets caught in the tuft of the tail', 'the coat at the forearm is short and dense under the hand and warm through, the ears soft as felt; the hooves click on stone and go silent on grass', 'breathes slow and deep, loud enough to hear in a quiet room; the ears move with a small leathery sound, and the tail-tuft whispers against the chair', 'a steady warm weight that does not shift when leaned on; a hug from {rm_them} comes slowly, holds, and is let go of last', 'a low unhurried voice that carries across a room without rising; when {rm_they} leans in, the breath smells of sweet grass', 'the jaw works sideways in a quiet moment, chewing cud; a sharp sudden noise is hard for {rm_them} to bear, and a hum of contentment comes through a shared seat'],
+        senses: ['smells of hay and a plain sweet soap, and of cut grass, which gets caught in the tuft of the tail', 'the coat at the forearm is short and dense under the hand and warm through, the ears soft as felt; the hooves click on stone and go silent on grass', 'breathes slow and deep, loud enough to hear in a quiet room; the ears move with a small leathery sound, and the tail-tuft whispers against the chair', 'a steady warm weight to lean on; a hug from {rm_them} comes slowly and holds', 'a low voice that carries across a room without rising', 'the jaw works sideways in a quiet moment, chewing cud; a sharp sudden noise is hard for {rm_them} to bear, and a hum of contentment comes through a shared seat'],
         room: ['The left-hand bed is made up with a heavy patched quilt folded back with the exactness of someone who has made a great many beds, and it smells, even from the door, of hay and some sweet plain soap. Two mugs stand on the sill.', 'The left-hand side of the room has been arranged for hooves: a rush mat by the bed for them, the chair replaced with a stool, a crate of apples under the window warm in the last of the sun.'],
         hello: ['hugs people hello, the way bovine mythkin do, and holds it a beat longer than a human would', 'leans a shoulder against people hello, the way the herd does, and apologises to humans afterwards', 'presses a cup of sweet tea on people before a word is said'],
-        hope: 'to feed {first} at the Creamery and, some day, a proper hug',
+        hope: 'a meal at the Creamery with {first} and, some day, a proper hug',
         where: { default: 'room 4B, Kettle Hall', breakfast: 'the dining hall', lunch: 'the Creamery', free: 'the Creamery or 4B', evening: 'wherever the evening is, near the food', night: 'room 4B, asleep by eleven' },
         aims: { evening: 'stay close to {first} at the mixer and introduce people {rm_they} likes', night: 'sleep; offer the warm side of the room if the heating fails' } },
       wolf: { genders: ['female', 'male'],
@@ -376,7 +388,7 @@ window.WINDLASS_WORLDS.sundered = {
         senses: ['smells of pine, wet dog and cold air, stronger after a run; the nose works before the eyes do', 'the fur on the forearms is soft as velvet one way and coarse the other; the fingertip pads are rough; the paws are quiet on the boards', 'breathes through the nose, audibly, and reads a room by it; a growl lives under the voice when {rm_they} is annoyed', 'moves quick and quiet and a little forward on the balls of the paws; sleeps curled, and wakes at every footstep', 'after the dusk run smells of crushed grass and lake water, the pelt damp at the nape and the breath coming hot; cold-nosed at any hour', 'the tail brushes a calf in passing and {rm_they} does not seem to know it has; a claw taps once on the table when {rm_they} is thinking', 'hot to the touch, a furnace under the pelt; goes still all at once when something moves, the head turning to track it'],
         room: ['The left-hand bed has been made into something closer to a nest than a bed, three blankets and a coat piled into a hollow, and the window is open to the lake wind. It smells of pine and wet dog.', 'The left-hand side is bare as a barracks: one blanket, a towel folded square, a map of the lake paths pinned up with the Tuesday route inked in red. The window is wedged open with a book.'],
         hello: ['sniffs people hello, frankly, and does not pretend otherwise', 'bumps shoulders hello, hard, the way the pack does, and checks that a human is still standing', 'says hello with a nod and a long look, and decides about people before the second sentence'],
-        hope: 'to get {first} out on the dusk run and, some day, into the pile',
+        hope: 'a dusk run with {first} and, some day, a place for {them} in the pile',
         where: { default: 'room 4B or the Moon Field', breakfast: 'the dining hall, early', lunch: 'the dining hall', free: 'the Moon Field', evening: 'the dusk run on Tuesdays; otherwise wherever the Moonrunners have ended up', night: 'room 4B, window open' },
         aims: { evening: 'keep the Moonrunners from crowding {first} at the mixer' } },
       harpy: { genders: ['female'],
@@ -386,7 +398,7 @@ window.WINDLASS_WORLDS.sundered = {
         eyes: ['bright black eyes', 'gold eyes like a kite\'s', 'pale grey eyes, seldom blinking', 'amber eyes like a hawk\'s'],
         hair: ['black hair cut close at the nape and left long enough on top to fall forward', 'long brown hair worn loose and pushed back behind the ear tufts', 'fair hair cut blunt at the jaw, light enough to lift in a draught', 'red-brown hair in a single plait down the back, kept clear of the wings', 'dark hair cropped short, the crest standing up through it'],
         breasts: ['breasts that sit close to the breastbone, an A cup, with dark nipples and areolae scarcely wider than them', 'high breasts, a B cup, round as cupped palms, the nipples small and pale and the areolae no wider than a coin', 'small breasts, an A cup, with puffy areolae that rise in soft mounds and nipples that stand in the cold off the Aerie ledges; flushed after a climb', 'small breasts set wide and a little upward, a neat B cup, with rose-brown nipples and areolae that darken a shade in the cold; they lift when the wings open', 'shallow breasts, an A cup, with nipples long for the size of them and areolae small and dark'],
-        senses: ['smells of warm feathers, dust and something dry and clean like a heated stone; cool to the touch on the hands, warm under the wing', 'the flight feathers are stiff and smooth and rasp when she folds them; the down at the nape is soft as a chick\'s; the claws on hand and foot are horn, cold and ridged, and scrape when she shifts her grip on a rail', 'a rustle when she moves, like a page turned; the feathers at her nape lift with a small dry sound, and her hum sits lower than expected from so small a frame', 'she weighs less than she looks, and the stair that creaks under anyone else is silent under her; she sleeps standing, head tucked under a wing', 'if she shakes a hand hers weighs almost nothing, the fingers curled so the claws stay clear of the skin by habit; when she sings in a small room the low notes are felt in the breastbone before they are heard', 'sings at first light before she is properly awake, a dawn song that will not be skipped, and calls back and forth to her own all day; she eats little and often, seeds, fruit and fish, and burns it fast', 'preens every day, drawing each feather through her fingers or lips and oiling it from the gland at the tail\'s root, and preens those she loves; once a year she moults, grounded, itching and vain about it, and glad of help with the pin feathers', 'roosts high with her feet locked and is uneasy in a low closed room; when autumn turns, something pulls at her to go somewhere'],
+        senses: ['smells of warm feathers, dust and something dry and clean like a heated stone; cool to the touch on the hands, warm under the wing', 'the flight feathers are stiff and smooth and rasp when she folds them; the down at the nape is soft as a chick\'s; the claws on hand and foot are horn, cold and ridged, and scrape when she shifts her grip on a rail', 'a rustle when she moves, like a page turned; the feathers at her nape lift with a small dry sound, and her hum sits lower than expected from so small a frame', 'she weighs less than she looks, and the stair that creaks under anyone else is silent under her; she sleeps standing, head tucked under a wing', 'if she shakes a hand hers weighs almost nothing, the fingers curled so the claws stay clear of the skin by habit; when she sings in a small room the glasses on the shelf ring', 'sings at first light before she is properly awake, a dawn song that will not be skipped, and calls back and forth to her own all day; she eats little and often, seeds, fruit and fish, and burns it fast', 'preens every day, drawing each feather through her fingers or lips and oiling it from the gland at the tail\'s root, and preens those she loves; once a year she moults, grounded, itching and vain about it, and glad of help with the pin feathers', 'roosts high with her feet locked and is uneasy in a low closed room; when autumn turns, something pulls at her to go somewhere'],
         room: ['There is no left-hand bed. Where it should be there is a perch, a thick oak bar bolted across the window frame at shoulder height with a rope ladder hanging from it, and the floor beneath is drifted with small feathers.', 'The left-hand bed has been stripped to the frame and a roost built over it, a branch as thick as your arm lashed between the wall and the wardrobe, a blanket folded on the sill beneath. Feathers have got into everything, including your pillowcase.'],
         hello: ['preens people she likes without much warning; it is how harpies say hello, and she has learned to ask humans first', 'greets people with a note, sung, that is their name in the Aerie\'s way, and laughs at the human face it gets', 'tilts her head at people, bird-fashion, and says nothing until they have said something worth answering'],
         hope: 'a hum along and, some day, an accepted feather',
@@ -400,7 +412,7 @@ window.WINDLASS_WORLDS.sundered = {
         hair: ['black hair cropped close, so the long ears stand clear of it and the light shows through their thin edges', 'a wiry black crest of hair running back between the ears, braided through with copper wire that winks in lamplight', 'dark brown hair shaved to the skin at the sides, where the green shows through, and left long on top, pulled back and tied with a strip of leather', 'grey-black hair in a dozen thin braids, each ending in a brass bead that taps the next when the head turns', 'black hair worn in a loose knot at the nape, with a pencil and two fine screwdrivers pushed through it'],
         senses: ['smells of a workshop, oil, hot metal and earth, with green tea and pickle vinegar under it; the hands are cool and dry and quick, gone to a pocket and back before anyone has seen them move', 'the skin is smooth to the touch and takes a long time to warm under a hand; the ears are thin and warm and make a small papery sound when they turn', 'the long fingers go on working at nothing while {rm_they} talks, and drum on the table or the rim of a cup; the small teeth click together when {rm_they} is thinking', 'moves low and fast, and is across the room before anyone has turned; eats nearly anything standing up, the stronger the better; squints in full sun and is wide-eyed and easy in a dim room; sleeps best in a warm heap of {rm_their} own people, and finds an empty room lonely', 'wiry and compact leaning on someone, the weight low and sure, with a climber\'s grip; the bare feet are silent on stone, the hooked toes finding the edge of a step before the eyes do', 'a quick rough voice that carries across a room, and a cackle of real delight; pockets that clink with small bright things, each one known and priced'],
         room: ['The left-hand side of the room is a workshop. The bed has been raised on blocks to fit a bench under it, there is a lamp clamped to the headboard, and the radiator has been taken apart and put back together with two more parts than it had.', 'The left-hand bed is buried under crates, each labelled in a tiny neat hand, and a set of brass scales sits on the windowsill where a plant would go. Something under the bed is ticking.'],
-        hello: ['greets people with a bargain: a small favour done before you asked, and a price named later, mostly in jest', 'shakes hands and keeps the hand a moment, reading the calluses, and tells people what they do for a living', 'offers people a pickle from a jar in {rm_their} pocket, and remembers who refused'],
+        hello: ['greets people with a bargain: a small favour done before it is asked, and a price named later, mostly in jest', 'shakes hands and keeps the hand a moment, reading the calluses, and tells people what they do for a living', 'offers people a pickle from a jar in {rm_their} pocket, and remembers who refused'],
         hope: 'a fair trade, a friend, and some day a goblin-made charm on {first}\'s wrist',
         where: { default: 'room 4B or the engineering workshop', evening: 'the arcade on Mondays; otherwise the workshop', night: 'room 4B, soldering' },
         aims: { evening: 'get a small charm onto {first}\'s wrist before the fairies get glitter on {them}' } },
@@ -427,7 +439,7 @@ window.WINDLASS_WORLDS.sundered = {
         senses: ['smells of fox musk, strong for {rm_their} size, with a sweetness like violets in it; keen noses know it at once', 'the fur at the ears and the tail is dense enough to lose a finger in and springs back the moment the hand lifts; the pads of the feet are rough and dry as a shoe sole; the breath is warm at the ear when {rm_they} leans in to say something', 'a step so light it makes no sound, and a sudden change of direction in the middle of a stride; a laugh that starts high and ends in a grin of small sharp teeth', 'curls up on any flat surface with a tail over the nose and is asleep by the second breath', 'a yip gets out at a surprise, and a quick chatter when {rm_they} is excited; the ears turn to a small sound across the room before anyone else has heard it', 'eats a little and often, and puts things by in hiding places for later, a biscuit, a button, a coin, and forgets half of them', 'says less than {rm_they} knows and enjoys it: a coin palmed, a voice thrown across a room, a straight answer that takes some getting, and a strict private sense of what is fair', 'a tail brushes past at the hip, by accident, twice; the fur of it is cool at the tip and warm nearer the body'],
         room: ['The room is warm, which Kettle Hall is not supposed to be, and the left-hand bed is untouched except for a deck of cards and a saucer of something fried. Your own bed has clearly been slept on.', 'The left-hand side is a fox\'s den in all but name: cushions heaped into a hollow, a brass hand-warmer glowing on the sill, a shelf of board games with the boxes taped and retaped.'],
         hello: ['greets people with a game for stakes, and takes winnings in odd currency, and says so', 'greets people with a question {rm_they} already knows the answer to, to see what they do', 'touches a warm hand to people\'s wrists hello, and notes how cold humans run'],
-        hope: 'to win a game off {first} and, some day, a shared warm bed on a cold night',
+        hope: 'a game won off {first} and, some day, a shared warm bed on a cold night',
         where: { default: 'room 4B or the library', class2: 'the Glamour studio', evening: 'the arcade on Mondays; otherwise wherever a game is on', night: 'room 4B, curled on whichever bed is warmer' },
         aims: { evening: 'find out what {first} is bad at, and be charming about it' } },
       cat: { genders: ['female', 'male'],
@@ -441,7 +453,7 @@ window.WINDLASS_WORLDS.sundered = {
         room: ['The left-hand bed has not been slept in; the windowsill has. There is a folded blanket on it, worn into a hollow, and the window is angled to catch the last of the sun.', 'The left-hand side is spare and exact: a bed made tight, a shelf of library books in call-number order, a cushion on the radiator cover where the warmth is.'],
         hello: ['grooms people {rm_they} likes without asking and is surprised when they mind', 'greets people by sitting on whatever they were about to use', 'blinks slowly at people hello and waits for them to work out what it means'],
         hope: 'a warm lap and, some day, to be chosen over the sun',
-        where: { default: 'room 4B windowsill or the library ledges', evening: 'the library until it closes; skips the mixer', night: 'the windowsill in 4B, or your bed if it is warmer' },
+        where: { default: 'room 4B windowsill or the library ledges', evening: 'the library until it closes; skips the mixer', night: 'the windowsill in 4B, or {first}\'s bed if it is warmer' },
         aims: { evening: 'skip the mixer, and be faintly disappointed if {first} goes' } },
       mer: { genders: ['female', 'male'],
         nameStyle: 'in the merfolk fashion: first names of water, tide and shell; Cornish, Breton or Portuguese surnames',
@@ -452,7 +464,7 @@ window.WINDLASS_WORLDS.sundered = {
         senses: ['smells of cold water, salt and stone; the skin is cool as the lake and faintly damp, the scales smooth stroked one way and catching the fingertips the other', 'a shoulder cold against another when {rm_they} leans in to say something; the webbing between the fingers thin and cool against a palm; the hair wet wherever it ends, and cold where it touches', 'a voice that carries, and under water seems to arrive from everywhere at once; a drip on the floor wherever {rm_they} stands', 'moves a little stiffly on land for the first minute out of the water, and then like anyone; sleeps in the tank-bed with the face under', 'a hand that is cold, then cool, and warms to another only after a long while; the bench wet where {rm_they} sat, and the air there a degree colder', 'soaks every day and sleeps best afloat; a missed day brings cracked skin and a cracked temper, and wet, {rm_they} {rm_are} quick, strong and at ease', 'eats from the sea, mostly raw, and salts everything else; near the spring tides the scales run brighter and the singing comes more often, and it passes with the tide'],
         room: ['The left-hand bed is not a bed. It is a long shallow basin of dark water with a lip of tile, and the floor around it is damp, and the whole room smells faintly of salt. Someone has put a towel on your bed with a note: sorry about the floor.', 'The left-hand side has been tiled, badly, by a student, and a deep trough of lake water fills it edge to edge; a stone jug of spring water sweats on the sill and there is sand in the corners of the room.'],
         hello: ['greets people with a cup of salt spring water and a straight question', 'greets people with a wet hand on the back of the neck, which is friendly where {rm_they} comes from', 'says hello with a song-note that carries, and then an ordinary sentence'],
-        hope: 'to get {first} into the lake and, some day, under it',
+        hope: 'a swim with {first} in the lake and, some day, a dive under it together',
         where: { default: 'room 4B or the lakeshore', class1: 'the Anatomy theatre', evening: 'the lake on Thursdays; otherwise the shore', night: 'the tank-bed in 4B' },
         aims: { evening: 'find out whether {first} can swim, and say so in front of the Moonrunners' } },
       dryad: { genders: ['female', 'male'],
@@ -461,9 +473,9 @@ window.WINDLASS_WORLDS.sundered = {
         colours: ['silver birch', 'dark oak', 'red rowan', 'pale ash', 'willow-green', 'copper beech'],
         eyes: ['eyes the green of a pond', 'moss-green eyes', 'eyes the brown of autumn beech, grained', 'eyes the pale green of new leaves'],
         hair: ['long hair the colour of {colour} bark, worn down the back', 'short hair, cut close, the colour of {rm_their} own wood', 'hair worn loose, {colour}, to the waist', '{colour} hair cut to the jaw and pushed back off the brow', '{colour} hair plaited back in one thick plait'],
-        senses: ['smells of sap, leaf mould and rain, and of blossom in season; warm to lean against, as a branch is in sun', 'the bark of the forearms is rough and grained under the hand and warmer than skin; the leaves in the hair are cool, and real, and stir when breathed on; the hands are dry and gentle and slow to let go', 'a voice like something settling in an old house, low and unhurried; a creak from somewhere in {rm_them} when {rm_they} {rm_do} turn quickly, which is seldom', 'stands so still {rm_they} {rm_are} taken for part of the room until {rm_they} {rm_are} not; sleeps upright beside the sapling with {rm_their} feet in its soil, and the soil is warm in the morning', 'the leaves in the hair turn toward the window, droop when {rm_they} {rm_are} thirsty and rustle with feeling; barefoot, {rm_they} set{rm_s} each foot down whole, the toes spreading on the boards, and {rm_are} in no hurry about it', 'eats little and drinks water by the jug; on a grey day indoors the leaves in the hair hang limp, and an hour of sun or rain lifts them again', 'in autumn the leaves in the hair turn colour and fall, a few always on the desk; quick and bright in spring, slow and drowsy through winter, with little appetite'],
+        senses: ['smells of sap, leaf mould and rain, and of blossom in season; warm to lean against, as a branch is in sun', 'the bark of the forearms is rough and grained under the hand and warmer than skin; the leaves in the hair are cool, and real, and stir when breathed on; the hands are dry and gentle and slow to let go', 'a voice like something settling in an old house, low and slow; a creak from somewhere in {rm_them} when {rm_they} {rm_do} turn quickly, which is seldom', 'stands so still {rm_they} {rm_are} taken for part of the room until {rm_they} {rm_are} not; sleeps upright beside the sapling with {rm_their} feet in its soil, and the soil is warm in the morning', 'the leaves in the hair turn toward the window, droop when {rm_they} {rm_are} thirsty and rustle with feeling; barefoot, {rm_they} set{rm_s} each foot down whole, the toes spreading on the boards, and {rm_are} in no hurry about it', 'eats little and drinks water by the jug; on a grey day indoors the leaves in the hair hang limp, and an hour of sun or rain lifts them again', 'in autumn the leaves in the hair turn colour and fall, a few always on the desk; quick and bright in spring, slow and drowsy through winter, with little appetite'],
         room: ['Half the room is a tree. A sapling stands in a pot the size of a bath on the left-hand side, its top brushing the ceiling, and the floor around it is soil and moss and the smell of a wood after rain. There is a bed under there somewhere.', 'The left-hand side is a garden: window boxes on every ledge, a climbing thing gone up the wardrobe and along the picture rail, a bed with roots for legs, and light that seems greener on that side of the room.'],
-        hello: ['greets people with tea from the sapling\'s sap, sweet, and does not mind if it is refused', 'greets people by putting a leaf in their hand, which is a dryad\'s way of saying they will remember you', 'says hello some seconds after being greeted, having thought about it'],
+        hello: ['greets people with tea from the sapling\'s sap, sweet, and does not mind if it is refused', 'greets people by putting a leaf in their hand, which is a dryad\'s way of saying the person will be remembered', 'says hello some seconds after being greeted, having thought about it'],
         hope: 'an hour of sitting still together now and then and, some day, a night under {rm_their} tree',
         where: { default: 'room 4B beside the sapling, or the Greenhouse Quarter', class1: 'the botany glasshouses', evening: 'the dryad trees in the Greenhouse Quarter on Fridays; otherwise 4B beside the sapling', night: 'room 4B, upright beside the pot' },
         aims: { evening: 'go to the mixer only if {first} goes, and stand at the edge' } }
@@ -478,7 +490,7 @@ window.WINDLASS_WORLDS.sundered = {
         senses: ['smells of hay, cut grass and clover honey; warm and quick to the touch, with a heart that can be felt going', 'the ears twitch away from a hand; the fur of the forearms is dense and soft as a mole\'s; the long hind feet are furred to the sole, and she crosses a wooden floor without a sound', 'the nose moves all the time, even while she talks; a thump of one hind foot on the boards when something startles her', 'sits so still she is forgotten, then is not in the chair; sleeps in the warren pile with whoever is nearest, and is up before the light', 'when she leans on someone it is her whole weight, and it is not much; when she is let close enough to touch noses, the whiskers reach a cheek a moment before the nose does, and the nose is cool', 'the tail is a handful of fur that flicks when she is spoken to from behind; her voice goes quiet rather than loud when she is startled, and comes back when the room does', 'grazes on greens from a pocket all day; when something delights her, a twisting jump of joy gets out before she can hold it in'],
         room: ['The left-hand bed is a burrow of blankets with only an ear showing, and there is a bowl of greens on the sill and a jar of honey with a spoon in it. The window is open an inch and the floor is swept twice a day.', 'The left-hand bed has been pushed into the corner and built up with cushions into a hollow, and the space under it is where the clothes live. A row of seedlings in yoghurt pots along the sill; a smell of hay.'],
         hello: ['touches noses hello, which is how rabbits do it, and has learned to ask humans first', 'grooms a stray hair off people\'s shoulders before she has said her name', 'offers people something green from her pocket, as rabbits do, and eats it herself if they refuse'],
-        hope: 'to get {first} out for the dawn race and, some day, into the warren pile',
+        hope: 'a dawn race with {first} and, some day, a place for {them} in the warren pile',
         where: { default: 'room 4B or the warren allotments', breakfast: 'the dining hall, early, by the greens', free: 'the allotments', evening: 'the warren', night: 'room 4B, under the blankets' },
         aims: { evening: 'walk {first} to the mixer and keep {them} between her and the crowd' } },
       human: { genders: ['female', 'male', 'nonbinary'],
@@ -489,7 +501,7 @@ window.WINDLASS_WORLDS.sundered = {
         hair: ['{colour} hair worn long and loose, pushed back behind one ear to listen', '{colour} hair cut short and close, shaved to velvet at the nape', '{colour} hair tied back with whatever was to hand, as often a pencil as a band', 'a {colour} crop growing out unevenly, longest at the front, where it falls across the brow', '{colour} hair in a plait over one shoulder, thick as a wrist', '{colour} hair in a short bob, a few strands always escaping at the temple', '{colour} hair wound up in a clip and coming down by the hour', '{colour} hair in a low bun, the kind done without a mirror'],
         body: ['entirely human: a face that has been awake since before it was light, colour that comes and goes in the cheeks, and a slow way of looking round a room, as if reading it', 'human, with a face that has decided things, the cheekbones roughened by a season outdoors, and square plain hands with ink on the middle finger', 'human, and a runner, which shows in the long calves and in a flat quick walk that gets {rm_them} to a door first; the arms swing loose, and {rm_they} stand{rm_s} with the weight already on the front foot', 'human, with a soft full face and the weight on one hip, whatever {rm_they} is carrying held in both hands, and a look that settles on whoever is talking and stays there'],
         senses: ['smells of soap and coffee and the ferry\'s salt and wet rope, and under that only warm skin, a scent that is gone a step away', 'a handshake, dry and brief, the palm cool and the fingertips a little rough; a habit of standing in doorways, leaning on the frame', 'a flat soft footfall with nothing hard in it, that takes the stairs two at a time', 'pencil shavings and peppermint; a laugh that comes out through the nose first', 'a voice pitched for indoor rooms, that stops at the edge of the table; the creak of a bag strap at every turn', 'a touch, if it comes, is light and taken back after a moment; a pen cap clicked open and shut while {rm_they} think{rm_s}'],
-        room: [], hello: ['shakes hands, which on the Isle is a human habit people find quaint', 'nods hello and waits to be told what the custom is here', 'says hello with a question about where you are from'], hope: '', where: {}, aims: {} },
+        room: [], hello: ['shakes hands, which on the Isle is a human habit people find quaint', 'nods hello and waits to be told what the custom is here', 'says hello with a question about where people are from'], hope: '', where: {}, aims: {} },
       chimera: { genders: ['female'],
         nameStyle: 'an old, stately name from anywhere in the world',
         first: { female: ['Ottoline', 'Seraphine', 'Imogen', 'Calanthe', 'Vespera', 'Honoria'] }, last: ['Marrow', 'Ashcombe', 'Delacroix', 'Sallow', 'Wyverne', 'Thorne'],
@@ -585,232 +597,615 @@ window.WINDLASS_WORLDS.sundered = {
     // feels about it, and a shared entry names no shape a kind's own lines do not give it.
     felt: {
       _: {
-        on: ['an ache, an itch or a tight pulling in one place, there and gone', 'a tingling and a faint heat in one place'],
-        mid: ['the same place hotter, tighter or itching, sore to press', 'a pulling ache that eases in the cool and comes back with use'],
-        end: ['the ache gone out and a new sensitivity in its place, every touch registering'],
-        touch: ['a touch there lands harder than it should, sharp and warm together']
+        on: ['an ache, an itch or a tight pull in one place, there and gone', 'a tingling and faint heat in one place'],
+        mid: ['the same place hotter or itching, sore to press', 'a pulling ache that eases in the cool and returns with use'],
+        end: ['the ache gone, a new sensitivity in its place'],
+        touch: ['a touch there landing sharp and warm together']
       },
       _ways: {
-        on: ['a small shift in how the body sits, breathes or reacts, noticed before it is understood', 'a flicker in the chest or the stomach that comes without a cause'],
-        mid: ['the shift coming again and staying a little longer, felt in the shoulders, the breath or the gut', 'a warmth or restlessness in the body that eases with food, rest or company'],
-        end: ['the shift settled into the body as a habit it no longer notices, until it is crossed']
+        on: ['a small shift in how the body sits or breathes, noticed before it is understood', 'a flicker in the chest or stomach without a cause'],
+        mid: ['the shift returning and staying longer, in the shoulders, breath or gut', 'a restlessness that eases with food, rest or company'],
+        end: ['the shift settled into habit, unnoticed until crossed']
       },
       forearm_coat: {
-        on: ['an itch and prickle under the skin of the wrists, like hairs pushing up from the root', 'a prickling along the wrists that scratching only stirs'],
-        mid: ['warmth under the skin as the roots set, an itch that comes in waves', 'the hairs lifting and settling in a breath of air, all one way, the skin under them hot'],
+        on: ['a hot itch at the wrist bones that wakes the body at night', 'a prickling along the wrists that scratching only stirs'],
+        mid: ['a dull soreness at the roots when a sleeve is shoved up', 'the hairs lifting and settling in a breath of air'],
         end: ['warm to the bone, the skin answering a stroke before the coat does'],
-        touch: ['with the lie a stroke runs warm up the arm; against it, a sharp prickle']
+        touch: ['a palm held still on it, its heat soaking slow to the bone']
       },
       forearm_pelt: 'forearm_coat',
       leg_and_hip_coat: {
-        on: ['an itch along the shins and ankles that spreads when scratched', 'a prickling at the ankles like a foot waking, but travelling up'],
-        mid: ['heat under the skin as the undercoat comes in, an itch that scratching only stirs', 'every hair felt at its root where cloth drags against the lie'],
-        end: ['warm and dense, the whole leg answering one stroke along the lie'],
-        touch: ['with the lie a hand runs up through the whole leg; against it, a shiver that tightens the thigh']
+        on: ['a crawling tickle behind the knees, as if an insect walked there', 'a prickling at the ankles like a foot waking, but travelling up'],
+        mid: ['the shins too hot under a blanket, cool air on them a relief', 'a dense warmth at the knees, sweating under wool'],
+        end: ['the legs warm in any weather and quick to sweat'],
+        touch: ['a hand resting on the thigh, its heat sinking slow into the muscle']
       },
       leg_and_hip_pelt: 'leg_and_hip_coat',
       spine_strip: {
-        on: ['a line of prickling gooseflesh at the base of the backbone', 'an itch low on the back, just out of reach'],
-        mid: ['the strip warm and itching as the coat climbs, a shiver following any hand', 'the skin of the back tingling ahead of the hair'],
-        end: ['a hand run along it felt down the whole back, a long loosening shiver'],
-        touch: ['with the lie a stroke runs warm down the back; against it, a shudder']
+        on: ['a line of prickling gooseflesh low on the back, there and gone', 'an itch low on the back, just out of reach'],
+        mid: ['a hot itch between the shoulder blades, worst against a chair', 'the skin of the back tingling ahead of the hair'],
+        end: ['warm to lie on, a long loosening shiver when ruffled the wrong way'],
+        touch: ['against the lie a shudder; with it, a slow warmth that settles the breath']
       },
       spine_line: 'spine_strip',
       'cow.tail': {
-        on: ['a bruised ache at the base of the spine, sharp when it is sat on'],
-        mid: ['a pulling at the tailbone as the length slides out, hot and tender', 'a flick from nowhere, the muscle moving before the thought'],
-        end: ['the root very sensitive, a touch there running up the spine and down the legs'],
-        touch: ['a hand near the root sends a jolt up the spine, sharp and warm together']
+        on: ['a sharp flare at the tailbone when sat on, and a twitch with nothing to move'],
+        mid: ['a hot, tender pull at the tailbone as the length slides out', 'a flick from nowhere, the muscle moving before the thought'],
+        end: ['the tuft swinging at each step, the lower back loose with it'],
+        touch: ['a hand near the root a jolt up the spine, sharp and warm']
       },
       'cow.ears': {
-        on: ['the ears running hot and heavy, as after a long cold wind', 'a tingling along the ear rims, sounds arriving lower and from further off'],
-        mid: ['a pulling stretch along the ear as it lengthens, tender when brushed', 'the ears twitching toward a sound before the head turns'],
-        end: ['soft, mobile ears, a stroke at their base running down the neck as a heavy ease'],
-        touch: ['a stroke at the base of an ear loosens the neck and shoulders; a flick at the rim stings']
+        on: ['a tickle deep in each ear and a stiffness at the hinge of the jaw', 'a tingling at the ear rims, a pressure as before a storm'],
+        mid: ['a stretching pull along the ear, tender when brushed', 'a tug at the scalp when the head shakes'],
+        end: ['the ears warm and quick, aching after a loud room'],
+        touch: ['fingers at the root loosening the neck and shoulders; a tug at the rim a sting']
       },
       'cow.nose_and_face': {
-        on: ['the nose cool and damp, wet again a moment after it is wiped'],
-        mid: ['the nostrils flaring wider on a breath', 'a tight, stretching ache across the nose and jaw as they come forward'],
-        end: ['a face a little forward, fuller at the lips, the nose cool and soft'],
-        touch: ['a thumb along the nose is cool and damp, and the whole face loosens under it']
+        on: ['a tickle deep in the nose, and the upper lip wet'],
+        mid: ['a stretching ache across the face, the teeth sore at the roots', 'a cool rush of air deep into the nose on each breath'],
+        end: ['the lips soft and quick to feel a breath, the nose tip cool'],
+        touch: ['a thumb along the nose, the whole face loosening under it']
       },
       'cow.own_scent': {
-        on: ['sweat gone mild and sweet, noticed at the collar and the wrists'],
-        mid: ['a warm smell rising off the skin when the body warms', 'the smell clinging to cloth after the body has gone'],
-        end: ['the smell settled into the skin and into cloth']
+        on: ['a new smell on the hands, faint and close'],
+        mid: ['the smell rising off the skin as the body heats', 'the smell clinging to cloth after the body has gone'],
+        end: ['the smell settled into the skin and into the pillow']
       },
       'cow.feet_and_stance': {
-        on: ['an ache in the arches that tightens and tips the weight onto the toes'],
-        mid: ['the heel lifting and refusing to come down, the calves hard and burning', 'a stretch at the back of the leg like a cramp that will not release'],
-        end: ['weight carried high and sure, the calves quiet, a deep ease in the long foot'],
-        touch: ['a hand on the calf finds it hard as rope, and a long loosening heat answers']
+        on: ['a cramp in the soles at night, shoes pinching at the heel'],
+        mid: ['a burning knot in each calf by evening, eased by a hand or warm water', 'a stretch at the back of the leg like a cramp that will not release'],
+        end: ['the calves quiet, a deep ease after a day on the feet'],
+        touch: ['a hand on the calf, hard as rope, drawing a long loosening heat']
       },
       'cow.hands': {
-        on: ['a dull pressure under every nail, as if each were pushed up from beneath', 'an ache in the fingertips, the kind a long carry leaves'],
-        mid: ['a tight pull in the skin between the fingers, a sting if they are forced apart', 'hot, stiff knuckles and a hard soreness at the fingertips'],
-        end: ['the ache gone and a blunt, sure grip in its place, the skin behind each hoof soft and very sensitive'],
-        touch: ['a touch behind a hoof runs through the whole hand, sharp and warm together']
+        on: ['a dull pressure under every nail, as if pushed up from beneath', 'an ache in the fingertips, the kind a long carry leaves'],
+        mid: ['a sharp sting when the hand is forced open wide', 'a deep heat in the joints that cold eases'],
+        end: ['a blunt, sure grip, a tap on a hoof tip felt as a dull ring'],
+        touch: ['a fingertip there sending a shiver to the elbow, sharp and warm']
       },
       'cow.toes_and_hooves': {
-        on: ['a pressure under the toenails and a snug, crowded feeling in the shoes', 'a dull ache at the toe ends, as if a door had been shut on them'],
-        mid: ['the middle toes drawing together, a deep toothache in the joints', 'a hot throb at the toe ends that eases in the cool and returns with weight'],
-        end: ['the throbbing settled to a hard, quiet bearing of weight, the soft bulb behind each hoof tender to the floor'],
-        touch: ['pressure on the bulb behind a hoof runs high into the calf, sore and warm at once']
+        on: ['pressure under the toenails, the shoes snug and crowded', 'a dull ache at the toe ends, as if shut in a door'],
+        mid: ['a deep toothache in the joints of the foot, worse in the cold', 'a hot throb at the toe ends, eased by cool stone'],
+        end: ['the throbbing gone, a cold floor felt only faintly'],
+        touch: ['a tap on the horn rings dully up the bone to the knee']
       },
       'cow.eyes': {
-        on: ['the lashes heavy, tangling and brushing the cheek on each blink', 'a faint drag on the lids when they close, as if something were threaded through the lashes'],
-        mid: ['a drawing ache behind the eyes as they enlarge', 'the sight sliding wide at the rims'],
-        end: ['the edges of the room standing clear without a turn of the head, sudden movement at the rim jolting the body']
+        on: ['the lashes brushing the cheek on each blink, the lids heavy'],
+        mid: ['a drawing ache behind the eyes as they enlarge', 'a dizzy swim when the head turns fast'],
+        end: ['the lids heavy and slow, each blink cool and long']
       },
       'cow.senses': {
-        on: ['smells arriving from much further than they should, thick at the back of the nose', 'a flare of scent so sharp it is almost taste'],
-        mid: ['low sound felt in the chest as pressure', 'rain smelled before the first drop'],
-        end: ['a sharp sudden noise landing as a flinch down the spine and heat in the ears, low sound held as warmth in the chest']
+        on: ['the back of the nose thick, as before a sneeze', 'a flare of scent so sharp it is almost taste'],
+        mid: ['a pressure in the ears before thunder', 'a tickle high in the nose and a sneeze before the weather turns'],
+        end: ['a bang a flinch down the spine and heat in the ears']
       },
       'cow.appetite_and_cud': {
-        on: ['the stomach turning at the smell of meat, the mouth running at greens, grain and milk'],
-        mid: ['a slow, steady hunger that eating dulls but does not end', 'a pull toward cream and cocoa'],
-        end: ['a heavy, easy fullness after grazing, the jaw working sideways when idle']
+        on: ['the stomach turning at cooking flesh, the mouth watering at anything green'],
+        mid: ['a slow, steady hunger that eating dulls but does not end', 'a tired jaw after long chewing, eased by a drink'],
+        end: ['a heavy, easy fullness after a meal, the belly warm']
       },
       'cow.weight_and_strength': {
-        on: ['a settled, loaded heaviness in the legs and back, a half-second lag between deciding and moving'],
-        mid: ['muscle thickening across the back and thighs, a warm ache like the day after hard work', 'a body that does not budge when pushed, a floor that gives under it'],
-        end: ['heavy, warm and steady, slow to start and hard to stop']
+        on: ['a loaded heaviness in the legs, a lag between deciding and moving'],
+        mid: ['a worked ache like the day after harvest, eased by sleep', 'a shove landing as a dull nudge'],
+        end: ['a deep steadiness in the legs, and sleep that comes heavy and fast']
       },
       'cow.herd': {
-        on: ['the shoulders dropping and the heartbeat slowing without any cause', 'the jaw unclenching and the hands going still'],
-        mid: ['a warmth in the chest that rises when someone sits close', 'an itch of restlessness that eases in company'],
+        on: ['the shoulders dropping and the heartbeat slowing for no cause', 'the jaw unclenching and the hands going still'],
+        mid: ['a warmth in the chest that rises when someone sits close', 'a restless itch in the legs when left alone'],
         end: ['a slow-breathing ease against a warm body, a restless prickle alone'],
         touch: ['a hand laid on the back loosens the whole spine']
       },
       'cow.voice': {
-        on: ['a low hum in the breastbone that comes unbidden and buzzes the ribs'],
-        mid: ['the throat loosening, a long low note felt in the teeth', 'the hum carrying through a shared seat'],
-        end: ['the hum felt through a shared seat, the low call shaking the chest']
+        on: ['a buzz in the throat on the deep words, unbidden'],
+        mid: ['the throat loosening and the chest buzzing on a deep word', 'a rumble in the ribs on a laugh'],
+        end: ['the throat easy on the deep notes, a long call buzzing in the teeth']
       },
       'cow.teats_and_udder': {
-        on: ['a deep itch and tenderness behind the nipples, which stay raised, and a faint fullness in the breasts'],
-        mid: ['the nipples lengthening and sore against cloth', 'a soft heat low on the belly, a tender swelling that aches when jolted'],
-        end: ['warm, heavy and very sensitive, cloth and touch both registering sharply'],
+        on: ['a deep itch behind each nipple, a sharp tingle when cloth brushes past'],
+        mid: ['a tight, tender ache at each jolt of a step, the skin there itching hot', 'a dull throb low on the belly, under the navel'],
+        end: ['cloth and touch both registering sharply, a sway at each step'],
         touch: ['touch lands high and bright, ache and pleasure together']
       },
       'cow.milk': {
-        on: ['a tight fullness late in the day, in the udder first and a little in the breasts'],
-        mid: ['pressure building to an ache that warmth and a hand ease', 'the first drops let down by touch or warmth, then relief and a heavy calm', 'a heaviness that builds through the day and aches until it is eased'],
-        end: ['a steady fullness that needs emptying, and relief and a deep ease when it is'],
+        on: ['a tingling at the teats in a warm room, a heaviness that walking jolts'],
+        mid: ['a hot heaviness throbbing with each step, the teats tender', 'a tingling rush at the teats and the first drops, warm, then a slackness', 'the udder tight by evening, a warm prickle at the teats at any strong feeling'],
+        end: ['a prickle at the teats as milking time nears, and the same prickle, then wet, whenever the body is aroused'],
         touch: ['being drawn off brings relief at once, deep and slow']
       },
       'cow.horns_and_crest': {
-        on: ['two tender spots above the temples, sore as bruises, with something hard underneath'],
-        mid: ['a bony pressure pushing out from inside the skull, a thick ache across the back of the neck', 'heat at the base of the horns when the head is bowed'],
-        end: ['the weight of the horns a steady pull on the neck, the base of each answering every touch'],
-        touch: ['a thumb at the base of a horn runs down the neck as a deep, sharp heat']
+        on: ['a dull headache behind the brow, eased by a cool cloth'],
+        mid: ['a bony pressure from inside the skull, a thick ache across the nape', 'heat at the base of the horns when the head is bowed'],
+        end: ['a steady pull on the neck from their weight, eased by resting the head'],
+        touch: ['a thumb rubbed at the root running down the spine as deep, sharp heat']
       },
       'cow.the_bulls_ground': {
-        on: ['a steady stillness in the body when it is pushed, and a lag before it moves'],
-        mid: ['the weight dropping forward onto the feet', 'the breath going loud when crowded'],
-        end: ['patient and heavy, a slow heat in the shoulders when challenged']
+        on: ['the legs bracing of themselves when pushed'],
+        mid: ['heat climbing the neck when crowded', 'a tightness through the shoulders at a raised voice'],
+        end: ['a slow heat in the shoulders when crossed, gone once the other yields']
+      },
+      // The other kinds' parts, each with its own: shared keys name only what every kind that has the part gives it.
+      toes_and_claws: {
+        on: ['the toe ends throbbing in shoes, the nails sore at the quick'],
+        mid: ['a dull ache deep in the ball of the foot', 'the nail beds hot, a stubbed step a sharp sting'],
+        end: ['cold stone underfoot a sharp shock, warm wood a relief']
+      },
+      feet_and_stance: {
+        on: ['a cramp in the soles at night, shoes pinching at the heel'],
+        mid: ['a burning in the calves by evening, eased by a hand or warm water', 'the new pad springy and good to stand on'],
+        end: ['the calves quiet and the balance sure, a spring in each step']
+      },
+      further_pairs: {
+        on: ['a small tender itch in two lines down the belly'],
+        mid: ['pinpoints of tenderness down the belly, sore to a waistband', 'a light touch down the belly a tingle, warm and good'],
+        end: ['a hand down the front catching at every one, a sharp bright tingle each time']
+      },
+      tail: {
+        on: ['a sharp flare at the tailbone when sat on, and a twitch with nothing to move'],
+        mid: ['a hot, tender pull at the tailbone as the length comes', 'the lower back sore and tired from a new weight to carry'],
+        end: ['the weight of it settled, the lower back easy with it'],
+        touch: ['a tug at it felt as a sharp jolt down both legs']
+      },
+      ears: {
+        on: ['an itch deep inside the ear that a finger cannot reach'],
+        mid: ['a pull along the ear as it changes, tender when brushed', 'a sore tiredness at the root of each ear by evening'],
+        end: ['sore after a loud room, cold at the tips in wind']
+      },
+      nose_and_face: {
+        on: ['an itch inside the nose at every new smell, and a sneeze'],
+        mid: ['a dull pull across the nose and jaw as they change', 'a smell arriving so rich it is almost taste'],
+        end: ['the face settled, the nose cool and quick']
+      },
+      face: {
+        on: ['the cheekbones tender to press, the face stiff on waking'],
+        mid: ['a tightness across the face as it settles', 'a palm on the cheek cool and soothing'],
+        end: ['the face at rest, its own and quiet under a hand']
+      },
+      teeth: {
+        on: ['a throb in the jaw at night, and cold water sharp on the teeth'],
+        mid: ['the gums sore, the tongue learning the new edges', 'biting into something firm a relief'],
+        end: ['the ache gone, the jaw quiet']
+      },
+      height: {
+        on: ['the long bones aching at night'],
+        mid: ['the joints sore at night as the body draws in', 'the floor a little nearer than the feet expect'],
+        end: ['the ache gone, the body light and quick at its new height']
+      },
+      figure: {
+        on: ['a dull ache at the hips or ribs as the frame changes'],
+        mid: ['the ribs or hips sore at night', 'the new curve warm under a hand'],
+        end: ['a frame settled and easy to carry']
+      },
+      build: {
+        on: ['a stiffness through the frame as it changes'],
+        mid: ['an ache through the frame as it settles', 'a stretch after it, long and good'],
+        end: ['the frame settled, quick and light to move']
+      },
+      'wolf.hands': {
+        on: ['a soreness at the quick of every nail'],
+        mid: ['the fingertips tender as the pads come', 'the palm pad warm and good against a smooth surface'],
+        end: ['a sure grip, the pads warm and quick to feel a texture']
+      },
+      'fox.hands': 'wolf.hands',
+      'wolf.teeth_and_jaw': {
+        on: ['the gums hot and swollen, a cold drink sharp on them'],
+        mid: ['a sharp nip to the lip on a careless bite', 'a good ache at the temples after chewing'],
+        end: ['the ache gone and a strong bite in its place']
+      },
+      'wolf.eyes': {
+        on: ['a dull ache behind the eyes at lamplight'],
+        mid: ['a squint in full sun', 'the dark restful, opening up shape by shape'],
+        end: ['the eyes rested by night, sore after a bright noon']
+      },
+      'wolf.spine_ruff': {
+        on: ['the hair at the nape lifting with a cold shiver, the skin there tight'],
+        mid: ['a crawling itch up the middle of the back, worse in a warm bed', 'a hand down the back easing the itch, slow and good'],
+        end: ['a crawl of heat up the back as it rises, a long slack breath as it lies']
+      },
+      'wolf.mantle': {
+        on: ['the neck stiff on waking'],
+        mid: ['an itch across the shoulders as the mantle comes in', 'a hand across the shoulders warm and steadying'],
+        end: ['a weight of warmth at the nape, the neck slow to tire']
+      },
+      'fox.second_tail': {
+        on: ['a twitch at the tailbone out of time with the tail'],
+        mid: ['a hot pull at the root as the new one grows, tender to sit on'],
+        end: ['a doubled weight settled at the tailbone, each root warm to a palm']
+      },
+      'fox.eyes': {
+        on: ['the eyes watering at noon'],
+        mid: ['a pinch behind the eye at noon', 'dusk a relief, the eyes easing wide'],
+        end: ['dusk the best light, noon a narrow squint']
+      },
+      'fox.bib': {
+        on: ['a soft itch under the chin that runs down on swallowing'],
+        mid: ['a stroke along the throat a small pleasure'],
+        end: ['a hand at the throat felt down to the breastbone, warm']
+      },
+      'cat.hands': {
+        on: ['the quick sore under each nail, a pinch when gripping'],
+        mid: ['an ache in the fingertips, and a tingle at a soft fabric', 'the pads warm and tingling on velvet or fur, a small pleasure'],
+        end: ['a stretch through the fingers running up to the elbow, slow and good']
+      },
+      'cat.teeth_and_tongue': {
+        on: ['the gums hot and tender, a sore spot where the tongue rubs'],
+        mid: ['the tongue catching on the lips', 'the rough tongue across the back of the hand a small comfort'],
+        end: ['the soreness gone, the lips catching on the fang tips']
+      },
+      'cat.whiskers_and_face': {
+        on: ['a tickle at the lip as if a hair were caught there, and a sneeze'],
+        mid: ['a whisker caught on cloth a sharp sting at the root', 'a stroke along the cheek a pleasure that half-closes the eyes'],
+        end: ['a brush at the whiskers a tingle to the eyes']
+      },
+      'cat.eyes': {
+        on: ['a dull ache behind the eyes in lamplight'],
+        mid: ['a sting in full sun until the lids half close', 'the dark restful, the eyes wide and easy in it'],
+        end: ['night as easy as day, a lamp in the face a sharp ache']
+      },
+      'cat.toms_build': {
+        on: ['the neck stiff on waking'],
+        mid: ['a heavy ache at the back of the neck and across the shoulders', 'the forearms heavy and warm after use'],
+        end: ['an easy strength in the neck and arms, slow to tire']
+      },
+      'rabbit.hands': {
+        on: ['the fingertips tender at the quick'],
+        mid: ['an itch over the knuckles that rubbing on cloth soothes', 'a soft warmth across the knuckles, good under a stroke'],
+        end: ['the fingertips quick and dry, the claws a light scratch on skin']
+      },
+      'rabbit.toes': {
+        on: ['the toe ends sore and hot by evening'],
+        mid: ['a hot pull at the root of the foot, sore to stand on', 'a tickle under the feet at each step'],
+        end: ['the floor\'s chill kept off, each step soft and quiet']
+      },
+      'rabbit.hind_feet': {
+        on: ['the soles hot and restless at night'],
+        mid: ['a sore stretch along the sole at each step', 'a good burn in the calves after a jump'],
+        end: ['the soles warm and springing, the calves tight and ready at rest']
+      },
+      'rabbit.belly_fur': {
+        on: ['a fine tickle under the waistband'],
+        mid: ['a hand on the belly a pleasure, the skin under it tingling'],
+        end: ['a palm on the belly settling the breath slow and deep']
+      },
+      'rabbit.bob_tail': {
+        on: ['a hot soreness low on the back, worst on a hard bench'],
+        mid: ['a tender throb at the root after a fright'],
+        end: ['the lower back warm and loose, sitting easy again']
+      },
+      'rabbit.nose_and_lip': {
+        on: ['a tickle at the upper lip, and sneezing at dust'],
+        mid: ['a soreness down the middle of the mouth, as if chapped', 'the air full of good smells, each breath a sniff'],
+        end: ['every smell sharp and near, the lip quick to feel a breath']
+      },
+      'rabbit.front_teeth': {
+        on: ['the gums sore and hot, eased by chewing'],
+        mid: ['gnawing something hard a relief'],
+        end: ['a sharp clean bite, the jaw quiet after a good chew']
+      },
+      'rabbit.eyes': {
+        on: ['the eyes gritty by evening'],
+        mid: ['full sun making the eyes water', 'the wide view restful, the whole room held at once'],
+        end: ['the eyes slow to tire, the lids heavy at noon']
+      },
+      'harpy.arm_feathers': {
+        on: ['a heat down the outsides of the arms, as after too long in the sun'],
+        mid: ['a hot, crawling soreness along the arms, eased by cool water', 'the down soft and warm, smoothing it a pleasure'],
+        end: ['a ruffle along both arms at a chill or a start, then a slow settling']
+      },
+      'harpy.wings': {
+        on: ['a hot itch down the outside of each arm, worst at the wrist'],
+        mid: ['the shoulders stiff and sore from the new weight', 'air under the feathers lifting the arm, a rush of pleasure'],
+        end: ['a deep burn across the chest after flying, and the air felt along every feather']
+      },
+      'harpy.hands': {
+        on: ['a cramp through the palm when gripping, worst when writing'],
+        mid: ['a deep cramp along the outside of the palm at night', 'the grip of what is left sure and strong'],
+        end: ['the claw tips quick to feel what they touch']
+      },
+      'harpy.talons': {
+        on: ['the toe ends sore in shoes'],
+        mid: ['a deep pull through the arch', 'the scales itching up the shin and the calf burning', 'a rail under the foot steady and good'],
+        end: ['the calves quiet, the soles hard to bruise']
+      },
+      'harpy.leg_and_hip_feathers': {
+        on: ['a hot itch under the skin of the thighs, worst sitting'],
+        mid: ['a sore tightness at each hip bone', 'a smoothing hand over the thighs a long, warm shiver'],
+        end: ['the thighs warm in any weather, a feather pulled against its lie a sharp sting']
+      },
+      'harpy.tail_fan': {
+        on: ['a sore heat at the tailbone, an itch no scratching reaches'],
+        mid: ['a dull ache low in the back after any quick turn'],
+        end: ['a stroke along the quills smoothing the whole back']
+      },
+      'harpy.crest_and_ears': {
+        on: ['an itch on the scalp that combing makes worse, and sore spots under it'],
+        mid: ['the ear openings cold in any draught', 'a shiver at the feather roots, sudden and bright'],
+        end: ['the scalp alive under the crest, a hand through it a shiver to the nape']
+      },
+      'harpy.eyes': {
+        on: ['a strain behind the eyes from looking far'],
+        mid: ['the eyes hot and smarting in glare', 'distance coming clear, a pleasure to look out at'],
+        end: ['a long look across the sky resting the eyes']
+      },
+      'harpy.light_bones': {
+        on: ['the long bones aching in the cold'],
+        mid: ['soreness along the ribs and breastbone', 'the body light enough that stairs are a pleasure'],
+        end: ['light and quick, a bruise from a knock']
+      },
+      'mer.webbed_hands': {
+        on: ['a soreness at the base of each finger, and a pull when the hand opens wide'],
+        mid: ['the web tender when spread', 'water pulled through the spread fingers, strong and good'],
+        end: ['a firm push of water against each palm, the hands tireless swimming']
+      },
+      'mer.webbed_feet': {
+        on: ['the toes pinching at the sides of the shoes'],
+        mid: ['the skin between the toes tender when they spread', 'bare feet in water a relief'],
+        end: ['the feet spread and strong in water']
+      },
+      'mer.arm_scales': {
+        on: ['a tingling across the backs of the hands in water, like small fish nibbling'],
+        mid: ['a rasp of new edges against cloth', 'the forearms itching as they dry, eased at once by water'],
+        end: ['the forearms quick to feel a current, a cold eddy a shiver to the elbow']
+      },
+      'mer.leg_and_hip_scales': {
+        on: ['a tingling over the tops of the feet in water, gone in air'],
+        mid: ['a rasp at the shins against bedclothes', 'water on the scales cool and good'],
+        end: ['a tight dryness after long out of water, eased at once by a soak']
+      },
+      'mer.water_tail': {
+        on: ['a pull along the inner thighs in water'],
+        mid: ['a tingling line down the inside of each leg that swimming makes stronger', 'kicking as one in water strong and good'],
+        end: ['a rush of strength in water, the knees weak a moment on dry land']
+      },
+      'mer.gills': {
+        on: ['a flutter under the arms, sharp on a deep breath'],
+        mid: ['a soreness at the sides when lain on, eased in a bath', 'a cool flutter along the ribs underwater, steady and good'],
+        end: ['a deep coolness through the chest underwater, a tightness after long dry']
+      },
+      'mer.finned_ears': {
+        on: ['the ear rims tender and cool'],
+        mid: ['a sore pull at the rims, cool to a fingertip', 'sound underwater clear, an ease in the ears'],
+        end: ['a cool flutter at the sides of the head underwater, the roots warm to a fingertip']
+      },
+      'mer.spine_ridge': {
+        on: ['a prickling down the back whenever it meets water, gone again in air'],
+        mid: ['a tender line between the shoulders', 'the ridge lifting in water, cool and easy'],
+        end: ['a pull down the back as it rises, and the skin along it cool to the touch']
+      },
+      'mer.sheen_and_skin': {
+        on: ['an itch over the whole body by evening, gone in a bath'],
+        mid: ['the skin tight in dry air', 'water on the skin feels good'],
+        end: ['the skin easy only when wet, tight and itching when dry']
+      },
+      'mer.eyes': {
+        on: ['the eyes dry and scratchy in air'],
+        mid: ['water on the eyes cool and soothing', 'a cool slide across the eye underwater'],
+        end: ['the eyes at ease underwater, dry in air']
+      },
+      'mer.breasts': {
+        on: ['a tingling across the chest whenever it is wet'],
+        mid: ['the breasts tender as they change', 'a palm warming them slowly, a pleasure'],
+        end: ['a cool, slick softness in water, the nipples tight in cold air']
+      },
+      'mer.colours': {
+        on: ['the skin under the scale edges prickling'],
+        mid: ['the bands warm in the sun', 'a deep ache across the shoulders as they broaden'],
+        end: ['colour bright and warm in the sun']
+      },
+      'dryad.hands': {
+        on: ['the fingertips sore at the quick'],
+        mid: ['the fingers stiff in the mornings', 'soil and growing things good under the fingers'],
+        end: ['the knuckles stiff in cold and supple in sun, the grip slow to tire']
+      },
+      'dryad.feet_and_roots': {
+        on: ['a sharp catch at the toe tips on every sock'],
+        mid: ['the soles sore on stone and cobbles', 'a cool, good pull through the soles on soil'],
+        end: ['a slow drink of cool drawn up from the ground, the legs heavy and quiet']
+      },
+      'dryad.arm_bark': {
+        on: ['a tight itch over the knuckles, cracking sore when the hand closes'],
+        mid: ['an itch where the bark meets the skin', 'sun on the bark a slow warmth'],
+        end: ['the forearms slow to bruise and slow to cool, aching dully when dry']
+      },
+      'dryad.leg_and_hip_bark': {
+        on: ['a sting after a hot wash, the ankles itching where cloth rubs'],
+        mid: ['the backs of the knees stiff and sore on stairs', 'the bark warm in the sun'],
+        end: ['the legs heavy and sure, a slow warmth rising through them in sun']
+      },
+      'dryad.spine_ridge': {
+        on: ['an itch down the middle of the back, dry and tight like sunburn'],
+        mid: ['the plates stiff as they set', 'a long stretch of the back easing the stiffness, slow and good'],
+        end: ['the back stiff in the cold, loosening slow and easy in sun']
+      },
+      'dryad.grain': {
+        on: ['a fine prickling all over, like dried salt'],
+        mid: ['a hand on the bare arm felt slow and good'],
+        end: ['a cut that aches dully for days, the body slow to warm in the morning']
+      },
+      'dryad.leaves': {
+        on: ['the scalp prickling and tender to a comb'],
+        mid: ['a soreness along the hairline as they swell', 'sun on the leaves a warmth at the scalp'],
+        end: ['the scalp dry and itching in drought, cool and easy after rain']
+      },
+      'dryad.eyes': {
+        on: ['a blur in shade that clears in sun'],
+        mid: ['a heaviness behind the eyes in deep shade', 'sun on the closed lids a slow pleasure'],
+        end: ['the eyes easiest in green light']
+      },
+      'dryad.breasts': {
+        on: ['a tenderness at the nipples, cloth catching where it slid before'],
+        mid: ['the skin at the sides of the chest tight and itching', 'a warm hand on the smooth skin there felt slow and good'],
+        end: ['a touch at the tips felt slow and sweet, the skin warm in sun']
+      },
+      'dryad.bark': {
+        on: ['a dry tightness across the top of the back, cracking sore when stretched'],
+        mid: ['a stiffness turning the head, slow to loosen in the morning', 'sun across the shoulders a deep warmth'],
+        end: ['the back warm through in sun, and a pressed palm felt long after it lifts']
+      },
+      'dryad.flowering': {
+        on: ['a tingling at the scalp where the buds come'],
+        mid: ['the scalp heavy and tingling under the flowers, a slow ease after'],
+        end: ['a heavy, drowsy fullness as the fruit sets, and a lightness when it falls']
+      },
+      'dryad.catkins': {
+        on: ['a tingling at the scalp where the tassels come'],
+        mid: ['an itch in the nose and a sneeze at every shake of the head', 'a buzzing warmth under the skin'],
+        end: ['the scalp light and cool once the catkins drop']
+      },
+      'goblin.green_skin': {
+        on: ['a faint tingle across the hands, as after cold water'],
+        mid: ['the skin prickling where the green spreads', 'warmth spreading with the green, good as sun'],
+        end: ['the skin slow to burn in sun and slow to feel a scratch']
+      },
+      'goblin.hands': {
+        on: ['a stretching ache through the knuckles, as after a long grip'],
+        mid: ['the knuckles hot as they loosen', 'a reach that closes on things easily, a small pleasure'],
+        end: ['the fingertips quick to feel a catch or a seam']
+      },
+      'goblin.feet': {
+        on: ['a cramp through the arch at night'],
+        mid: ['the soles tender on gravel', 'bare feet on a warm floor a comfort'],
+        end: ['cool stone good underfoot, a shoe a pinch at once']
+      },
+      'goblin.nose_and_face': {
+        on: ['the nose tender at the tip'],
+        mid: ['the mouth corners chapped and tender', 'smells richer than before'],
+        end: ['the cheeks tired after laughing']
+      },
+      'goblin.eyes': {
+        on: ['a dull ache behind the eyes by midday'],
+        mid: ['dim rooms a relief, the eyes easing', 'the eyes watering in a draught'],
+        end: ['dim light restful, a lamp turned up a dull ache']
+      },
+      'fairy.wing_buds': {
+        on: ['a heat between the shoulders, and the back muscles twitching on their own'],
+        mid: ['a sore pressure under the skin of the back, worst lying down'],
+        end: ['the buds ready, tender to a touch']
+      },
+      'fairy.wings': {
+        on: ['a raw stinging at the shoulder blades, and a wet chill down the back'],
+        mid: ['a raw ache at the wing roots', 'air on the wings a cool, bright pleasure'],
+        end: ['a hum through the back as they beat, and a deep tiredness across the shoulders after']
+      },
+      'fairy.sheen': {
+        on: ['the fingertips prickling'],
+        mid: ['a tingle under the shimmer', 'the shimmer warm in sun, good on the skin'],
+        end: ['the sheen warm where it lies']
+      },
+      'fairy.eyes': {
+        on: ['the eyes aching in strong light'],
+        mid: ['a dazzle at the edges of things', 'colour a small pleasure everywhere'],
+        end: ['strong light a squint, dusk soft and easy']
+      },
+      'fairy.hands_and_feet': {
+        on: ['the fingertips and toes tingling'],
+        mid: ['the toes taking the weight, a light spring that feels good'],
+        end: ['the fingertips quick and sure on a needle or a knot']
+      },
+      'fairy.glow_and_dust': {
+        on: ['the skin warming at a strong feeling'],
+        mid: ['a warmth spreading under the skin before a laugh or tears'],
+        end: ['a fine itch as the dust lifts off, the skin warm after']
       },
       'woman.voice': {
-        on: ['a catch in the throat and a crack upward on a word'],
-        mid: ['a looseness at the throat, the low notes gone', 'the voice climbing and thinning on a long word'],
-        end: ['a lighter voice, felt higher in the chest']
+        on: ['a catch and a rawness in the throat, as after shouting'],
+        mid: ['a looseness at the throat, and a strain in reaching the old low words', 'the voice climbing and thinning on a long word'],
+        end: ['speech easy on the throat, the old strain gone']
       },
       'man.voice': {
-        on: ['a hoarse catch in the throat, as with a cold'],
-        mid: ['a heavy vibration in the chest on the low words', 'a lump at the throat that moves on swallowing'],
-        end: ['a lower voice, felt in the breastbone']
+        on: ['a rawness at the back of the throat, worse by evening'],
+        mid: ['a heavy vibration in the chest on the low words', 'a stiffness at the voice box, and a buzz through the ribs when speaking loudly'],
+        end: ['the throat easy on a shout, the chest full with it']
       },
       'woman.face': {
         on: ['the cheeks smoother under a palm and the jaw sore, as after a long day of chewing'],
-        mid: ['a tender ache in the jaw and brow as they soften', 'the lips fuller and sensitive'],
-        end: ['a smaller, rounder face, the skin of it registering every touch']
+        mid: ['a tender ache along the cheekbones, and the lips quick to chap', 'the lips tingling at anything cold'],
+        end: ['the skin of the face registering every touch']
       },
       'man.face': {
-        on: ['the skin of the jaw coarser under a palm, a scratch of new hairs at the lip'],
-        mid: ['an ache along the jaw and brow as they firm', 'the cheeks leaner'],
-        end: ['a harder, larger-planed face, the jaw rough under a hand']
+        on: ['an itch along the jaw and upper lip, worse in the warm'],
+        mid: ['a dull ache at the temples and the skin of the chin itching', 'the chin rough to a palm by evening'],
+        end: ['the jaw rough under a hand, a cold wind felt less']
       },
       'woman.skin_and_hair': {
-        on: ['the hair on the chest and belly thinning, the skin there tingling'],
-        mid: ['skin finer and softer, bruising at a knock and feeling more', 'the head hair thicker and growing fast'],
-        end: ['soft skin that registers every touch, the head hair thick']
+        on: ['a cool tingling over the front of the body, cloth sliding where it used to catch'],
+        mid: ['a light touch on the arm felt long after, the cold biting sooner', 'the scalp tingling and tight, a brush through it a long shiver'],
+        end: ['a breath of air on the arm raising gooseflesh, the scalp tender to a pull']
       },
       'man.skin_and_hair': {
-        on: ['the hair on the forearms and shins darker and coarser, prickling'],
-        mid: ['skin thicker and oilier, slower to bruise', 'a line of hair coming in below the navel'],
-        end: ['a man\'s skin and hair, rough under a palm']
+        on: ['a prickle and itch on the arms and legs, worse under wool'],
+        mid: ['a knock that would have marked the skin barely felt', 'an itch low on the belly, and the face greasy by midday'],
+        end: ['skin rougher under a palm and slower to feel the cold']
       },
       'woman.frame': {
-        on: ['the shoulders easing inward, shirts hanging looser there'],
-        mid: ['a dull ache in the shoulders and arms as they slim', 'the hands finer, the grip lighter'],
-        end: ['a lighter frame carried differently, old clothes hanging wrong everywhere']
+        on: ['an ache in the collarbones and a stiffness between the shoulder blades'],
+        mid: ['a dull ache down the arms at night', 'a cup heavier in the hand than it was'],
+        end: ['the body lighter on its feet, the shoulders easy, the old stiffness gone']
       },
       'man.frame': {
-        on: ['the shoulders pushing outward, a tightness across the back'],
-        mid: ['a deep ache in the shoulders and neck as they broaden', 'the hands thicker, the knuckles heavier'],
-        end: ['a heavier frame, the grip stronger, old clothes tight everywhere']
+        on: ['a stretching ache across the collarbones, sore to lie on one side'],
+        mid: ['the knuckles stiff in the morning, the shirt seams biting', 'a deep ache across the shoulder blades'],
+        end: ['the body heavier on its feet, the old aches gone']
       },
       'woman.waist_and_hips': {
-        on: ['the waist drawing in a little, a dull ache at the hips at night'],
-        mid: ['clothes pulling tight across the hips and seat, the skin there tender', 'a deep ache across the hips for days as the pelvis widens', 'the walk changing to carry it'],
-        end: ['the weight sitting lower, the new curves felt in every step']
+        on: ['a dull ache at the hips at night'],
+        mid: ['a grinding soreness in the hip sockets, worse lying on them', 'the hip sockets clicking at a long step'],
+        end: ['the new curves felt in every step, a chair fitting differently']
       },
       'man.waist_and_hips': {
-        on: ['the waist thickening and straightening, a stiffness at the back'],
-        mid: ['a deep ache across the hips for days as they narrow', 'the stride lengthening'],
-        end: ['the weight sitting higher, the stride longer']
+        on: ['a stiffness across the small of the back on waking'],
+        mid: ['a grinding soreness in the hip sockets, worst on rising', 'the thighs tight and sore after stairs'],
+        end: ['a belt sitting easy, the old ache gone']
       },
       'woman.chest': {
-        on: ['a deep itch and tenderness behind the nipples, which stay raised'],
-        mid: ['a firm, tender disc under each areola that aches when knocked', 'a swelling that stretches the skin, sore to cloth and cold', 'the nipples and areolae full and tender, sore to cloth'],
-        end: ['settled, soft and heavy, the weight felt on the ribs and the nipples answering every touch'],
+        on: ['a tingling that comes and goes across the chest, and a sharp sting when a shirt rubs'],
+        mid: ['a hot, tight tingling under the nipples that wakes the body at night', 'a stretched heat across the chest that cold eases'],
+        end: ['the soreness gone, a sway felt at each step, a touch at the tips bright and sharp'],
         touch: ['touch lands high and bright, ache and pleasure together']
       },
       'man.chest': {
         on: ['a soft tenderness and a loosening ache across the chest'],
-        mid: ['the breasts shrinking and aching', 'the muscle beneath tightening'],
-        end: ['a flat, broad chest, the nipples small and quick to the cold']
+        mid: ['a dull ache at the nipples when cloth rubs', 'a tight pull across the chest when the arms reach'],
+        end: ['the tenderness gone out of the chest, a palm across it felt as plain warmth']
       },
       'woman.scent': {
-        on: ['sweat milder, the smell rising off warm skin'],
-        mid: ['the skin smelling warmer and sweeter', 'the smell lingering on cloth'],
-        end: ['a scent that any keen nose would call a woman\'s']
+        on: ['a softer smell on the skin once it is warm'],
+        mid: ['less sweat after work, the nape dry', 'the smell lingering on cloth'],
+        end: ['sweat lighter and slower to come, sweet on cloth']
       },
       'man.scent': {
-        on: ['sweat sharper, the smell rising off warm skin'],
-        mid: ['the skin smelling heavier and warmer', 'the smell lingering on cloth'],
-        end: ['a scent that any keen nose would call a man\'s']
+        on: ['a strong smell off the skin once it is warm'],
+        mid: ['a sharp smell from the armpits after any work', 'the smell lingering on cloth'],
+        end: ['sweat heavier and slower to wash out of cloth']
       },
       'woman.balance_and_gait': {
-        on: ['balance a beat late, the body tipping before the feet catch up'],
-        mid: ['the stride shortening and the hips moving with it', 'the arms carried differently around the chest'],
-        end: ['a gait that no longer needs thinking about']
+        on: ['a lurch at the top of a stair, the stomach dropping with it'],
+        mid: ['the thighs brushing at each step', 'a sway in the walk that tires the lower back by evening'],
+        end: ['the old stumbles gone, the feet sure on stairs']
       },
       'man.strength_and_gait': {
-        on: ['things lighter than expected in the hand, the grip overshooting'],
-        mid: ['the stride lengthening', 'the weight carried high in the shoulders'],
-        end: ['a gait that no longer needs thinking about']
+        on: ['a tight, ready feel in the arms and a hunger after work'],
+        mid: ['things lighter than braced for, a jolt in the arms', 'the shoulders hard and sore after use, quick to recover'],
+        end: ['the body easy in its strength, a heavy load barely felt']
       },
       'woman.below': {
-        on: ['a tightness and a drawing-in low in the body, tender to pressure'],
+        on: ['a tenderness low in the body, sharp to pressure'],
         mid: ['a tender, heightened sensitivity, cloth and touch registering sharply', 'a deep ache that comes and goes'],
-        end: ['new and easily overwhelmed by touch']
+        end: ['touch landing deep and bright, the old tenderness gone']
       },
       'man.below': {
-        on: ['a fullness and heat low in the body, more sensitive each day'],
+        on: ['a restless throb low down that comes at odd hours and ebbs'],
         mid: ['a tender, heightened sensitivity, cloth and touch registering sharply', 'a deep ache that comes and goes'],
-        end: ['new and quick to answer']
+        end: ['a quick throb at a brush of cloth']
       },
       'woman.rhythms': {
         on: ['a dull drawing ache low in the belly, there and gone'],
-        mid: ['a warmth and sensitivity that spread through the body, slower to start and wider', 'a tenderness that comes and goes'],
-        end: ['a rhythm the body keeps, felt in the belly and the back']
+        mid: ['a slow heat that builds under a hand and lingers long after', 'a tenderness that comes and goes'],
+        end: ['a dull pull low in the belly and the small of the back as each turn comes round']
       },
       'man.rhythms': {
         on: ['a heaviness low in the chest, the pulse quicker to rise'],
-        mid: ['a warmth and restlessness quicker to start and held in one place', 'a steadier heat'],
-        end: ['a steadier rhythm, the days running level']
+        mid: ['a sudden heat and stiffening low down, sharp and soon over', 'a heaviness low down on waking'],
+        end: ['a quick, sharp heat that leaves the head clear after']
       }
     },
     tracks: {
@@ -821,7 +1216,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Nails thicker and harder from the root, growing to a blunt point however short they are cut.',
               'Fingertip skin thickens into the first of the pads. Touch through them is duller for texture and sharper for pressure and warmth.',
               'The nails are claws: curved, rooted deeper, the quick grown down into them. A pad on every fingertip and one forming across the palm; knuckles heavier. Fine grip has to be relearned.',
-              'Five strong fingers, a pad on each tip and a broad one across the palm, blunt claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
+              'Five fingers, a pad on each tip and one across the palm, the nails grown to claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
             ] },
           { key: 'forearm_pelt', name: 'Forearm pelt', weight: 4, range: { least: 'Backs of the hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders, joining the ruff' }, endsAs: 'pelt from the backs of the hands to the elbows',
             stages: [
@@ -835,7 +1230,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
-              'Four toes with a pad under each and blunt claws that do not sheathe; the dewclaw high on the inside. Nothing with a closed toe fits.'
+              'Four toes, blunt claws that do not sheathe and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
           { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low, close to a human stance on a long paw', standard: 'Heel raised a hand\'s width, weight on the toes', most: 'A full hock: long foot, heel high, a deep backward bend' }, endsAs: 'paws: weight on the toes and one broad pad, the heel raised',
             stages: [
@@ -843,7 +1238,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
               'The bones of the mid-foot lengthen. The heel resists coming down, and standing still means standing on the toes. Calves and shoes both complain.',
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
-              'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised as far as the draw sets. Quiet on hard floors, and balance is better than it ever was.'
+              'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised. Quiet on hard floors, and balance is better than it ever was.'
             ] },
           { key: 'leg_and_hip_pelt', name: 'Leg and hip pelt', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'pelt from paws to hips, fading out at the navel',
             stages: [
@@ -851,7 +1246,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Pelt from the paws up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'tail', name: 'Tail', weight: 8, range: { least: 'Slim, to the back of the knee', standard: 'A full brush to the calf', most: 'Thick and heavy, to the ankle' }, endsAs: 'a full brush to the calf',
             stages: [
@@ -859,7 +1254,7 @@ window.WINDLASS_WORLDS.sundered = {
               'A finger\'s length of bone and muscle under tight skin. It twitches when startled, and sitting has to allow for it.',
               'A hand\'s length, free of the body, in short fur. It lifts, tucks and twitches with mood before the mood is known. Waistbands have to give way to it.',
               'Longer and thickening, with a full coat. It carries real weight, the hips answer it in walking, and it wags. It has to be kept track of.',
-              'A full tail at the drawn length, expressive and readable by anyone who looks. Stroked along the lie it is felt up the whole spine, and the root is the most sensitive place on the back of the body.'
+              'A full tail, expressive and readable by anyone who looks. Stroked along the lie it is felt up the whole spine, and the root is the most sensitive place on the back of the body.'
             ] },
           { key: 'ears', name: 'Ears', weight: 6, range: { least: 'Pointed and furred, set a little high', standard: 'Tall wolf ears set high', most: 'Large, tall and heavily furred' }, endsAs: 'tall furred wolf ears set high',
             stages: [
@@ -881,9 +1276,9 @@ window.WINDLASS_WORLDS.sundered = {
               'The tip of the nose runs cool and damp.',
               'The skin at the tip darkens and takes a fine pebbled grain. The nostrils flare wider and move when scenting.',
               'The bridge broadens a little, and nose and jaw sit slightly further forward than they did.',
-              'The same face, plainly the person\'s own, with as much wolf in it as the draw allows. At the standard: a broad nose with a wolf\'s tip, the jaw slightly forward, canines behind the lips.'
+              'The same face, plainly the person\'s own, with something of the wolf in it; canines behind the lips.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes bright in the dark, in the drawn colour',
+          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes bright in the dark',
             stages: [
               'Night is less dark; shapes hold in an unlit room.',
               'A ring of {eye} at the edge of the iris, spreading inward. The eyes throw light back in the dark.',
@@ -900,7 +1295,7 @@ window.WINDLASS_WORLDS.sundered = {
               'A line of gooseflesh down the spine that comes with anger or cold and stays a moment after.',
               'Fine hair along the backbone, starting at the base of the spine.',
               'Longer and coarser, climbing the back. It rises by itself when startled or challenged.',
-              'A ruff of longer fur along the spine at the drawn width and reach, standing at a threat and lying flat under a calming hand. Stroked downward, it settles the whole body.'
+              'A ruff of longer fur along the spine, standing at a threat and lying flat under a calming hand. Stroked downward, it settles the whole body.'
             ] },
           { key: 'smell', name: 'Smell', weight: 5, endsAs: 'the world read by scent first',
             stages: [
@@ -918,7 +1313,7 @@ window.WINDLASS_WORLDS.sundered = {
           { key: 'heat_and_strength', name: 'Heat and strength', weight: 4, endsAs: 'a body that runs hot, tireless and strong',
             stages: [
               'Runs warm; always one layer too many.',
-              'Effort costs less. The body wants to run and is restless without it.',
+              'Effort costs less, and the body is restless without a run.',
               'Stronger than the frame shows, and hot to the touch. Force has to be judged again.',
               'Tireless at a lope for miles, strong enough to carry a grown person at a run, a furnace under the pelt. Others are drawn to the warmth.'
             ] },
@@ -947,14 +1342,14 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Sleep is lighter as the moon fills.',
               'For the nights around the full: wakeful, restless, strong, quick to anger and quick to laugh.',
-              'No sleep at the full moon and no wish for it: the body hums, the senses are at their widest, and it wants to run, sing and be among its own until dawn. The shape stays as it is.'
+              'No sleep at the full moon: the body hums, the senses are at their widest, and the legs are restless until dawn. The shape stays as it is.'
             ] },
           { key: 'further_pairs', name: 'Further pairs', weight: 5, sex: 'women', range: { least: 'One more pair', standard: 'Two more pairs', most: 'Three more pairs' }, endsAs: 'two more pairs of small nipples down the belly below the breasts',
             stages: [
               'Tender points on the ribs under each breast, like pressed bruises.',
               'Each is a small flat disc of darker skin. A second pair of tender points sits lower, toward the navel.',
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
-              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, as many as the draw sets (two more pairs at the standard), each as sensitive as the first.'
+              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly (two more pairs on most), each as sensitive as the first.'
             ] },
           { key: 'mantle', name: 'Mantle', weight: 5, sex: 'men', needs: [{ track: 'spine_ruff', stage: 2 }], range: { least: 'A thick neck and fur at the nape', standard: 'A mantle across the shoulders and a chest line', most: 'A heavy mantle over shoulders and chest' }, endsAs: 'a thick neck, a mantle of fur across the shoulders and a line from chest to navel',
             stages: [
@@ -966,26 +1361,26 @@ window.WINDLASS_WORLDS.sundered = {
           { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a season about twice a year, lasting a week or so',
             stages: [
               'A few days, months apart, of running too warm, short-tempered and easily moved, with no cause found.',
-              'It has a shape now: warmth low in the belly, skin that wants contact, broken sleep, a stronger scent.',
-              'A full season: days of running hot and restless, the skin answering every touch, sleep broken, temper on a hair. What is wanted of it stays the player\'s to say. Wolves nearby know by scent.',
-              'It comes about twice a year for a week and is planned around. At its height wanting is most of thought; then it passes and leaves a clear head and a sharp appetite. What is done with it is for the one who carries it to decide.'
+              'It has a shape now: warmth low in the belly, skin hot and quick to answer touch, broken sleep, a stronger scent.',
+              'A full season: days of running hot and restless, the skin answering every touch, sleep broken, temper on a hair. Wolves nearby know by scent.',
+              'It comes about twice a year for a week and is planned around. At its height the body runs hot and sleep stays broken; then it passes and leaves a clear head and a sharp appetite.'
             ] },
           { key: 'answering', name: 'Answering', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a body that answers a woman\'s season by scent',
             stages: [
               'Some days one person smells sharper and warmer than anyone else in the room.',
               'Knows a season by scent before a word is said; runs warm and restless near it.',
               'The temper runs short and the skin runs hot. Sleep and appetite both go while it lasts.',
-              'Reads it across a room by scent, and the body answers with heat and restlessness. What is done with it stays the player\'s to say. It passes when the season does.'
+              'Reads it across a room by scent, and the body answers with heat and restlessness. It passes when the season does.'
             ] }
         ],
         cow: [
-          { key: 'hands', name: 'Hands', weight: 7, range: { least: 'Four fingers, each tipped with a small hoof', standard: 'Two hooved fingers and a hooved thumb', most: 'Two heavy digits hooved to the first joint; still hands that grip and hold' }, endsAs: 'two hooved fingers and a hooved thumb',
+          { key: 'hands', name: 'Hands', weight: 7, range: { least: 'Two fingers and a thumb, each ending in a small thin hoof', standard: 'Two hooved fingers and a hooved thumb', most: 'Two heavy fingers and a thumb, all hooved to the first joint; still hands that grip and hold' }, endsAs: 'two hooved fingers and a hooved thumb',
             stages: [
               'Nails thicker, harder and broader, curving round the fingertips.',
               'The fingers move in pairs, first with second and third with fourth, and resist being spread. The skin between each pair tightens.',
               'Each pair has joined to the last knuckle into one thick finger with two tips. The thumb is heavier. Grip is strong and clumsy.',
               'The paired tips close into one and the nail wraps each end in a small hard cap, the start of a hoof. Fine work has to be relearned.',
-              'Two thick fingers and a thumb, each ending in a small smooth hoof, as far as the draw sets. Strong and sure, and still hands that hold and write. The skin behind each hoof is soft and very sensitive.'
+              'Two thick fingers and a thumb, each ending in a small smooth hoof. Strong and sure, and still hands that hold and write. The skin behind each hoof is soft and very sensitive.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
             stages: [
@@ -1000,14 +1395,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, short and close, the skin beneath it hot; an itch as it comes in that scratching only stirs.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh with a crawling prickle. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
-              'Coat from the hooves up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
+              'Coat from the hooves up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 5, endsAs: 'two toes in a split hoof with dewclaws behind',
             stages: [
               'Toenails thicker, harder and broader, curving down over the toe ends. Socks and shoes begin to disagree with them.',
               'The middle toes press together into two groups and stop moving separately. The big toe and the little toe shorten.',
               'Each group has joined into one thick toe, the nails spreading over them as two hard shells with a cleft between. The shortened toes have ridden up behind the ankle as small dewclaws. Shoes fit badly at the front.',
-              'A cloven hoof: two toes, each cased in hard horn, a soft bulb behind them and two dewclaws above. Nothing with a closed toe fits, and the hooves sound on hard floors.'
+              'A cloven hoof: two toes cased in hard horn, a soft bulb behind them, tender to the floor, and two dewclaws above. Nothing with a closed toe fits; the hooves sound on hard floors.'
             ] },
           { key: 'feet_and_stance', name: 'Feet and stance', weight: 9, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
             stages: [
@@ -1015,14 +1410,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The heel lifts and resists coming down. The calves shorten and harden.',
               'The bones of the mid-foot lengthen and draw together. The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle).',
               'Weight is carried on the toe tips alone. Balance is narrow; gait, stairs and standing still all have to be relearned, and the hips and back shift to help.',
-              'Standing on two hooves per foot, the heel raised as far as the draw sets, the long foot coated down to the horn. Sure on rough ground, loud on hard floors, slow to turn.'
+              'Standing on two hooves per foot, the heel raised, the long foot coated down to the horn. Sure on rough ground, loud on hard floors, slow to turn.'
             ] },
           { key: 'tail', name: 'Tail', weight: 6, range: { least: 'To mid-thigh, a small tuft', standard: 'To the knee, tufted', most: 'To the ankle, a heavy tuft' }, endsAs: 'a slim tail to the knee, tufted',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of thin, flexible tail in short coat. It flicks by itself, and sitting and waistbands have to allow for it.',
               'Longer, thin as a rope, with a tuft of long hair starting at the tip. It swishes with annoyance and lifts with pleasure before either is known.',
-              'A slim tail at the drawn length ending in a full tuft. It swishes, flicks and curls with mood, and the root is sensitive to touch.'
+              'A slim tail ending in a full tuft. It swishes, flicks and curls with mood, and the root is sensitive to touch.'
             ] },
           { key: 'ears', name: 'Ears', weight: 5, range: { least: 'Small furred ears set a little low', standard: 'Cow ears out to the sides', most: 'Large, wide ears' }, endsAs: 'furred cow ears out to the sides',
             stages: [
@@ -1036,7 +1431,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The nose runs cool and damp.',
               'The nose broadens and softens at the tip, the skin there smooth and darker; the nostrils widen.',
               'Nose and jaw sit slightly further forward than they did; the lips are fuller.',
-              'The same face, plainly the person\'s own, with as much cow in it as the draw allows. At the standard: a broad soft nose, the jaw slightly forward, a mild steady look.'
+              'The same face, plainly the person\'s own, with something of the cow in it, and a mild steady look.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, dark-lashed, wide-seeing eyes',
             stages: [
@@ -1048,7 +1443,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
-              'A strip of coat along the spine at the drawn width and reach, in the coat\'s colours. A hand run along it is felt down the whole back.'
+              'A strip of coat along the spine in the coat\'s colours. A hand run along it is felt down the whole back.'
             ] },
           { key: 'senses', name: 'Senses', weight: 3, endsAs: 'weather, water and grass read by nose, and low sound felt',
             stages: [
@@ -1078,7 +1473,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Unsettled alone and soothed by touch: leaning, grooming, a hand on the back. Pushed too far it does not flare; it sets and will not be moved.',
               'Placid, patient and close: at ease in a group, restless outside one, gentle until truly crossed and then immovable. Sleeps best touching someone.'
             ] },
-          { key: 'voice', name: 'Voice', weight: 2, endsAs: 'a low hum and a carrying low',
+          { key: 'voice', name: 'Voice', weight: 2, endsAs: 'a soft low voice that carries a long way',
             stages: [
               'A low hum in the chest when content.',
               'The voice deepens and softens. A long low note comes when calling or upset.',
@@ -1093,18 +1488,18 @@ window.WINDLASS_WORLDS.sundered = {
           { key: 'teats_and_udder', name: 'Teats and udder', weight: 12, sex: 'women', needs: [{ track: 'chest', stage: 3 }], range: { least: 'Nipples a little long; a small udder close to the belly', standard: 'Long thick nipples like teats; a small rounded four-teated udder', most: 'Full teats; a fuller udder that shows under clothes' }, endsAs: 'breasts with long thick nipples like teats and a small four-teated udder low on the belly',
             stages: [
               'The nipples are tender and stay raised; the breasts feel fuller and show faint veins.',
-              'The nipples lengthen and thicken toward the shape of teats. A soft warm swelling starts low on the belly, below the navel.',
+              'The nipples lengthen and thicken toward the shape of teats. A soft warm swelling starts below the navel.',
               'The swelling is a small firm mound with four tender points on it. The teats on the breasts show through cloth.',
               'The mound has rounded into a small udder, bare-skinned within the coat, its four points grown into short teats. It is warm, heavy for its size and very sensitive, and clothing has to make room.',
-              'Breasts faintly veined with long thick nipples like teats, and below them a small rounded udder with four teats, low on the belly, at the size the draw sets. Both are as sensitive as anything on the body.'
+              'Breasts faintly veined with long thick nipples like teats, and below them a small rounded udder with four teats, low on the belly. Both are as sensitive as anything on the body.'
             ] },
           { key: 'milk', name: 'Milk', weight: 8, sex: 'women', needs: [{ track: 'teats_and_udder', stage: 4 }], endsAs: 'being in milk',
             stages: [
               'A fullness and tightness in the udder late in the day, and a lesser one in the breasts.',
               'The fullness becomes pressure, then an ache that eases with warmth and a hand.',
-              'The first milk: drops, let down by warmth, touch or strong feeling. Relief follows, and a heavy calm.',
+              'The first milk: drops, let down by warmth, touch, arousal or strong feeling. Relief follows, and a heavy calm.',
               'The udder fills through the day and wants emptying morning and evening; the breasts give a little. Left too long it means soreness, weight and a short temper.',
-              'In milk, steadily. Milking is routine and brings a deep ease; whether it is private or shared is for the one in milk to decide.'
+              'In milk, steadily, and arousal lets it down as surely as warmth or a hand. Milking is routine and brings a deep ease; whether it is private or shared is for the one in milk to decide.'
             ] },
           { key: 'horns_and_crest', name: 'Horns and crest', weight: 12, sex: 'men', range: { least: 'Blunt horn stubs', standard: 'Two short thick horns, a heavy neck and a crest', most: 'Longer curving horns and a heavy crest' }, endsAs: 'two short thick horns, a heavy neck and a crest at the nape',
             stages: [
@@ -1112,7 +1507,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Horn buds break the skin, blunt and warm. Neck and shoulders gain bulk.',
               'The horns are a finger long, curving outward. The spine strip thickens at the nape.',
               'Longer and thick at the base, with real weight; the head is carried lower on a neck heavy with muscle.',
-              'Two horns curving out above the ears at the drawn length, a bull\'s neck and shoulders, and the spine strip risen to a crest at the nape. The horns feel touch at the base.'
+              'Two horns curving out above the ears, a bull\'s neck and shoulders, and the spine strip risen to a crest at the nape. The horns feel touch at the base.'
             ] },
           { key: 'the_bulls_ground', name: 'The bull\'s ground', weight: 8, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'placid until crossed, then immovable',
             stages: [
@@ -1129,7 +1524,7 @@ window.WINDLASS_WORLDS.sundered = {
               'A finger\'s length of bone and muscle under tight skin. It twitches when startled, and sitting has to allow for it.',
               'A hand\'s length in soft fur, already fuller than its bones. It curls and flicks with mood before the mood is known.',
               'Long and thickening fast, with a dense coat that doubles its width. It balances every quick turn and has to be kept track of.',
-              'A thick brush at the drawn length with a pale tip, as wide as a thigh and nearly weightless. It wraps the body in sleep and gives every feeling away, and the root is very sensitive.'
+              'A thick brush with a pale tip, as wide as a thigh and nearly weightless. It wraps the body in sleep and gives every feeling away, and the root is very sensitive.'
             ] },
           { key: 'second_tail', name: 'Second tail', weight: 5, needs: [{ track: 'tail', stage: 'finished' }], extentWith: 'tail', range: { least: 'None', standard: 'A second with age', most: 'Two or three full tails' }, endsAs: 'a second full tail',
             stages: [
@@ -1155,7 +1550,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The tip of the nose runs cool and damp.',
               'The tip darkens and narrows; the nostrils move when scenting.',
               'The nose is finer and the chin more pointed, both a little further forward. The cheekbones stand higher.',
-              'The same face, plainly the person\'s own, with as much fox in it as the draw allows. At the standard: a narrow dark-tipped nose, a pointed chin, a sly cast to the eyes.'
+              'The same face, plainly the person\'s own, with something of the fox in it, and a sly cast to the eyes.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'slit-pupilled eyes, bright at dusk',
             stages: [
@@ -1182,12 +1577,12 @@ window.WINDLASS_WORLDS.sundered = {
               'The body crouches and springs by reflex at small moving things. Balance is close to perfect.',
               'Light, quick and silent: the high pounce, the narrow ledge, the sudden change of direction. Most awake at dusk and dawn.'
             ] },
-          { key: 'guile', name: 'Guile', weight: 8, endsAs: 'clever, playful and at home in glamour',
+          { key: 'guile', name: 'Guile', weight: 8, endsAs: 'clever, playful and at home in misdirection',
             stages: [
               'Notices what people want and what they are hiding.',
               'A taste for teasing, misdirection and the small harmless lie; a straight answer takes effort.',
-              'Glamour and sleight come easily: a voice thrown, a face held, a thing palmed. Play has an edge.',
-              'Clever, playful and hard to pin down, with a trickster\'s pleasure in a well-made deception and a strict private sense of fairness about it. Glamour is second nature.'
+              'Sleight comes easily: a voice thrown, a face held, a thing palmed. Play has an edge.',
+              'Clever, playful and hard to pin down, with a trickster\'s pleasure in a well-made deception and a strict private sense of fairness about it. Misdirection is second nature.'
             ] },
           { key: 'voice', name: 'Voice', weight: 3, endsAs: 'the yip, the chatter and the scream',
             stages: [
@@ -1206,35 +1601,35 @@ window.WINDLASS_WORLDS.sundered = {
               'Tender points on the ribs under each breast, like pressed bruises.',
               'Each is a small flat disc of darker skin. A second pair of tender points sits lower, toward the navel.',
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
-              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, as many as the draw sets (two more pairs at the standard), each as sensitive as the first.'
+              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly (two more pairs on most), each as sensitive as the first.'
             ] },
           { key: 'bib', name: 'Bib', weight: 5, sex: 'men', range: { least: 'Pale down at the throat', standard: 'A bib from throat to chest', most: 'A full pale ruff over throat and chest' }, endsAs: 'a pale bib from the throat down the chest',
             stages: [
               'The throat and upper chest grow fine pale down.',
               'A pale patch of short coat at the throat.',
               'It spreads down the breastbone and thickens at the neck.',
-              'A pale bib from the throat down the chest at the drawn reach, on a slight, fine-boned frame.'
+              'A pale bib from the throat down the chest, on a slight, fine-boned frame.'
             ] },
           { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'one season a year, at midwinter',
             stages: [
               'A few restless nights in the dead of winter, with no cause to point to.',
               'It has a shape: wakeful after dark, warm, quick-tempered, the musk stronger.',
-              'A full season: nights of wanting, calling and pacing, and days short on sleep and patience. Company quiets it and solitude sharpens it.',
-              'It comes once a year at midwinter for a few weeks and is planned around. At its height it is most of thought; then it lifts with the lengthening days. What is done with it stays the player\'s to say.'
+              'A full season: nights of heat, calling and pacing, and days short on sleep and patience. Company quiets it and solitude sharpens it.',
+              'It comes once a year at midwinter for a few weeks and is planned around. At its height the body runs hot and sleep comes hard; then it lifts with the lengthening days.'
             ] },
           { key: 'winter_roaming', name: 'Winter roaming', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a loud, restless midwinter',
             stages: [
               'Restless on winter nights; walks further than intended.',
               'The musk strengthens with the cold, and a bark comes at night without quite being chosen.',
               'Restless enough to walk half the night; the temper runs short. Appetite drops.',
-              'Every midwinter: loud and restless, the musk strong, and any woman of the kind in season known by scent. What is done with it stays the player\'s to say, and it passes with the season.'
+              'Every midwinter: loud and restless, the musk strong, and any woman of the kind in season known by scent. It passes with the season.'
             ] },
           { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with small claws', standard: 'Slim fingers, pads and small dark claws', most: 'Short quick fingers with full pads and furred backs; still hands' }, endsAs: 'Slim fingers, pads and small dark claws',
             stages: [
               'Nails thicker and harder from the root, growing to a blunt point however short they are cut.',
               'Fingertip skin thickens into the first of the pads. Touch through them is duller for texture and sharper for pressure and warmth.',
               'The nails are claws: curved, rooted deeper, the quick grown down into them. A pad on every fingertip and one forming across the palm; knuckles heavier. Fine grip has to be relearned.',
-              'Five strong fingers, a pad on each tip and a broad one across the palm, blunt claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
+              'Five fingers, a pad on each tip and one across the palm, the nails grown to claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Dark gloves to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Dark gloves from the hands to the elbows',
             stages: [
@@ -1248,7 +1643,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
-              'Four toes with a pad under each and blunt claws that do not sheathe; the dewclaw high on the inside. Nothing with a closed toe fits.'
+              'Four toes, blunt claws that do not sheathe and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
           { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a narrow paw', standard: 'Heel raised, weight on the toes', most: 'A full hock on a long narrow foot' }, endsAs: 'Narrow paws, heel raised',
             stages: [
@@ -1256,7 +1651,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
               'The bones of the mid-foot lengthen. The heel resists coming down, and standing still means standing on the toes. Calves and shoes both complain.',
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
-              'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised as far as the draw sets. Quiet on hard floors, and balance is better than it ever was.'
+              'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised. Quiet on hard floors, and balance is better than it ever was.'
             ] },
           { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Stockings to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, dark stockings below the knee',
             stages: [
@@ -1264,13 +1659,13 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Pelt from the paws up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
-              'A strip of coat along the spine at the drawn width and reach, in the coat\'s colours. A hand run along it is felt down the whole back.'
+              'A strip of coat along the spine in the coat\'s colours. A hand run along it is felt down the whole back.'
             ] }
         ],
         cat: [
@@ -1279,14 +1674,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Nails thicker and narrower, curving to points.',
               'The fingertips soften into small pads. The last joint of each finger loosens and bends back further than before.',
               'The nails are curved claws that draw back into the fingertip and slide out when the fingers flex. They come out with temper or pleasure before the mind decides.',
-              'Five supple fingers with soft pads and sharp claws that sheathe completely, as far as the draw sets. A hand that can be velvet or hooks; kneading something soft is a deep comfort.'
+              'Five supple fingers with soft pads and sharp claws that sheathe completely. A hand that can be velvet or hooks; kneading something soft is a deep comfort.'
             ] },
           { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, needs: [{ track: 'hands', stage: 3 }], endsAs: 'Four toes, the claws sheathed, and a dewclaw',
             stages: [
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
-              'Four toes with a pad under each and sharp claws that sheathe and slide out; the dewclaw high on the inside. Nothing with a closed toe fits.'
+              'Four toes, sharp claws that sheathe and slide out and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
           { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a soft paw', standard: 'Heel raised, weight on the toes', most: 'A full hock' }, endsAs: 'Soft silent paws, heel raised',
             stages: [
@@ -1294,14 +1689,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
               'The bones of the mid-foot lengthen. The heel resists coming down, and standing still means standing on the toes. Calves and shoes both complain.',
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
-              'A paw: the long foot narrow and soft-padded, furred to the claws, weight on the toes and the broad pad, the heel raised as far as the draw sets. It makes no sound on any floor, and balance is better than it ever was.'
+              'A paw: the long foot narrow and soft-padded, furred to the claws, weight on the toes and the broad pad, the heel raised. It makes no sound on any floor, and balance is better than it ever was.'
             ] },
           { key: 'tail', name: 'Tail', weight: 7, range: { least: 'Slim, to the knee', standard: 'Long, to the ankle', most: 'Longer than the leg and thick-furred' }, endsAs: 'a long expressive tail',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of slim tail in short fur. It twitches at the tip with attention, and sitting has to allow for it.',
               'Long and supple, moving all the time: a slow wave for thought, a lash for temper, upright for welcome.',
-              'A long tail at the drawn length that balances every leap and speaks every mood. It curls round what its owner likes, and stroked at the base it arches the whole back.'
+              'A long tail that balances every leap and speaks every mood. It curls round what its owner likes, and stroked at the base it arches the whole back.'
             ] },
           { key: 'ears', name: 'Ears', weight: 6, range: { least: 'Small points', standard: 'Pointed cat ears set high', most: 'Large, tufted at the tips' }, endsAs: 'pointed cat ears set high',
             stages: [
@@ -1315,7 +1710,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Fine dots appear on the upper lip, tender to the touch.',
               'Stiff pale hairs grow from the dots and above the brows. They feel the air move.',
               'The nose shortens and broadens a little, the tip darkening; the chin is smaller and the cheeks fuller at the whisker pads.',
-              'The same face, plainly the person\'s own, with as much cat as the draw allows. At the standard: a short broad nose, a small chin, and whiskers that read a gap\'s width and a draught\'s direction.'
+              'The same face, plainly the person\'s own, with something of the cat in it, and whiskers that read a gap\'s width and a draught\'s direction.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'slit-pupilled eyes that shine in the dark',
             stages: [
@@ -1351,7 +1746,7 @@ window.WINDLASS_WORLDS.sundered = {
           { key: 'self_and_affection', name: 'Self and affection', weight: 8, endsAs: 'proud, curious, and warm on its own terms',
             stages: [
               'Less eager to please; a no comes easier.',
-              'Company is wanted on its own terms: near, then not. Curiosity pulls hard.',
+              'Closeness comes on its own terms: near, then not.',
               'Affection is physical and sudden: a cheek rubbed along a jaw, a body pressed close, then distance. Dislikes being held when it was not the one to choose.',
               'Self-possessed, curious and proud, giving warmth freely to the few it chooses and marking them with its cheek. Its trust is slow and, once given, plain.'
             ] },
@@ -1372,28 +1767,28 @@ window.WINDLASS_WORLDS.sundered = {
               'Tender points on the ribs under each breast, like pressed bruises.',
               'Each is a small flat disc of darker skin. A second pair of tender points sits lower, toward the navel.',
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
-              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, as many as the draw sets (three more pairs in two rows at the standard), each as sensitive as the first.'
+              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly (three more pairs on most), each as sensitive as the first.'
             ] },
           { key: 'toms_build', name: 'Tom\'s build', weight: 5, sex: 'men', range: { least: 'A thick neck', standard: 'Broad cheeks, a thick neck, heavy forearms', most: 'Heavy jowls and shoulders' }, endsAs: 'broad cheeks, a thick neck and heavy forearms',
             stages: [
               'The neck thickens.',
               'The cheeks fill out at the jaw.',
               'Broad cheeks and a heavy neck; the forearms thicken.',
-              'A broad-cheeked face, a thick neck and heavy forearms at the drawn weight, on a body otherwise as supple as any cat\'s.'
+              'A broad-cheeked face, a thick neck and heavy forearms, on a body otherwise as supple as any cat\'s.'
             ] },
           { key: 'season', name: 'Season', weight: 5, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'seasons that return from spring to autumn',
             stages: [
-              'A few restless days in spring, warm and wanting contact.',
+              'A few restless days in spring, warm, the skin alive to touch.',
               'It returns every few weeks through spring and summer: restless, affectionate, rubbing against things and people.',
               'A full season: calling at night, rolling, unable to settle, skin alive to every touch. It lasts days and comes back within weeks.',
-              'Seasons come again and again from spring to autumn and are planned around. At the height it is most of thought; between, the body is entirely its own. What is done with it stays the player\'s to say.'
+              'Seasons come again and again from spring to autumn and are planned around. At the height the body runs hot and will not settle; between, it is entirely its own.'
             ] },
           { key: 'roaming', name: 'Roaming', weight: 5, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'a spring and summer of roaming',
             stages: [
               'Wakeful on spring nights.',
               'Walks at night, further each time, leaving scent along the way.',
               'Hears a woman\'s calling from far off; bristles at other toms, and the voice yowls without leave.',
-              'Through spring and summer: wakeful and restless, the scent strong, and any season nearby known by scent. What is done with it stays the player\'s to say.'
+              'Through spring and summer: wakeful and restless, the scent strong, and any season nearby known by scent.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
@@ -1408,13 +1803,13 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Pelt from the paws up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'spine_line', name: 'Spine line', weight: 3, endsAs: 'A line of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
-              'A strip of coat along the spine at the drawn width and reach, in the coat\'s colours. A hand run along it is felt down the whole back.'
+              'A strip of coat along the spine in the coat\'s colours. A hand run along it is felt down the whole back.'
             ] }
         ],
         rabbit: [
@@ -1438,13 +1833,13 @@ window.WINDLASS_WORLDS.sundered = {
               'The foot lengthens from heel to toe, and fine fur spreads over the top of it.',
               'Half as long again, the sole growing a dense mat of fur in place of bare skin. The heel lifts when moving and comes down at rest.',
               'Long, narrow and powerful, furred on the sole, with a spring in the ankle that wants to be used. Walking is short steps; standing still, the whole long foot lies flat.',
-              'Long hind feet at the drawn length, furred to the sole and silent, flat at rest and up on the toes at speed. They thump the ground hard when alarmed, without leave.'
+              'Long hind feet, furred to the sole and silent, flat at rest and up on the toes at speed. They thump the ground hard when alarmed, without leave.'
             ] },
           { key: 'belly_fur', name: 'Belly fur', weight: 4, needs: [{ track: 'leg_and_hip_coat', stage: 'finished' }], extentWith: 'leg_and_hip_coat', range: { least: 'None', standard: 'Pale belly fur to just under the breasts', most: 'Pale belly fur to just under the breasts' }, endsAs: 'soft pale fur from the hips to just under the breasts',
             stages: [
               'Fine pale down from the navel upward.',
               'Soft pale fur over the belly, shorter and finer than the coat.',
-              'Soft pale belly fur from the hips to just under the breasts at the drawn reach, the softest coat on the body and the most sensitive to a hand.'
+              'Soft pale belly fur from the hips to just under the breasts, the softest coat on the body and the most sensitive to a hand.'
             ] },
           { key: 'bob_tail', name: 'Bob tail', weight: 4, range: { least: 'A small tuft', standard: 'A round bob', most: 'A full soft scut' }, endsAs: 'a short round tail, pale beneath',
             stages: [
@@ -1458,14 +1853,14 @@ window.WINDLASS_WORLDS.sundered = {
               'They lengthen upward, the tops rounding, with fine fur along the edges.',
               'As long as a hand and still growing, sitting higher on the skull, turning toward sound on their own.',
               'Long and upright, furred outside and thin enough inside to show the light. They rise with interest and lie back with fear. Anything worn on the head is a problem.',
-              'Long rabbit ears at the drawn length, each turning independently, warm and velvet to hold. Stroked from base to tip, they loosen the whole body.'
+              'Long rabbit ears, each turning independently, warm and velvet to hold. Stroked from base to tip, they loosen the whole body.'
             ] },
           { key: 'nose_and_lip', name: 'Nose and lip', weight: 6, face: true, range: { least: 'The person\'s own human face; the rabbit shows in ears, eyes and whiskers', standard: 'A faint cast: a cleft nose, a faintly split lip', most: 'A short soft muzzle with a rabbit\'s nose and lip; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a cleft nose and a faintly split lip',
             stages: [
               'The nose twitches with every new smell.',
               'A fine line appears down the centre of the upper lip and the nose tip; fine whiskers start at the cheeks.',
               'The nose is cleft and soft, moving all the time; the upper lip has parted slightly along its line.',
-              'The same face, plainly the person\'s own, with as much rabbit as the draw allows. At the standard: a soft cleft nose that never stops moving, a faintly split upper lip, and fine whiskers.'
+              'The same face, plainly the person\'s own, with something of the rabbit in it, the nose never still, and fine whiskers.'
             ] },
           { key: 'front_teeth', name: 'Front teeth', weight: 4, endsAs: 'front teeth a little long, kept down by gnawing',
             stages: [
@@ -1501,7 +1896,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] },
           { key: 'warren', name: 'Warren', weight: 7, endsAs: 'sociable, nesting and close',
             stages: [
-              'Wants company and closeness more than before.',
+              'Sleeps easier with company close than before.',
               'Makes a nest of whatever is soft, and sleeps better in a heap.',
               'Greets with a touch of the nose, grooms friends, and frets when one is missing.',
               'Sociable to the bone: a burrow of blankets, bodies piled warm, noses touched in greeting, and a need to know where everyone is.'
@@ -1517,14 +1912,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Tender points on the ribs under each breast, like pressed bruises.',
               'Each is a small flat disc of darker skin. A second pair of tender points sits lower, toward the navel.',
               'The upper pair have risen into small true nipples; the lower pair are discs. All tighten together in the cold.',
-              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, hidden in the belly fur, as many as the draw sets (two more pairs at the standard), each as sensitive as the first.'
+              'Breasts as before, and beneath them further pairs of small nipples in two lines down the belly, hidden in the belly fur (two more pairs on most), each as sensitive as the first.'
             ] },
           { key: 'year_round', name: 'Year-round', weight: 6, sex: 'women', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'no season: a steady, ready warmth',
             stages: [
               'Warmer toward touch than before, on any day.',
-              'Affection and wanting sit close to the surface all the time, easily roused by closeness.',
-              'No rise and fall through the year: a steady warmth that a touch can turn into wanting.',
-              'Always a little in season and never overwhelmed by it: affectionate, easily roused, and at ease with it. What is done with it stays the player\'s to say.'
+              'Warmth sits close under the skin all the time, quick to rise at closeness.',
+              'No rise and fall through the year: a steady warmth in the skin that a touch can stir.',
+              'Always a little in season and never overwhelmed by it: warm, quick to rouse, steady.'
             ] },
           { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
@@ -1539,13 +1934,13 @@ window.WINDLASS_WORLDS.sundered = {
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
               'Full coat to the knee, lying downward and shedding water; undercoat climbing the thigh. Cloth drags against the lie.',
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
-              'Pelt from the paws up to wherever the draw sets, thinning to bare skin in a soft uneven line. At the standard it closes over the hips and fades out at the navel.'
+              'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
           { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
-              'A strip of coat along the spine at the drawn width and reach, in the coat\'s colours. A hand run along it is felt down the whole back.'
+              'A strip of coat along the spine in the coat\'s colours. A hand run along it is felt down the whole back.'
             ] }
         ],
         harpy: [
@@ -1553,7 +1948,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'A prickling along the outer arms, and rows of small hard points under the skin.',
               'Pin feathers break through from shoulder to wrist, sheathed and itching, and open into soft down.',
-              'True feathers overlay the down in the drawn colours, lying back along the arm. Sleeves catch and bend them.',
+              'True feathers overlay the down, lying back along the arm. Sleeves catch and bend them.',
               'The arms are feathered from the shoulder to the wrist, sleek, warm and waterproof. Each feather has feeling at its root, and a hand smoothing them the right way is a deep comfort.'
             ] },
           { key: 'wings', name: 'Wings', weight: 12, needs: [{ track: 'arm_feathers', stage: 'finished' }], range: { least: 'Feathered arms that glide but do not lift', standard: 'Arms as wings: short flight and long glides', most: 'Arms as great wings: strong sustained flight' }, endsAs: 'the arms as wings',
@@ -1562,9 +1957,9 @@ window.WINDLASS_WORLDS.sundered = {
               'The flight feathers lengthen past the fingertips. The forearm grows longer and lighter, and the chest muscles ache.',
               'The arm opens into a true wing a body-length across, and the shoulders turn further than a human\'s. Folded, the wings lie along the sides; doors and crowds need thought.',
               'The breast muscle is deep and strong. A hard downbeat lifts the feet from the ground, and a drop from a height becomes a glide.',
-              'The arms are wings at the drawn span: flight in short strong bursts, long glides from any height, and a wing folded round someone as an embrace. Grounded for long, the body pines.'
+              'The arms are wings: flight in short strong bursts, long glides from any height, and a wing folded round someone as an embrace. Grounded for long, the body pines.'
             ] },
-          { key: 'hands', name: 'Hands', weight: 6, range: { least: 'Four clawed fingers', standard: 'A thumb and two clawed fingers', most: 'A thumb and one strong clawed finger' }, endsAs: 'a thumb and two clawed fingers at each wrist',
+          { key: 'hands', name: 'Hands', weight: 6, range: { least: 'A thumb and two short clawed fingers', standard: 'A thumb and two clawed fingers', most: 'A thumb and two strong clawed fingers, the claws long and curved' }, endsAs: 'a thumb and two clawed fingers at each wrist',
             stages: [
               'The ring and little fingers stiffen and lie against the edge of the hand.',
               'They have drawn into the hand\'s edge, which now carries quills. The nails of the thumb and two remaining fingers thicken and hook.',
@@ -1577,20 +1972,20 @@ window.WINDLASS_WORLDS.sundered = {
               'The little toe shortens and is lost into the foot. The big toe sets lower and begins to turn.',
               'The big toe has swung round to the back. Three long toes forward and one behind, each ending in a talon; the skin of the foot hardens into fine scales.',
               'Scales climb toward the knee, the shin thins and the heel lifts. The foot grips whatever it stands on, by itself.',
-              'Scaled shanks and talons, three toes forward and one back, at the drawn weight. They lock round a perch in sleep, carry a surprising load, and click on hard floors.'
+              'Scaled shanks and talons, three toes forward and one back. They lock round a perch in sleep, carry a surprising load, and click on hard floors.'
             ] },
           { key: 'leg_and_hip_feathers', name: 'Leg and hip feathers', weight: 7, range: { least: 'Knee to mid-thigh', standard: 'Knee to hips, fading out at the navel, and down the spine', most: 'Feathers from knee to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'feathers from knee to hips and down the spine',
             stages: [
               'Prickling above the knees and at the base of the spine.',
               'Down over the thighs; pin feathers at the hips.',
               'Soft body feathers from knee to hip, and a line of them up the spine.',
-              'Feathers from the knee to the hips, thinning to bare skin at the navel, and a line of down along the spine, at the drawn reach. Soft, warm, and sensitive to a smoothing hand.'
+              'Feathers from the knee to the hips, thinning to bare skin at the navel, and a line of down along the spine. Soft, warm, and sensitive to a smoothing hand.'
             ] },
           { key: 'tail_fan', name: 'Tail fan', weight: 5, range: { least: 'A few short feathers', standard: 'A fan', most: 'A long sweeping fan' }, endsAs: 'a fan of tail feathers',
             stages: [
               'A bruised ache at the base of the spine, and a row of quills starting there.',
               'Short tail feathers that spread and close with balance and mood.',
-              'A fan of tail feathers at the drawn length that steers in the air and flares with feeling. The root is sensitive.'
+              'A fan of tail feathers that steers in the air and flares with feeling. The root is sensitive.'
             ] },
           { key: 'crest_and_ears', name: 'Crest and ears', weight: 5, range: { least: 'A few feathers in the hair', standard: 'A crest, with tufts over the ears', most: 'A full crest, feathers all through the hair, and tufts where the ears were' }, endsAs: 'a crest through the hair and feather tufts where the ears were',
             stages: [
@@ -1603,7 +1998,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'The head tilts to look, one eye and then the other.',
               'The nose is finer and a touch sharper; the eyes seem larger.',
-              'The same face, plainly the person\'s own, with as much bird as the draw allows. At the standard: a fine sharp nose, large bright eyes, quick tilting movements.'
+              'The same face, plainly the person\'s own, with something of the bird in it, and quick tilting movements.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'far-sighted, bright eyes',
             stages: [
@@ -1672,7 +2067,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The skin between the fingers feels tight when they spread.',
               'A thin fold of skin joins the fingers at the base.',
               'Webbing to the middle joint, translucent; the hands cup water well.',
-              'Long fingers webbed as far as the draw sets, the web folding away when the hand closes. Strong in the water and deft out of it.'
+              'Long webbed fingers, the web folding away when the hand closes. Strong in the water and deft out of it.'
             ] },
           { key: 'webbed_feet', name: 'Webbed feet', weight: 6, endsAs: 'long webbed feet',
             stages: [
@@ -1686,7 +2081,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The skin of the hands and wrists feels smooth and cool, faintly patterned.',
               'Fine scales on the backs of the hands, lying toward the fingers.',
               'Scales climbing the forearm, slick when wet and dull when dry.',
-              'Scales from the backs of the hands up the arm as far as the draw sets, fading into pearled skin. Stroked with the lie they are silk; against it, a rasp.'
+              'Scales from the backs of the hands up the arm, fading into pearled skin. Stroked with the lie they are silk; against it, a rasp.'
             ] },
           { key: 'leg_and_hip_scales', name: 'Leg and hip scales', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, fading out at the navel', most: 'Scales from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'scales from feet to hips, fading out at the navel',
             stages: [
@@ -1694,7 +2089,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Fine scales over the feet and shins. Dry, they itch.',
               'Scales to the knee, larger and brighter on the shins.',
               'Scales over thighs and hips, small and fine on the inner thigh, the colours strong when wet.',
-              'Scales from the feet up to wherever the draw sets, fading out in a soft uneven line. At the standard they close over the hips and end at the navel. Cool to the touch, bright in water, and sensitive to a hand moving with the lie.'
+              'Scales from the feet up, fading out in a soft uneven line. Cool to the touch, bright in water, and sensitive to a hand moving with the lie.'
             ] },
           { key: 'water_tail', name: 'Water tail', weight: 10, needs: [{ track: 'leg_and_hip_scales', stage: 'finished' }, { track: 'webbed_feet', stage: 'finished' }], range: { least: 'Legs stay legs, finned and webbed', standard: 'Legs close into a tail and fluke', most: 'The tail holds for an hour after leaving the water' }, endsAs: 'one scaled tail and a fluke, in water',
             stages: [
@@ -1715,13 +2110,13 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'The ears thin at the rims.',
               'The tops lengthen into soft spines with skin between them.',
-              'Finned, translucent ears at the drawn size that fan and fold with mood and hear well underwater.'
+              'Finned, translucent ears that fan and fold with mood and hear well underwater.'
             ] },
           { key: 'spine_ridge', name: 'Spine ridge', weight: 4, extentWith: 'finned_ears', range: { least: 'Small fins', standard: 'A low ridge', most: 'A high back fin' }, endsAs: 'a low fin-ridge up the spine',
             stages: [
               'A line of smooth cool skin down the backbone.',
               'A low ridge of soft spines beginning between the shoulders.',
-              'A fin-ridge along the spine at the drawn height, lying flat in air and lifting in water. Sensitive at its base.'
+              'A fin-ridge along the spine, lying flat in air and lifting in water. Sensitive at its base.'
             ] },
           { key: 'sheen_and_skin', name: 'Sheen and skin', weight: 5, endsAs: 'smooth, cool, pearl-sheened skin',
             stages: [
@@ -1733,7 +2128,7 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'The nose feels flatter at the bridge.',
               'The nostrils narrow and can close; the eyes sit a touch wider.',
-              'The same face, plainly the person\'s own, with as much of the sea as the draw allows. At the standard: a slightly flat nose, wide-set eyes, a mouth made for singing.'
+              'The same face, plainly the person\'s own, with something of the sea in it, and a mouth made for singing.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'eyes that see clearly underwater',
             stages: [
@@ -1741,12 +2136,12 @@ window.WINDLASS_WORLDS.sundered = {
               'The iris turns {eye}, and a clear inner lid slides across in water.',
               'Large {eye} eyes that see clearly underwater and in the dim of depth, and find full noon too bright.'
             ] },
-          { key: 'voice', name: 'Voice', weight: 7, endsAs: 'a voice that is hard to stop listening to',
+          { key: 'voice', name: 'Voice', weight: 7, endsAs: 'a voice that carries a long way and holds a listener still',
             stages: [
               'The voice carries further than intended.',
               'A singing voice of new range and sweetness; people stop to listen.',
-              'Underwater it carries for miles as clicks and long notes. In air, a sung line holds a listener still for a moment.',
-              'A voice that carries and is hard to stop listening to. Sung with intent it draws people nearer and softens them, and using that on someone unwilling is a line the merfolk hold hard.'
+              'Underwater it carries for miles as clicks and long notes. In air, a sung line reaches everyone in the room.',
+              'A voice that carries and that people stop to hear. Sung with intent it holds a listener still; holding someone unwilling that way is a line the merfolk hold hard.'
             ] },
           { key: 'water_need', name: 'Water need', weight: 7, endsAs: 'soaking daily, with a dry spell felt as illness',
             stages: [
@@ -1778,7 +2173,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The skin of the chest takes the pearl sheen first.',
               'The breasts are smoother and firmer, cool to the touch.',
               'The nipples pale to the colour of the inside of a shell.',
-              'Smooth, firm breasts with the pearl sheen and pale nipples, at the size the draw sets. They warm slowly under a hand.'
+              'Smooth, firm breasts with the pearl sheen and pale nipples. They warm slowly under a hand.'
             ] },
           { key: 'colours', name: 'Colours', weight: 7, sex: 'men', endsAs: 'bright scales, a tall back fin and a swimmer\'s shoulders',
             stages: [
@@ -1791,15 +2186,15 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Restless for a few days near the highest tides.',
               'At the spring tides: warm, wakeful, drawn to the water, the scales brighter.',
-              'A full season at the spring tides: singing more, wanting, restless on land and easy only in the pools.',
-              'The season comes with the spring tides and passes with them, planned around like weather. What is done with it stays the player\'s to say.'
+              'A full season at the spring tides: singing more, running warm, restless on land and easy only in the pools.',
+              'The season comes with the spring tides and passes with them, planned around like weather.'
             ] },
           { key: 'display', name: 'Display', weight: 7, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, endsAs: 'colour and song at the spring tides',
             stages: [
               'Livelier near the highest tides.',
               'The colours flare at the spring tides; the swimming is harder and the singing louder.',
               'The colours flare brightest near any woman of the kind in season, and the water will not allow stillness.',
-              'At the spring tides: all colour and song. What is done with it stays the player\'s to say, and it passes with the tide.'
+              'At the spring tides: all colour and song, and it passes with the tide.'
             ] }
         ],
         dryad: [
@@ -1808,7 +2203,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The nails harden and narrow to points.',
               'The finger joints stand out like the nodes on a twig, and the fingers lengthen.',
               'Long jointed fingers with thorn nails; the skin over the knuckles is finely ridged.',
-              'Long twig-jointed fingers with nails like thorns, as far as the draw sets. Strong, patient and exact, and gentle with anything growing.'
+              'Long twig-jointed fingers with nails like thorns. Strong, patient and exact, and gentle with anything growing.'
             ] },
           { key: 'feet_and_roots', name: 'Feet and roots', weight: 7, endsAs: 'splayed thorn-nailed toes and grained soles that root',
             stages: [
@@ -1822,7 +2217,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The skin of the hands and wrists roughens and dries.',
               'Fine bark on the backs of the hands, thin as paper.',
               'Bark climbing the forearm, ridged along the arm, with smooth skin at the creases of wrist and palm.',
-              'Bark from the backs of the hands up the arm as far as the draw sets, thinning into grained skin. Warm in sun, and a touch on it is felt slowly and deeply.'
+              'Bark from the backs of the hands up the arm, thinning into grained skin. Warm in sun, and a touch on it is felt slowly and deeply.'
             ] },
           { key: 'leg_and_hip_bark', name: 'Leg and hip bark', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, thinning out at the navel', most: 'Bark from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'bark from feet to hips, thinning out at the navel',
             stages: [
@@ -1830,19 +2225,19 @@ window.WINDLASS_WORLDS.sundered = {
               'Thin bark on the shins.',
               'Bark to the knee, ridged, with smooth skin behind the joint so it bends.',
               'Bark climbing the thighs and hips, thinner and finer on the inner thigh.',
-              'Bark from the feet up to wherever the draw sets, thinning to smooth grained skin in an uneven line. At the standard it closes over the hips and ends at the navel. It keeps out cold and thorn, and needs oil or rain to stay supple.'
+              'Bark from the feet up, thinning to smooth grained skin in an uneven line. It keeps out cold and thorn, and needs oil or rain to stay supple; dry, it aches.'
             ] },
           { key: 'spine_ridge', name: 'Spine ridge', weight: 3, endsAs: 'a ridge of bark up the spine',
             stages: [
               'A line of rough skin down the backbone.',
               'A narrow ridge of bark from the base of the spine upward.',
-              'A ridge of bark along the spine at the drawn width and reach, flexing in plates.'
+              'A ridge of bark along the spine, flexing in plates; a hand pressed on it is felt deep and warm.'
             ] },
           { key: 'grain', name: 'Grain', weight: 5, endsAs: 'skin faintly grained like pale wood',
             stages: [
               'The skin takes a faint pattern, like wood under varnish.',
               'Grain shows on the bare skin everywhere. A scratch beads with clear sap before blood.',
-              'Skin faintly grained like pale wood in the drawn tone, cool and smooth, healing clean and slowly. Body hair is gone below the head.'
+              'Skin faintly grained like pale wood, cool and smooth, healing clean and slowly. Body hair is gone below the head.'
             ] },
           { key: 'leaves', name: 'Leaves', weight: 7, range: { least: 'A few leaves in the hair', standard: 'Leaves growing through the hair', most: 'A crown of leaves and fine twigs through the hair' }, endsAs: 'leaves growing through the hair',
             stages: [
@@ -1855,13 +2250,13 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'The ear tips lengthen.',
               'Long and flat, with a central vein.',
-              'Long leaf-shaped ears at the drawn length that turn toward light as well as sound.'
+              'Long leaf-shaped ears that turn toward light as well as sound.'
             ] },
           { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face with a faint grain', standard: 'A faint cast: high cheekbones, faint grain', most: 'Strong grain, with bark at the temples and jaw' }, endsAs: 'the person\'s own face with a faint cast of the wood',
             stages: [
               'The face looks stiller in the mirror.',
               'The cheekbones stand higher, and the grain shows faintly on the skin.',
-              'The same face, plainly the person\'s own, with as much of the wood as the draw allows. At the standard: high cheekbones, faint grain, a calm unhurried look.'
+              'The same face, plainly the person\'s own, with something of the wood in it, and a calm, still look.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes that read light and growing things',
             stages: [
@@ -1898,11 +2293,11 @@ window.WINDLASS_WORLDS.sundered = {
               'Feels what it feels: wind in its crown, frost at its root, harm coming near it.',
               'Bound to one tree. Near it the dryad is strongest and most at ease; far from it for long, it pines. Harm to one is harm to the other.'
             ] },
-          { key: 'voice', name: 'Voice', weight: 3, endsAs: 'low and unhurried',
+          { key: 'voice', name: 'Voice', weight: 3, endsAs: 'low and slow, with a creak in it',
             stages: [
               'Speaks more slowly.',
               'The voice lowers and softens, with a creak in it.',
-              'A low, unhurried voice with the sound of wood and leaves under it.'
+              'A low, slow voice with the sound of wood and leaves under it.'
             ] },
           { key: 'own_scent', name: 'Own scent', weight: 3, endsAs: 'sap, leaf and rain',
             stages: [
@@ -1915,7 +2310,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The skin of the chest stays smooth as bark spreads elsewhere.',
               'The grain on the breasts is fine and pale; the nipples darken.',
               'Where bark reaches the ribs, it parts round the breasts and leaves them bare.',
-              'Breasts of smooth grained skin where the bark opens, the nipples dark as knots in pale wood, at the size the draw sets.'
+              'Breasts of smooth grained skin where the bark opens, the nipples dark as knots in pale wood.'
             ] },
           { key: 'bark', name: 'Bark', weight: 7, sex: 'men', needs: [{ track: 'spine_ridge', stage: 2 }], endsAs: 'heavy bark across the shoulders',
             stages: [
@@ -1928,15 +2323,15 @@ window.WINDLASS_WORLDS.sundered = {
             stages: [
               'Small buds among the leaves in spring.',
               'The buds open: flowers in the hair for a few weeks, scented, visited by bees.',
-              'In flower: warm, bright and wanting, the scent carrying on the air. After it, small fruits set among the leaves.',
-              'Flowers every spring and fruits by late summer. The flowering is the season, felt as sweetness and wanting; what is done with it stays the player\'s to say.'
+              'In flower: warm and bright, the scent carrying on the air. After it, small fruits set among the leaves.',
+              'Flowers every spring and fruits by late summer. The flowering is the season, felt as warmth and sweetness in the body.'
             ] },
           { key: 'catkins', name: 'Catkins', weight: 7, sex: 'men', crossAt: { track: 'rhythms', stage: 3 }, needs: [{ track: 'leaves', stage: 'finished' }], endsAs: 'catkins and pollen every spring',
             stages: [
               'Tassels bud among the leaves in spring.',
               'Catkins hang in the hair and shed pollen when shaken.',
               'In catkin: restless and bright, the catkins opening near any dryad in flower, dusting everything near gold.',
-              'Catkins every spring, and clouds of pollen with them. What is done with the season stays the player\'s to say, and it passes with the blossom.'
+              'Catkins every spring, and clouds of pollen with them; the season passes with the blossom.'
             ] }
         ],
         goblin: [
@@ -1946,7 +2341,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Green to the wrists, and at the toes and ear rims, darkest at the tips.',
               'Hands to elbows and feet to knees are deep green, and an olive cast is spreading over the rest.',
               'Green all over, darkest at the limbs and ears, the lips and nipples darker still. Body hair below the brows has thinned away.',
-              'Green skin from scalp to sole in the drawn shade, darkest from hands to elbows, feet to knees and at the ear tips, paling to olive on the belly and chest. Smooth, cool and tougher than it looks.'
+              'Green skin from scalp to sole, darkest from hands to elbows, feet to knees and at the ear tips, paling to olive on the belly and chest. Smooth, cool and tougher than it looks.'
             ] },
           { key: 'height', name: 'Height', weight: 10, range: { least: 'A head shorter than before', standard: 'About four feet', most: 'About three and a half feet' }, endsAs: 'about four feet, adult in proportion',
             stages: [
@@ -1954,7 +2349,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Shorter by a hand; sleeves and hems need turning up. The proportions stay an adult\'s.',
               'Shorter by a head. Counters, shelves and chairs are built for someone else.',
               'Shorter than nearly everyone, with a low centre of weight and a quick short stride. Shoes go loose, then too long.',
-              'The drawn height, about four feet at the standard, fully adult in proportion and build, compact and strong for the size. The world is tall, and climbing is the answer.'
+              'Grown into the new height, adult in proportion and build, compact and strong for the size. The world is tall, and climbing is the answer.'
             ] },
           { key: 'hands', name: 'Hands', weight: 7, range: { least: 'Long fingers', standard: 'Long nimble fingers, hard dark nails', most: 'Very long fingers with an extra reach of joint' }, endsAs: 'long nimble fingers with hard dark nails',
             stages: [
@@ -1975,14 +2370,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The ear tips ache and run warm.',
               'The tops draw to points and lengthen outward.',
               'Long pointed ears held out to the sides, moving with mood and sound.',
-              'Long pointed ears at the drawn length, held sideways, drooping with gloom and lifting with interest, sharp of hearing. The tips are sensitive.'
+              'Long pointed ears, held sideways, drooping with gloom and lifting with interest, sharp of hearing. The tips are sensitive.'
             ] },
           { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face, in green', standard: 'A faint cast: a nose a little long, a wide mouth', most: 'A long nose, a very wide mouth and heavy brows' }, endsAs: 'the person\'s own face with a faint goblin cast',
             stages: [
               'The nose feels larger to the fingers.',
               'The nose lengthens a little, and the mouth widens.',
               'The chin sharpens and the cheekbones stand out; the grin reaches further.',
-              'The same face, plainly the person\'s own and an adult\'s, with as much goblin as the draw allows. At the standard: a nose a little long, a wide mobile mouth, bright quick eyes.'
+              'The same face, plainly the person\'s own and an adult\'s, with something of the goblin in it, and bright quick eyes.'
             ] },
           { key: 'teeth', name: 'Teeth', weight: 3, endsAs: 'small sharp teeth',
             stages: [
@@ -2045,7 +2440,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The hips widen under the shortening frame.',
               'Hips and thighs fill, and the breasts keep their size as the body shrinks around them.',
               'Wide hips, a small waist, breasts full for the frame, the nipples dark green.',
-              'A compact, wide-hipped grown woman\'s figure with breasts full for the height and dark green nipples, at the size the draw sets.'
+              'A compact, wide-hipped grown woman\'s figure with breasts full for the height and dark green nipples.'
             ] },
           { key: 'build', name: 'Build', weight: 8, sex: 'men', range: { least: 'Wiry and long-armed, with big hands', standard: 'Wiry and long-armed, with big hands and lower canines a shade long', most: 'Wiry and long-armed, with big hands and small tusks' }, endsAs: 'wiry and long-armed, with big hands and lower canines a shade long',
             stages: [
@@ -2062,7 +2457,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Shorter by a hand, and lighter. The proportions stay an adult\'s.',
               'Shorter by a head and a half. Shoes are too long to walk in, and furniture is a climb.',
               'Waist-high to most people, slight and quick. A cup needs two hands.',
-              'The drawn height, about three feet at the standard, a grown adult\'s proportions in small, fine-boned and very light. Most of the world is oversized, and wings are the answer.'
+              'Grown into the new height, a grown adult\'s proportions in small, fine-boned and very light. Most of the world is oversized, and wings are the answer.'
             ] },
           { key: 'wing_buds', name: 'Wing buds', weight: 5, endsAs: 'four folded buds beside the spine',
             stages: [
@@ -2076,26 +2471,26 @@ window.WINDLASS_WORLDS.sundered = {
               'They unfold and dry into four small clear wings, veined like a leaf, too weak to lift anything.',
               'The wings lengthen past the waist and beat in a blur. A hop becomes a long float.',
               'Hovering for moments at a time; the back and chest ache with new muscle. Clothes need a low back.',
-              'Four clear veined wings at the drawn span that fold flat down the back. True flight once the body is small enough to carry: darting, hovering, tiring quickly. A fingertip along a wing vein is felt through the whole body.'
+              'Four clear veined wings that fold flat down the back. True flight once the body is small enough to carry: darting, hovering, tiring quickly. A fingertip along a wing vein is felt through the whole body.'
             ] },
           { key: 'sheen', name: 'Sheen', weight: 7, range: { least: 'At the fingertips and toes', standard: 'To the elbows and knees, and along the spine', most: 'Over the whole body' }, endsAs: 'an iridescent sheen at the limbs and spine',
             stages: [
               'The fingernails gleam as if polished.',
               'A faint shimmer on the fingertips and toes, colours moving in it.',
               'Iridescence climbing the forearms and the shins.',
-              'Bare skin all over, with a sheen like the inside of a shell from the fingertips and toes up the limbs and along the spine round the wing roots, at the drawn reach.'
+              'Bare skin all over, with a sheen like the inside of a shell from the fingertips and toes up the limbs and along the spine round the wing roots.'
             ] },
           { key: 'ears', name: 'Ears', weight: 5, range: { least: 'Small points', standard: 'Long pointed ears', most: 'Very long, swept back' }, endsAs: 'long pointed ears',
             stages: [
               'The ear tips ache.',
               'The tops draw up to points.',
-              'Long pointed ears at the drawn length, fine and upright, sensitive at the tips.'
+              'Long pointed ears, fine and upright, sensitive at the tips.'
             ] },
           { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face', standard: 'A faint cast: fine features, eyes a little large', most: 'Sharply fey: very large eyes and fine features on a human face' }, endsAs: 'the person\'s own face with a faint fey cast',
             stages: [
               'The features look finer in the mirror.',
               'Cheekbones and chin more delicate; the eyes seem larger.',
-              'The same face, plainly the person\'s own and an adult\'s, with as much of the fey as the draw allows. At the standard: fine features and eyes a little large.'
+              'The same face, plainly the person\'s own and an adult\'s, with something of the fey in it.'
             ] },
           { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'large, many-toned eyes that see glamour for what it is',
             stages: [
@@ -2164,7 +2559,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The waist draws in as the frame slims.',
               'A narrow waist and a light curve of hip.',
               'Small high breasts on a fine frame.',
-              'A slight, grown woman\'s figure in small: a narrow waist, light hips, small high breasts, at the size the draw sets.'
+              'A slight, grown woman\'s figure in small: a narrow waist, light hips, small high breasts.'
             ] },
           { key: 'build', name: 'Build', weight: 8, sex: 'men', endsAs: 'a slim, beardless grown man in small, with tinted wings',
             stages: [
@@ -2179,7 +2574,7 @@ window.WINDLASS_WORLDS.sundered = {
         { key: 'voice', name: 'Voice', weight: 8, endsAs: 'A woman\'s voice with the person\'s own phrasing',
           stages: [
             'The voice cracks upward on a word.',
-            'The low notes are gone; the whole range sits higher.',
+            'The deep register is gone; the whole range sits higher.',
             'Lighter and clearer, with less chest in it. The lump at the throat has smoothed away.',
             'A woman\'s voice, with the person\'s own turns of phrase in it. Even the laugh is new.'
           ] },
@@ -2238,14 +2633,14 @@ window.WINDLASS_WORLDS.sundered = {
             'Smaller and more sensitive by the day. The body\'s morning habit stops.',
             'Most of what was outward has drawn inward, with a tender fold where there was none.',
             'A woman\'s in form, new and easily overwhelmed.',
-            'Complete and working; the body is a woman\'s throughout. What is felt about it is the player\'s to say.'
+            'Complete and working; the body is a woman\'s throughout.'
           ] },
         { key: 'rhythms', name: 'Rhythms', weight: 12, needs: [{ track: 'chest', stage: 4, from: 3 }], endsAs: 'A woman\'s rhythm, by month or by season',
           stages: [
             'Feeling moves more freely; tears and laughter both come sooner.',
-            'Arousal changes shape: slower to start, spread wider through the body, less in one place; touch registers more widely. What is wanted stays the player\'s.',
+            'Arousal changes shape: slower to start, spread wider through the body, less in one place; touch registers more widely.',
             'A cycle begins: a few tender days and cramps, then the first bleed. In a kind with a season, the season takes its place.',
-            'The body keeps a woman\'s rhythm, by the month or by the season. Who it wants is the player\'s to say; how it wants is new.'
+            'The body keeps a woman\'s rhythm, by the month or by the season; how it wants is new.'
           ] }
       ],
       man: [
@@ -2310,14 +2705,14 @@ window.WINDLASS_WORLDS.sundered = {
             'The monthly bleed lightens, then stops.',
             'What was inward begins to close, and what was small is outward now.',
             'A man\'s in form, new and unruly, answering without being asked.',
-            'Complete and working; the body is a man\'s throughout. What is felt about it is the player\'s to say.'
+            'Complete and working; the body is a man\'s throughout.'
           ] },
         { key: 'rhythms', name: 'Rhythms', weight: 12, endsAs: 'A man\'s steadier rhythm',
           stages: [
             'Feeling sits further down; tears come harder and temper sooner.',
-            'Wanting changes shape: quicker to start, more in one place, set off by sight.',
+            'Arousal changes shape: quicker to start, more in one place, set off by sight.',
             'The monthly rhythm is gone and the days run level. In a kind whose men have a trait of their own, it starts here.',
-            'The body keeps a man\'s steadier rhythm. Who it wants is the player\'s to say; how it wants is new.'
+            'The body keeps a man\'s steadier rhythm; how it wants is new.'
           ] }
       ],
       bond: [
@@ -2332,7 +2727,7 @@ window.WINDLASS_WORLDS.sundered = {
           stages: [
             'Knows your name, your course and where you are from.',
             'Knows your habits: how you take your tea, when you go quiet, which chair is yours.',
-            'Reads your mood before you speak and knows what helps. You can do the same for them.',
+            'Reads your mood before you speak and knows what helps.',
             'Knows your history, finishes your sentence, and knows what you will not say.'
           ] },
         { key: 'trust', name: 'Trust', weight: 14, endsAs: 'Would put their safety in your hands',
@@ -2370,7 +2765,7 @@ window.WINDLASS_WORLDS.sundered = {
           stages: [
             'Nothing, and the thought may not have occurred.',
             'A charged moment that passes: a held look, a near thing, both careful afterwards.',
-            'A first kiss, and then kissing as a thing you do.',
+            'A first kiss, and after it kisses offered freely.',
             'Sharing a bed to sleep, undressing in front of each other, hands learning each other.',
             'Lovers. What it changes between you is told.'
           ] },
@@ -2416,7 +2811,7 @@ window.WINDLASS_WORLDS.sundered = {
             steps: ['a heaviness through the torso, warm and dragging, and the belly and hips filling out the clothes until a wrap makes more sense than trousers', 'a sense of the room behind {first}: who is there, how many, without turning; the nose running cool and damp at the tip', 'the sweat gone milder and sweeter, settling into a smell of warm hide and hay that is the herd\'s and is now a smell {first} has and can find on {themself}; the mood of a crowded room read by nose before a word is said, and a sharp sudden noise hard to bear', 'the voice deeper and softer, and a long low note that comes when calling across the quad or when upset', 'the nose has broadened and softened at the tip, the skin there smooth and darker, cool and damp to the touch, the nostrils wider and the lips fuller; the eyes have gone {eye}, slow to blink, in a face that is {first}\'s own around them', 'unsettled alone and eased by touch, a hand on the back, a shoulder leant; pushed, the body sets its weight and stays where it stands', 'the fingers moving in pairs, first with second and third with fourth, and resisting being spread, the skin between each pair gone tight; the grip strong and clumsy, so that a pen is held like a spoon and fine work has to be learned again', 'an ache across the knuckles for a week and the nails gone thick and dark, and then the fingers have drawn together in pairs and their nails spread into hard shells, so each hand ends in two broad hoof-fingers, and the thumb has hardened into a third, smaller hoof that still closes against them; a pen sits in the crook of the thumb and a cup is held fine, and what {first} makes of the new hands is {theirs} to decide', 'the body has gone over to the bovine shape, broad in the shoulder, hip and belly, heavy and warm and plainly not human, and the face is {first}\'s; {first} knows who is in the room the way a herd does, and the Creamery folk have found {them} a wrap'],
             anatomy: 'The finished shape: upright and human-faced, with a broad dark nose that is not quite a human nose; eyes {eye}, slow to blink; long soft ears set low, that swing to a sound; short curved horns; hide over shoulders, arms, back and belly; hands of three hooves each, two broad hoof-fingers and an opposable hoof-thumb that closes against them round a cup, a pen or a hand; cloven black hooves that click on stone; a tufted tail that moves on its own.',
             sex: ['{genitals}', '{tanner5}', 'the bovine woman\'s shape, complete: full at the hip and soft through the belly, the udder low and heavy and warm with its four teats, the breasts full above it, and in the mirror a woman\'s face that is still {first}’s; no trousers close over any of it now, and the wrap the Creamery folk found does'],
-            women: ['a fullness and tightness in the udder late in the day, and a lesser one in the breasts, that becomes pressure and then an ache eased by warmth and a hand', 'milk: a bead of it at a nipple in the shower, then at the teats, white against the hide and rinsed away, let down by warmth, touch or strong feeling, and a heavy calm after; the breasts full and veined with long thick nipples, and by midmorning the cloth over each nipple is damp', 'the udder filling through the day and wanting emptying morning and evening, the breasts giving a little; left too long it means soreness, weight and a short temper, and whether the milking is private or shared is {first}’s to decide'] },
+            women: ['a fullness and tightness in the udder late in the day, and a lesser one in the breasts, that becomes pressure and then an ache eased by warmth and a hand', 'milk: a bead of it at a nipple in the shower, then at the teats, white against the hide and rinsed away, let down by warmth, touch, arousal or strong feeling, and a heavy calm after; the breasts full and veined with long thick nipples, and by midmorning the cloth over each nipple is damp', 'the udder filling through the day and wanting emptying morning and evening, the breasts giving a little; left too long it means soreness, weight and a short temper, and whether the milking is private or shared is {first}’s to decide'] },
           { at: 100, trait: 'fully bovine mythkin: horns, hooves, a broad and steady frame',
             steps: ['the horns have their full curve and feel a touch at the base, and the first low doorway of the morning teaches the head a new angle', 'a warmth through the middle that does not leave, a body slow to start and hard to stop and tireless under a load, and a slower, steadier step that arrives everywhere a little later and unhurried', 'the hooves loud on the flagstones and sure on the scree; the ears droop when tired and flick when bothered, and stroked they bring a deep heavy calm', 'the last bare patch of skin, at the small of the back, has gone under hide, found by the hand in the shower; at the Creamery people lean a shoulder on {first} in passing, the way they lean on each other', 'bovine from horn to hoof: tall and warm and horned, upright and {first}-faced in the mirror, the ears turning to the corridor before the door opens'],
             anatomy: 'As above, complete.' }
@@ -2681,7 +3076,7 @@ window.WINDLASS_WORLDS.sundered = {
 
   skills: {
     glamour: { name: 'Glamour', taught: 'Glamour Theory (Mon/Wed/Fri 09:00); theatre society and the fairy ring on Fridays', text: 'Illusion and charm-magic: small lights, a changed face in a mirror, a voice that persuades. Fairies are its natural teachers.' },
-    alchemy: { name: 'Alchemy', taught: 'Applied Alchemy lab (Tue/Thu 09:00); Alchemy Society on Wednesdays', text: 'Potions, salts and tinctures: sleep draughts, warming cordials, the reagents behind the Restoration Spa. Dryads and merfolk excel.' },
+    alchemy: { name: 'Alchemy', taught: 'Applied Alchemy lab (Tue/Thu 09:00); Alchemy Society on Wednesdays', text: 'Potions, salts, tinctures: sleep draughts, cordials, the reagents behind the Restoration Spa. Merfolk, bovine and rabbit mythkin excel.' },
     artificing: { name: 'Artificing', taught: 'Artificing workshop (Mon/Wed 13:00); Artificers\' Guild on Mondays', text: 'Charms and wards worked into metal, wood and glass: a bracelet that warms, a lock that knows its owner. Goblin craft, taught by goblins.' },
     wardcraft: { name: 'Wardcraft', taught: 'Wardcraft and Sigils (Tue/Thu 13:00); Sigil Circle on Tuesdays', text: 'Protective and binding marks drawn in chalk, salt or blood: a door nobody notices, a circle nothing crosses. Slow to learn, hard to fake.' },
     beastcraft: { name: 'Beastcraft', taught: 'Beastcraft at the Mews (Tue/Thu 14:30); volunteering at the Mews any afternoon', text: 'Familiars and creatures: the reading of animals, the bond that makes one yours. Cat and wolf mythkin have an instinct for it.' }
@@ -2761,18 +3156,18 @@ window.WINDLASS_WORLDS.sundered = {
   ],
 
   lore: [
-    {name:'species: cow',species:'cow',keys:['cow','bovine','Creamery','cocoa','milk','cream'],priority:7,text:'Bovine mythkin have cow ears out to the sides and a tufted tail to the knee, short coat from the hands to the elbows and from the hooves to the hips, fading out at the navel, with a strip of it up the spine, hands of two hooved fingers and a hooved thumb, and split hooves; bovine men have two short thick horns, a heavy neck and a crest at the nape, and bovine women have no horns. Some are notably warm to stand near. The Creamery is a dairy science practical where students make milk, cream, butter, cheese and cocoa. Bovine women have full veined breasts with long thick nipples like teats, and a small udder low on the belly with four teats. Dairy, touch and shared sleep are possible routes of transformation, not social expectations: individuals vary in what they offer, welcome or enjoy.'},
-    {name:'species: wolf',species:'wolf',keys:['wolf','werewol*','pack','Moonrunner*','Moon Field','dusk run'],priority:7,text:'The werewolves run as a pack, the Moonrunners, at dusk on Tuesdays from the Moon Field, and the pack is whoever keeps up, human runners included; anyone may run behind them, and being invited to run with them is another matter. Sharing their meals, sleeping in the pack pile and a playful nip or scratch draw a human toward the wolf; a nip is considered forward. Werewolves live upright and human-faced, like everyone; the wolf is in the body, the senses and the pack, and none of them takes a wolf\'s shape.'},
-    {name:'species: harpy',species:'harpy',keys:['harpy','harpies','feather','Aerie','choir','roost','perch'],priority:7,text:'Harpies roost in the Aerie, a roofless tower of ledges, and sing every Wednesday. A harpy who gives you a feather is asking; if you wear it, you have answered. Being preened, roosting overnight in the Aerie and singing with them draw a human toward the harpy. A harpy\'s arms are her wings, feathered from the shoulder, and each ends in a hand of a thumb and two clawed fingers, for gripping; she has no other wings and no beak, and her feet are talons, scaled, three toes forward and one back, so she perches rather than sits.'},
-    {name:'species: goblin',species:'goblin',keys:['goblin','arcade','market','charm','bargain','stall','haggle'],priority:7,text:'Goblins keep the arcade under the old chapel and hold a market there every Monday night. They are about four feet tall and adult in proportion, green all over and darkest at the limbs and ears, with long pointed ears held sideways, large night-seeing eyes that squint in sun, small sharp teeth, long nimble fingers with hard dark nails, and wide flat feet with five long gripping toes; they have no tail. Goblin-made charms worn against the skin, their spiced food and green tea, a signed bargain and traded favours draw a human toward the goblin. A goblin gift is never free, and they will tell you the price if you ask.'},
+    {name:'species: cow',species:'cow',keys:['cow','bovine','Creamery','cocoa','milk','cream','udder*','hoof'],priority:7,text:'Bovine mythkin have cow ears out to the sides and a tufted tail to the knee, short coat from the hands to the elbows and from the hooves to the hips, fading out at the navel, a strip of it up the spine, hands of two hooved fingers and a hooved thumb, and split hooves; bovine men have two short thick horns, a heavy neck and a crest at the nape; bovine women have none. The Creamery is a dairy practical: milk, cream, butter, cheese and cocoa. Bovine women have full veined breasts with long thick nipples like teats, and a small udder low on the belly with four teats, and a grown one is in milk, which arousal lets down. Bovine men have no udder and no milk. Dairy, touch and shared sleep draw a human toward the bovine; none of it is expected, and each offers and welcomes what they choose.'},
+    {name:'species: wolf',species:'wolf',keys:['wolf','werewol*','pack','Moonrunner*','Moon Field','dusk run'],priority:7,text:'The werewolves run as a pack, the Moonrunners, at dusk on Tuesdays from the Moon Field, and the pack is whoever keeps up, human runners included; anyone may run behind them, and being invited to run with them is another matter. Sharing their meals, sleeping in the pack pile and a playful nip or scratch draw a human toward the wolf; a nip is thought forward. Werewolves live upright with a person\'s eyes and brow however much wolf the nose and jaw carry; the wolf is in the body, the senses and the pack.'},
+    {name:'species: harpy',species:'harpy',keys:['harpy','harpies','feather','Aerie','choir','roost','perch','talon*'],priority:7,text:'Harpies roost in the Aerie, a roofless tower of ledges, and sing every Wednesday. A harpy\'s gift of a feather is an ask, and wearing it is the answer. Being preened, roosting overnight in the Aerie and singing with them draw a human toward the harpy. A harpy\'s arms are her wings, feathered from the shoulder, and each ends in a hand of a thumb and two clawed fingers, for gripping; she has no other wings and no beak, and her feet are talons, scaled, three toes forward and one back, so she perches rather than sits.'},
+    {name:'species: goblin',species:'goblin',keys:['goblin','arcade','market','charm','bargain','stall','haggle'],priority:7,text:'Goblins keep the arcade under the old chapel and hold a market there every Monday night. They are about four feet tall and adult in proportion, green all over and darkest at the limbs and ears, with long pointed ears held sideways, large night-seeing eyes that squint in sun, small sharp teeth, long nimble fingers with hard dark nails, and wide flat feet with five long gripping toes; they have no tail. Goblin-made charms worn against the skin, their spiced food and green tea, a signed bargain and traded favours draw a human toward the goblin. A goblin gift is never free, and they name the price if asked.'},
     {name:'species: fairy',species:'fairy',keys:['fairy','fairies','fae','glamour','fairy ring','ring dance','fairy dust','bower','theatre'],priority:7,text:'Fairies live in bowers in the Greenhouse Quarter and dance the mown rings on Friday nights. A fairy is about three feet tall, a grown adult in small, with long pointed ears, large many-toned eyes, four clear veined wings that fold flat along the back and buzz when annoyed (a fairy man\'s are tinted), an iridescent sheen at the limbs and spine, slender hands, no tail, and a glow that rises and falls with mood and, with strong feeling, sheds a fine bright dust on whatever is near. Fairy dust and glamour on the skin, a fairy\'s kiss (glamour passes mouth to mouth, which is why they kiss hello), dancing through a ring and sleeping in a bower draw a human toward the fae. Bare iron burns them on touch, and its nearness aches; other metals are no trouble.'},
     {name:'species: fox',species:'fox',keys:['fox','kitsune','tails','fox-fire','game','bet','tofu'],priority:7,text:'Fox mythkin may run warm and often sleep curled, though the way one fox spends time or plays games is their own. Shared warmth, fox-fire brushed on the skin, a completed game or eating together are possible routes of transformation; none is a required greeting, bargain or romantic gesture.'},
-    {name:'species: cat',species:'cat',keys:['cat','feline','ledge','library','purr'],priority:6,text:'Cat mythkin claim the library\'s south sun ledges and the warm windowsills of every building. Being groomed or brushed by them, napping together in the sun, a play scratch or bite and being chosen as a lap draw a human toward the cat. They do not recruit; they permit. They are sleek and quiet, with cat ears, slit pupils, whiskers, padded fingers with claws that slide out and in, padded paws for feet and a long tail, and coat from the hands to the elbows and from the paws to the hips, fading out at the navel, with a line of it up the spine; a cat woman has three more pairs of small nipples in two rows down the belly below her breasts.'},
-    {name:'species: mer',species:'mer',keys:['merfolk','mermaid','mer','swim','pool','gill*','salt water'],priority:7,text:'Merfolk keep pool rooms on the lakeshore, half under water, and swim at night on Thursdays. On land a mer walks on legs and long webbed feet, with a pearl sheen on the skin, scales from the hands to the elbows and from the feet to the hips, fading out at the navel, a low fin-ridge up the spine and three gill slits either side of the ribs; in the lake, and only there, the legs close into a tail and fluke. Swimming with them, salt water from their spring, a breath-gift kiss under water and sleeping in the pools draw a human toward the mer. The lake is cold; merfolk find that funny.'},
+    {name:'species: cat',species:'cat',keys:['cat','feline','ledge','library','purr','nap','lap'],priority:6,text:'Cat mythkin claim the library\'s south sun ledges and every warm windowsill. Being groomed or brushed by them, napping together in the sun, a play scratch or bite and being chosen as a lap draw a human toward the cat. They do not recruit; they permit. They are sleek and quiet, with cat ears, slit pupils, whiskers, padded fingers with claws that slide out and in, padded paws for feet and a long tail, and coat from the hands to the elbows and from the paws to the hips, fading out at the navel, with a line of it up the spine; a cat woman has two to four more pairs of small nipples in two rows down the belly below her breasts.'},
+    {name:'species: mer',species:'mer',keys:['merfolk','mermaid','mer','swim','pool','gill*','salt water','fluke'],priority:7,text:'Merfolk keep pool rooms on the lakeshore, half underwater, and swim at night on Thursdays. On land a mer walks on legs and long webbed feet, with a pearl sheen on the skin, scales from the hands to the elbows and from the feet to the hips, fading out at the navel, a low fin-ridge up the spine and three gill slits either side of the ribs; in deep water, and only there, the legs close into a tail and fluke. Swimming with them, salt water from their spring, a breath-gift kiss underwater and sleeping in the pools draw a human toward the mer. The lake is cold; merfolk find that funny.'},
     {name:'species: dryad',species:'dryad',keys:['dryad','elm','tree','sap','pollen','Greenhouse','glasshouse','planting'],priority:6,text:'Dryads live in and around their trees in the Greenhouse Quarter. A dryad wears bark from the hands to the elbows and from the feet to the hips, thinning out at the navel, in the colour of their wood, with a ridge of it up the spine and the skin faintly grained elsewhere; leaves grow through the hair and turn with the season, the fingers are twig-jointed with thorn nails, the feet go bare with the toes spread, and a dryad has no tail. Sap tea, pollen on the skin, sleeping under a dryad\'s tree and tending plants with them draw a human toward the dryad. Nothing about a dryad is quick, including the way they like someone.'},
     {name:'species: rabbit',species:'rabbit',keys:['rabbit','rabbits','warren','allotment*','clover honey','greens','dawn race','burrow'],priority:7,text:'Some rabbit mythkin keep the warren: burrows and allotments beyond the Greenhouse Quarter, where they grow greens for the dining hall and keep hives for clover honey. Some sleep in a pile or race the Moon Field at dawn on Thursdays; anyone may run. Greens, clover honey, grooming and a shared race are possible routes of transformation, not a personality or courtship script. Each rabbit decides their own boundaries and habits.'},
     { name: 'daily life', keys: ['breakfast', 'lunch', 'dinner', 'class', 'timetable', 'curriculum', 'club', 'society', 'free hours', 'what to do'], priority: 4,
-      text: 'Daily life: breakfast in the dining hall at eight, classes in the morning and early afternoon, free hours from half past three, dinner at six, and something on every evening. The curriculum is craft: Glamour (illusion and charm-magic), Applied Alchemy (potions, salts, tinctures), Artificing (charms, wards worked into metal and wood, goblin-taught), Wardcraft and Sigils (protective and binding marks), Beastcraft (familiars and the handling of creatures), one ordinary course, Comparative Mythkin Anatomy, and one history course, the Sundering, which nobody passes with a straight answer. First-years take all of them lightly and choose what to pursue. Evenings: the goblin night market and the Artificers\' Guild on Mondays, the Moonrunners\' dusk run and the Sigil Circle on Tuesdays, the Aerie choir and the Alchemy Society on Wednesdays, the lake night swim and the Human Society tea on Thursdays, the theatre society and the fairy ring dance on Fridays, the Creamery fair on Saturdays. Clubs recruit hard in the first two weeks and teach what the classes only introduce.' },
+      text: 'Daily life: breakfast in the dining hall at eight, classes in the morning and early afternoon, free hours from half past three, dinner at six, and something on every evening. The curriculum is craft: Glamour (illusion and charm-magic), Applied Alchemy (potions, salts, tinctures), Artificing (charms, wards worked into metal and wood, goblin-taught), Wardcraft and Sigils (protective and binding marks), Beastcraft (familiars and the handling of creatures), two ordinary courses, Comparative Mythkin Anatomy and the Sundering, a history nobody passes with a straight answer. First-years take all of them lightly and choose what to pursue. Evenings: the goblin night market and the Artificers\' Guild on Mondays, the Moonrunners\' dusk run and the Sigil Circle on Tuesdays, the Aerie choir and the Alchemy Society on Wednesdays, the lake night swim and the Human Society tea on Thursdays, the theatre society and the fairy ring dance on Fridays, the Creamery fair on Saturdays. Clubs recruit hard in the first two weeks and teach what the classes only introduce.' },
     { name: 'places', keys: ['dining hall', 'Anatomy', 'studio', 'labs', 'workshop', 'practice yard', 'Mews', 'Aerie', 'lakeshore', 'pools', 'Greenhouse', 'arcade', 'Creamery', 'Moon Field', 'Fenwood', 'warren', 'allotments', 'medical', 'Spa', 'old wall', 'tower', 'pier', 'explore'], priority: 3,
       text: 'Places: Kettle Hall (the mixed first-year dorm, four floors, shared rooms, a common room with a bad piano); the central quad with its bell tower; the dining hall; the library (sun ledges on the south side, claimed by the cat mythkin); the Anatomy theatre; the Glamour studio (mirrors that lie); the Alchemy labs (a fume of salt and burnt sugar); the Artificers\' workshop under the engineering block; the practice yard, its flagstones scarred with old sigils; the Mews, where the beastcraft familiars are kept; the Aerie; the lakeshore and the pools; the Greenhouse Quarter; the goblin arcade under the chapel; the Creamery; the Moon Field; Fenwood, the upper-year hall by the Moon Field; the medical centre and its Restoration Spa; the old wall; the doorless tower on the cliff; the Edge; Sallow Pier, where the ferry comes in.' },
     { name: 'the Isle and the Edge', keys: ['cliff', 'cloud', 'ferry', 'pier', 'old wall', 'tower', 'bell tower', 'island'], priority: 6,
@@ -2788,7 +3183,7 @@ window.WINDLASS_WORLDS.sundered = {
     { name: 'charms, curses and the Unpriced Table', keys: ['charm', 'charms', 'bracelet', 'pendant', 'locket', 'silver collar', 'torc', 'fox-fire bead', 'pearl', 'moonstone', 'jewellery', 'jewelry', 'curse', 'cursed', 'hex', 'trap', 'night market', 'Unpriced Table', 'feather-hex', 'tide-mark', 'fairy-ring mark'], priority: 4,
       text: 'Small made things carry a kind: a harpy\'s feather on a cord, a goblin copper bracelet, a mer-pearl, a fox-fire bead, a dryad\'s seed-pod pendant, a cat\'s-eye ring, a moonstone pin from the pack, a locket of fairy dust, an amber drop from the warren, a brass bell from the Creamery fair. Worn against the skin, each is a little of its kind every day; everyone knows it, they are given as gifts and meant as them, and come off when the wearer chooses. The Unpriced Table, a goblin stall at the far end of the Monday night market with no prices on it, sells pieces that cost something later: a tarnished silver collar that closes by itself, a ring of braided grey fur, a black feather pin that will not unpin, a torc of living green wood. Once worn they do not come off by hand and bite deeper each day; only a wardcraft unbinding at the third level or the Restoration Spa slips one off. Curses are rarer and shorter, a few days of a kind and then they lift (the Spa lifts them early): the feather-hex (a Sigil Circle prank, or a ward mis-sung in the Aerie), the pack\'s bite (a werewolf\'s bite in anger), the fairy-ring mark (the ring at midnight, or stepping in uninvited), the tide-mark (past the buoys after dark), a goblin debt unpaid, the fox\'s due (cheating a fox at their table). The fairy ring at the wrong hour touches a person with a kind all at once; the medical centre calls that a trap and treats it like any other contact.' },
     { name: 'the Restoration Spa', keys: ['spa', 'restoration', 'medical', 'reverse', 'undo', 'clinic', 'font', 'healing', 'heal me', 'cure', 'change back'], priority: 6,
-      text: 'The Restoration Spa in the campus medical centre heals transformation, however long ago it happened: any one change (a tail, the ears, the nose, an appetite), one kind\'s whole set, the body\'s sex, or everything. Each visit is a warm mineral bath and an hour\'s sleep, and takes a change back one step, to the stage before; a part brought all the way back is the person\'s own again. Where taking one change back would leave another without what it grows from, the healer says so before the bath and both go back together. Bonds with people are not the Spa\'s to touch. Free, unlimited, no questions, open 08:00 to 22:00, {npc_physician} presiding. Some students use it weekly; some never; some go in meaning to reverse everything and keep one thing. Nobody judges, comments on or takes offense at another student\'s choice. The water is piped from a spring under the building that is older than the plumbing.' },
+      text: 'The Restoration Spa in the campus medical centre heals transformation, however long ago it happened: any one change (a tail, the ears, the nose, an appetite), one kind\'s whole set, the body\'s sex, or everything. Each visit is a warm mineral bath and an hour\'s sleep, and takes a change back one step, to the stage before; a part brought all the way back is the person\'s own again. Where taking one change back would leave another without what it grows from, the healer says so before the bath and both go back together. Bonds with people are not the Spa\'s to touch. Free, unlimited, no questions, open 08:00 to 22:00, {npc_physician} presiding. Some students use it weekly; some never; some go in meaning to reverse everything and keep one thing. Nobody judges, comments on or takes offence at another student\'s choice. The water is piped from a spring under the building that is older than the plumbing.' },
     { name: 'the mixer', keys: ['mixer', 'podium', 'orientation', 'speech', 'leaflet'], priority: 6,
       text: 'The cross-species mixer fills the central quad on orientation Monday from seven: lanterns in the bell tower, long tables from the dining hall, the Creamery cocoa stand, harpies on the tower ledges, merfolk at the fountain, goblins with a folding table of samples, fairies as a moving glitter, and everyone mixed in with everyone. {npc_dean} gives a short speech at half past seven and names the new human, which she considers a kindness and the human may not. Every society recruits; every species sends someone to meet the human.' },
     { name: 'the Dean', keys: ['Dean', 'chimera', 'collects', 'letters'], priority: 6,
@@ -2927,8 +3322,8 @@ window.WINDLASS_WORLDS.sundered = {
     summary: '{name}, nineteen and human, saw something in the world below three weeks before Day 1 that {they} could not explain, and was invited to Mythaven. {They} came up on the afternoon cloud ferry on Day 1 as the only human first-year, on a full scholarship, and met {their} roommate {rm_name} in room 4B of Kettle Hall on arrival. The cross-species mixer was set for seven that evening, on the quad.',
     events: [
       'Before Day 1: three weeks earlier, in the world below, {first} saw something {they} could not explain; four days later the letter came, with a seal, a ferry ticket and a scholarship.',
-      'Day 1 15:00 {first} boards the afternoon ferry at Sallow Pier; a mile out the boat leaves the water and rises into cloud.',
-      'Day 1 16:30 {first} lands on the Isle and collects the key to room 4B from {npc_porter}, the Kettle Hall porter.',
+      'Day 1 16:00 {first} boards the afternoon ferry on the coast; a mile out the boat leaves the water and rises into cloud.',
+      'Day 1 17:00 {first} lands at Sallow Pier and collects the key to room 4B from {npc_porter}, the Kettle Hall porter.',
       'Day 1 17:40 {first} reaches room 4B and meets roommate {rm_name}, {rm_species}, second-year.'
     ],
     beats: [],
@@ -2937,7 +3332,7 @@ window.WINDLASS_WORLDS.sundered = {
       '{first} rooms with {rm_name} ({rm_species}, second-year) in room 4B, Kettle Hall, top floor.',
       'The cross-species mixer is on the central quad at 19:00 on Day 1; {npc_dean} speaks at 19:30.',
       'The Restoration Spa in the medical centre heals transformations free and without limit, one step a visit, any single change, a kind\'s whole set, the body\'s sex or everything, 08:00 to 22:00.',
-      'The ferry from Sallow Pier leaves the water a mile out and climbs into cloud; the Isle is on no map.'
+      'The ferry to Sallow Pier leaves the water a mile out and climbs into cloud; the Isle is on no map.'
     ]
   },
 
