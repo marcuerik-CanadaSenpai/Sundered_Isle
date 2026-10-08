@@ -2901,7 +2901,7 @@
   const PART_WHERE = [[/^(?:ears|eyes|face|nose_|whiskers|teeth|front_teeth|crest|horns|finned_ears|leaves|skin_and_hair|gills|mantle|colours|green_skin|sheen|grain)/, 'head'], [/^(?:hands|webbed_hands|hands_and_feet)$/, 'hands'], [/^(?:forearm_|arm_|wings$)/, 'arms'], [/^(?:feet|toes|hind_feet|talons|webbed_feet)/, 'feet'], [/^leg_and_hip/, 'legs'], [/^(?:tail|second_tail|bob_tail|tail_fan|water_tail)$/, 'tail'], [/^(?:wing_buds|spine_)/, 'back'], [/^(?:belly_fur|bib|chest|breasts|teats|further_pairs|light_bones|bark|catkins|flowering|display)/, 'torso'], [/^(?:height|figure|frame|build|toms_build|waist_and_hips|lightness|glow_and_dust)$/, 'figure'], [/^(?:voice|purr_and_voice|voice_and_song)$/, 'voice'], [/^(?:own_scent|scent)$/, 'scent']];
   const partWhere = (k, key) => (k === 'fairy' && key === 'wings') ? 'back' : ((PART_WHERE.find(([re]) => re.test(key)) || [])[1] || 'inner');
   const COVERS = { dressed: ['arms', 'legs', 'feet', 'back', 'torso', 'tail'], sport: ['feet', 'back', 'torso', 'tail'], sleep: ['back', 'torso', 'tail'], water: ['torso', 'tail'], bare: [] };
-  const KEEN_NOSE = /^(?:wolf|fox|cat|rabbit|cow)$/;
+  const KEEN_NOSE = /^(?:wolf|fox|cat|rabbit|cow|horse|donkey|mouse)$/;
   // The parts the player hides or shows on purpose, read from the action, and only the player's own: a part after "my" or "our"
   // with a verb that puts it in a hiding place ("I tuck my tail in", "I keep my hands in my pockets", "I cover my horns") or shows
   // it ("I show her my hands", "I let my tail out"), or a garment the player puts on or takes off ("I pull a hat on", "I take the
@@ -6442,7 +6442,7 @@
     const forms = [t, t.replace(/ies$/, 'y'), t.replace(/ves$/, 'f'), t.replace(/es$/, ''), t.replace(/s$/, '')];
     for (const k of Object.keys(W.genPools.species || {})) {
       const sp = W.transformation && W.transformation.species && W.transformation.species[k];
-      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].filter(Boolean).map(strip);
+      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].concat((sp && sp.aliases) || []).filter(Boolean).map(strip);
       if (forms.some((f) => names.includes(f))) return k;
     }
     return null;
