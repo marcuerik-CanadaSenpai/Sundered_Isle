@@ -3692,6 +3692,41 @@ const S = {
   // A scene that runs over several turns is one contact: at the unbounded pace (no day cap) eight five-minute turns of the same
   // intimate contact add what one forty-minute contact would, not eight whole contacts; a contact three hours later counts whole
   // again, and a single touch (intensity 1) is never shortened.
+  // Contact that goes on counts by the time it lasts: a night held against someone, reported again in the turn the night passes,
+  // gives more than an hour does (up to the per-turn cap); and the writer is told to report it again each turn it continues, and
+  // that sharing a room or sitting near is not contact.
+  // Any touch counts for every kind, not only the ways a kind's own method lists: shaking a harpy's hand (the harpy's ways are
+  // feathers, preening, roosting and song) is a brief contact with harpies even when the writer reports none.
+  async handshakeCountsForEveryKind() {
+    const h = await begin({ rmSpecies: 'harpy', rmName: 'Lenna Vale', rmGender: 'female' });
+    try {
+      patchTurns(h, (r) => { r.exposures = []; r.state_updates = (r.state_updates || []).filter((u) => u.key !== 'present').concat([{ key: 'present', op: 'set', value: [onlyAdv(h.mock.store).data.player.first, 'Lenna Vale'] }]); });
+      assert(await h.turn('I look around the room.'));
+      const before = onlyAdv(h.mock.store).data.state.tf.influence.harpy || 0;
+      assert(await h.turn("I shake Lenna's hand."));
+      const after = onlyAdv(h.mock.store).data.state.tf.influence.harpy || 0;
+      assert(after > before, 'a handshake with a harpy is contact with harpies: ' + before + ' to ' + after);
+      assert.match(promptOf(lastTurn(h)), /Any touch of skin, fur, feathers or scale with someone of a kind is contact with that kind/, 'and the writer is told so');
+      clean(h);
+    } finally { h.close(); }
+  },
+  async continuingContactCountsTheNight() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
+    try {
+      const store = h.mock.store;
+      h.click('#btnSettings'); h.$('#setPace').value = 'unbounded'; h.$('#setPace').dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000)); h.click('[data-close="dlgSettings"]');
+      const inf = () => onlyAdv(store).data.state.tf.influence.cow || 0;
+      let advance = 5;
+      patchTurns(h, (r) => { r.time_advance_minutes = advance; r.exposures = [{ species: 'cow', method: 'sleeping against Daisy', intensity: 2 }]; });
+      assert(await h.turn('I lie down against Daisy.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /reported again in each turn it continues/, 'the writer reports a continuing contact each turn');
+      assert.match(p, /sharing a room, talking or sitting near someone is not contact/, 'and being near is not contact');
+      advance = 480; const before = inf(); assert(await h.turn('I sleep.'));
+      assert(inf() - before > 8, 'a night held close counts more than one hour of it: +' + (inf() - before));
+      clean(h);
+    } finally { h.close(); }
+  },
   async continuingContact() {
     const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' });
     try {

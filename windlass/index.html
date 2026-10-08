@@ -2361,13 +2361,14 @@
     // The most intimate contact (intensity 4) counts for the most and doubles the turn and day limits for its kind that day.
     if (!tf.dayGain || tf.dayGain.day !== state.day) tf.dayGain = { day: state.day, by: {}, boost: {} };
     tf.dayGain.boost = tf.dayGain.boost || {};
-    // A contact that goes on over several turns (a scene, a shared night) is one contact: a report of a kind met in person under an
-    // hour before this turn began counts for the story time this turn took (an hour counts whole); a single touch (intensity 1), the
-    // first report and the daily charm and curse contacts count whole.
+    // A contact that goes on over several turns (a scene, a shared night) counts by the time it lasts: a report of a kind met in
+    // person under an hour before this turn began counts for the story time this turn took (an hour as one contact, a night as
+    // several, within the per-turn and daily caps); a single touch (intensity 1), the first report and the daily charm and curse
+    // contacts count whole.
     const turnStart = storyMin(state) - (elapsed || 0); tf.contact = tf.contact || {};
     for (const e of (exposures || [])) {
       const sp = T.species[e.species]; if (!sp) continue; const level = Math.max(1, Math.min(4, Math.round(Number(e.intensity) || 1))), prev = tf.contact[e.species];
-      const dose = !e.flat && level >= 2 && elapsed != null && prev != null && turnStart - prev <= 60 ? Math.min(1, Math.max(elapsed, 10) / 60) : 1;
+      const dose = !e.flat && level >= 2 && elapsed != null && prev != null && turnStart - prev <= 60 ? Math.max(elapsed, 10) / 60 : 1;
       gained[e.species] = (gained[e.species] || 0) + Math.max(1, Math.round(level * (sp.rate || 6) * dose)); if (level >= 4) tf.dayGain.boost[e.species] = true;
       if (!e.flat) tf.contact[e.species] = storyMin(state);
     }
@@ -2530,6 +2531,7 @@
       ? 'Each part changes on its own track of waypoints: a waypoint\'s line is the fact, found by ' + who + ' mid-action in a way of your own each time. One part is new a turn; every other part stays as it stands, felt (an ache, an itch, a pull) and, where it shows, seen as it is, until a note from the engine moves it, even if the action asks for one: answer with what the begun parts already do; a finished part is rendered only at its last waypoint. The body never takes an animal\'s shape. Progress numbers are internal only and never appear in the narration.'
       : 'Where a path has ten progressive entries for one feature, treat them as successive ten-percent increments from first alteration to fully established form: describe each in-between state and do not present the finished feature before its last entry. Progress numbers are internal only and never appear in the narration.');
     const methodKinds = kinds.filter((k) => inScene.has(k)), restKinds = kinds.filter((k) => !inScene.has(k));
+    lines.push('Any touch of skin, fur, feathers or scale with someone of a kind is contact with that kind: a handshake or a brush of hands brief, hands held or skin against skin for a while sustained (reported each turn it goes on), sleeping against them deep. Contact through clothes alone, sharing a room or sitting near is not. The ways each kind passes on most are below.');
     lines.push('What raises influence' + (methodKinds.length ? ':\n' + methodKinds.map((k) => '- ' + k + ' (' + T.species[k].name + '): ' + T.species[k].method).join('\n') : ': no kind is in the scene yet.')
       + (restKinds.length ? '\nOther kinds (' + restKinds.join(', ') + '): their contacts are listed here once one of them is in the scene.' : ''));
     const carried = T.elements ? carriedElements(tf) : [];
@@ -2554,8 +2556,8 @@
         + (inPlay.length ? ' ' + inPlay.join(' ') : ''));
     }
     lines.push(compact
-      ? 'Report each transformative contact once in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Never repeat continuing contact. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape. A part past half never reverts by itself (a small one may ease back after a long quiet with nothing of its kind); the Spa heals any on purpose, one step a visit.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
-      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). A contact counts once: report it in the turn it happens or is completed, not again while it continues (a shared night is one exposure however many turns it spans). The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + (T.tracks ? ' A part past half never changes back by itself (a small change may ease back after a long quiet with nothing of its kind, as the engine says), but any change can be healed on purpose at the Restoration Spa, at any time, however old, at ' + who + '\'s asking: one change, a kind\'s whole set, the body\'s sex or everything, each taken back one step a visit, the same slow morph in reverse. Bonds with people are not the Spa\'s to heal. Report what ' + who + ' asks it to heal in "spa_reset".' : ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.'));
+      ? 'Report each transformative contact in "exposures": intensity 1 brief, 2 sustained, 3 deep, 4 intimate (sex with someone of the kind). Touch, food or a gift of the kind is contact; sharing a room, talking or sitting near is not. Report a contact that goes on (hands held, a night together) again each turn it continues; the engine counts the time. Change unfolds in days and engine-announced steps only; never predict or invent a step. ' + (T.tracks ? 'No one takes an animal\'s shape. A part past half never reverts by itself (a small one may ease back after a long quiet with nothing of its kind); the Spa heals any on purpose, one step a visit.' : 'Whole-animal shifts are voluntary.') + ' Report Spa use in "spa_reset".'
+      : 'Report every transformative contact this turn in "exposures" with the species key and an intensity: 1 brief (a hug, a sip, a feather held, a kiss hello), 2 sustained (hands held for a while, an evening of contact, a meal of it, a long swim, wearing a gift all day), 3 deep (a night sleeping together, a ritual or ring or bargain completed), 4 intimate (sex with someone of the kind: the most one contact can give, and it may pass the day\'s usual limit). Contact is touch, food or drink of the kind, or a gift of it worn; sharing a room, talking or sitting near someone is not contact and is never reported. A contact that goes on across turns (hands held through a walk, a night sleeping together) is reported again in each turn it continues, with the same intensity: the engine counts the story time it lasted and holds the pace. The change is a slow burn measured in days, not turns; the engine holds the pace, and the middle changes of a path come in an order of their own for each person, so never predict which comes next. A changed human\'s resting shape is the one the mythkin of that kind keep, upright and human-faced; ' + (T.tracks ? 'no one, mythkin or changed, takes an animal\'s shape.' : 'where a kind has a whole animal in it, that is a shift ' + who + ' takes and leaves at will, only when the player chooses it, and never taken for ' + who + ' by the narration.') + (T.tracks ? ' A part past half never changes back by itself (a small change may ease back after a long quiet with nothing of its kind, as the engine says), but any change can be healed on purpose at the Restoration Spa, at any time, however old, at ' + who + '\'s asking: one change, a kind\'s whole set, the body\'s sex or everything, each taken back one step a visit, the same slow morph in reverse. Bonds with people are not the Spa\'s to heal. Report what ' + who + ' asks it to heal in "spa_reset".' : ' The Restoration Spa reverses any change at any time, however old, at ' + who + '\'s asking: report its use in "spa_reset". Ladders of change for active kinds are in <lore>.'));
     return lines.join('\n');
   }
 
@@ -4460,7 +4462,7 @@
         (kiss && /\bkiss/.test(method)) ||
         (embrace && /\b(hug\w*|cuddl\w*|touch\w*|warmth)\b/.test(method)) ||
         (touch && /\b(touch\w*|groom\w*|brush\w*|preen\w*)\b/.test(method));
-      if (!supported) continue;
+      if (!supported && !(sleep || kiss || embrace || touch)) continue;   // any touch counts for every kind; the method only adds
       const intensity = sex ? 4 : sleep ? 3 : /\b(long|for hours|all evening|all afternoon|for a while)\b/i.test(text) ? 2 : 1;
       add(species, intensity);
     }
@@ -4473,16 +4475,16 @@
   // Contact the action itself describes in the imperative or the first person ("Kiss her again", "Fuck her", "drink from her",
   // "let yourself go to sleep against her"). The person is a mythkin cast member by any name they answer to, or by pronoun when they
   // are the only one else in the scene. A verb counts in its own clause with no ask, offer, wish or negation before it, and only where
-  // the kind's method (world data) names that sort of contact; sex always counts.
+  // a touch counts for every kind (milk only from a kind that gives it); sex always counts.
   const CONTACT_VERBS = [
     { level: 4, re: /\b(?:fuck\w*|make(?:s|ing)?\s+love|made\s+love|love-?making|(?:have|had|having)\s+sex|jack\s*-?hammer\w*|(?:thrust\w*|climax\w*|cum(?:s|ming)?)\s+(?:in|inside|into|deep|deeper|hard|harder)|penetrat(?:e|es|ed|ing)\s+(?:her|him|them)|(?:lick|suck)(?:s|ed|ing)?\s+(?:on\s+)?(?:her|his|their|\w+['’]s)\s+(?:pussy|clit\w*|cock|penis|dick)|go(?:es|ing)?\s+down\s+on\s+(?:her|him|them)|eat(?:s|ing)?\s+(?:her|him|them)\s+out)\b/i },
     // Milk is taken from the person: the person is the very next word and what follows is milk, a part that gives it, or nothing
     // ("suck her nipple", "drink from her", "milk her"), or the part was named earlier in the clause ("move to her breasts and suck");
     // "lick her neck", "suck on her earlobe" and "drink from her glass" are not.
-    { level: 3, gate: /\b(?:milk|dairy|nurs|cream|teat)/, obj: true, before: /\b(?:her|his|their|\w+['’]s)\s+(?:\w+\s+)?(?:breasts?|nipples?|teats?|udders?|milk)\b/i, tail: /^\s*(?:(?:\w+\s+){0,2}(?:breasts?|nipples?|teats?|udders?|milk|chest)\b|$)/i, re: /\b(?:suck(?:s|ed|ing)?(?:\s+on)?|lick(?:s|ed|ing)?|nurs(?:e|es|ed|ing)\s+(?:from|at|on)|drink(?:s|ing)?\s+(?:deeply\s+)?from|latch(?:es|ed|ing)?\s+on(?:to)?|milk(?:s|ed|ing)?)\b/i },
+    { level: 3, need: true, gate: /\b(?:milk|dairy|nurs|cream|teat)/, obj: true, before: /\b(?:her|his|their|\w+['’]s)\s+(?:\w+\s+)?(?:breasts?|nipples?|teats?|udders?|milk)\b/i, tail: /^\s*(?:(?:\w+\s+){0,2}(?:breasts?|nipples?|teats?|udders?|milk|chest)\b|$)/i, re: /\b(?:suck(?:s|ed|ing)?(?:\s+on)?|lick(?:s|ed|ing)?|nurs(?:e|es|ed|ing)\s+(?:from|at|on)|drink(?:s|ing)?\s+(?:deeply\s+)?from|latch(?:es|ed|ing)?\s+on(?:to)?|milk(?:s|ed|ing)?)\b/i },
     { level: 3, gate: /\b(?:sleep|night)/, obj: true, re: /\b(?:(?:sleep|sleeps|slept|sleeping)(?:\s+[a-z]+){0,3}|(?:lie|lies|lay|lying)(?:\s+down)?|(?:spend|spent|spending)\s+the\s+night|(?:share|shared|sharing)\s+(?:a\s+)?bed)\s+(?:with|beside|next to|against|on top of)\b/i },
     { level: 1, gate: /\bkiss/, re: /\bkiss(?:es|ed|ing)?\b/i },
-    { level: 1, gate: /\b(?:hug\w*|cuddl\w*|touch\w*|warmth)/, re: /\b(?:hug(?:s|ged|ging)?|embrac\w+|cuddl\w+|snuggl\w+|(?:hold|held|take|took|grab)\w*\s+(?:her|his|their|\w+['’]s)\s+hands?)\b/i },
+    { level: 1, gate: /\b(?:hug\w*|cuddl\w*|touch\w*|warmth)/, re: /\b(?:hug(?:s|ged|ging)?|embrac\w+|cuddl\w+|snuggl\w+|(?:hold|held|take|took|grab|shak|shook|squeez)\w*\s+(?:her|his|their|\w+['’]s)\s+(?:hands?|hoofs?|hooves|paws?|claws?|fingers)|(?:shak\w*|shook)\s+hands\s+with)\b/i },
     { level: 1, gate: /\b(?:touch\w*|groom\w*|brush\w*|preen\w*)/, obj: true, re: /\b(?:touch(?:es|ed|ing)?|stroke(?:s|d)?|stroking|caress\w*|groom\w*|brush(?:es|ed|ing)?|preen\w*|pinch\w*|squeez\w*)\b/i }
   ];
   // A clause that names an act only to take it out of the turn ("instead of having sex with her", "rather than kissing her, I read",
@@ -4513,7 +4515,7 @@
         if (!people.length && sole && sole.species !== 'human' && pr.some((w) => w && new RegExp('\\b' + w + '\\b', 'i').test(scope))) people.push(sole);
         for (const c of people) {
           const species = speciesKeyOf(c), sp = species && W.transformation.species[species]; if (!sp) continue;
-          if (f.level < 4 && !(f.gate && f.gate.test(String(sp.method || '').toLowerCase()))) continue;
+          if (f.need && !f.gate.test(String(sp.method || '').toLowerCase())) continue;   // milk only from a kind that gives it; any other touch counts for every kind
           out.push({ species, intensity: f.level === 1 && long ? 2 : f.level });
         }
       }
