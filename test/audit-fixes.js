@@ -7405,14 +7405,15 @@ const S = {
     } finally { h.close(); }
   },
 
-  async carriedItemsAreThePlayersOwn() {
+  async carriedItemsAndPastAreThePlayersOwn() {
     // The inventory reaches the narrator in the state, so a roommate once spoke of the player's forty dollars unasked: what the
-    // player carries is known to others only once shown, used in front of them or said on the page.
+    // player carries, and the home town or past the creation gave (a roommate once named the player's town unasked), is known to others only once shown, used in front of them or said on the page.
     const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
     try {
       assert(await h.turn('I sit down to eat.'));
       const p = promptOf(lastTurn(h));
-      assert.match(p, /nobody knows of an item, or how much money, until \S+ shows it, uses it in front of them or says so on the page/, 'the turn prompt keeps the inventory private');
+      assert.match(p, /nobody knows an item, a sum of money or a fact of \S+ past until \S+ shows it, uses it in front of them or says so on the page/, 'the turn prompt keeps the inventory and the past private');
+      assert.match(p, /who \S+ was before the Isle \(home town, family/, 'the home town is named as the player\'s own');
       clean(h);
     } finally { h.close(); }
   },
