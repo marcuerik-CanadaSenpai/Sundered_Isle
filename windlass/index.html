@@ -6442,7 +6442,7 @@
     const forms = [t, t.replace(/ies$/, 'y'), t.replace(/ves$/, 'f'), t.replace(/es$/, ''), t.replace(/s$/, '')];
     for (const k of Object.keys(W.genPools.species || {})) {
       const sp = W.transformation && W.transformation.species && W.transformation.species[k];
-      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].filter(Boolean).map(strip);
+      const names = [k, k.replace(/_/g, ' '), sp && sp.name, sp && sp.short, speciesRace(W, k)].concat((sp && sp.aliases) || []).filter(Boolean).map(strip);
       if (forms.some((f) => names.includes(f))) return k;
     }
     return null;

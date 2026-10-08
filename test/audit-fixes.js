@@ -7395,6 +7395,20 @@ const S = {
   // is in the world's lists and lore, has felt lines for every part and weights that sum to a body, can be drawn as the roommate
   // and as cast with looks that pass the composer's rules, carries its own must-nots (never the bovine's udder, milk and horns),
   // and has tracks the engine advances. The mouse or rat draws both leans across seeds.
+  // A kind typed as "Rat" is the mouse or rat kind, as "Mouse" is: the Cast fill draws that kind's body and saves its key.
+  async typedRatIsTheMouseKind() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'May Tanaka', rmGender: 'female' });
+    try {
+      h.click('#btnCast'); await h.sleep(20);
+      h.click(h.$('#castList [data-key="roommate"]')); await h.sleep(20);
+      h.type('#cfSpecies', 'Rat'); h.type('#cfLooks', '');
+      h.click('#cfFill'); await h.until(() => /Filled in/.test(h.$('#cfNote').textContent), 'the fill');
+      h.click('#cfSave'); assert(await h.idle(10000), 'the save did not finish'); await h.sleep(20);
+      const o = onlyAdv(h.mock.store).data.cast.overrides.roommate;
+      assert.equal(o.species, 'mouse', 'typed Rat is the mouse or rat kind: ' + JSON.stringify({ species: o.species, race: o.race }));
+      assert.match(o.looks, /whiskers/, 'with that kind\'s body: ' + String(o.looks).slice(0, 200));
+    } finally { h.close(); }
+  },
   async horseDonkeyMouseKinds() {
     const G = loadGenerator(HTML, WORLDS, { random: mulberry32(global.__WL_SEED) }), Wg = G.W, LK = Wg.genPools.looks, T = Wg.transformation, TRS = T.tracks.species;
     const kinds = ['horse', 'donkey', 'mouse'], byKey = (k, key) => TRS[k].find((t) => t.key === key), F = T.felt;
@@ -7511,6 +7525,33 @@ const S = {
         clean(h);
       } finally { h.close(); }
     }
+  },
+
+  async passersbyNamedByWhatShows() {
+    // A passerby with "a tail" could be any of half the kinds: the narrator is told to pin each person by the feature that tells
+    // what they are, in ordinary animal words, while the Isle's own words stay unsaid until the player learns them.
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      assert(await h.turn('I walk through the dining hall.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /a passerby included, is pinned by what shows, in ordinary animal words/, 'the turn prompt asks for people to be pinned by what shows');
+      assert.match(p, /never a bare "a tail" or "ears" that many kinds share/, 'a bare tail is ruled out');
+      assert.doesNotMatch(p, /\(scales on a forearm, a tail, ears that move\)/, 'the old example of a bare tail is gone');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  async carriedItemsAndPastAreThePlayersOwn() {
+    // The inventory reaches the narrator in the state, so a roommate once spoke of the player's forty dollars unasked: what the
+    // player carries, and the home town or past the creation gave (a roommate once named the player's town unasked), is known to others only once shown, used in front of them or said on the page.
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      assert(await h.turn('I sit down to eat.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /nobody knows an item, a sum of money or a fact of \S+ past until \S+ shows it, uses it in front of them or says so on the page/, 'the turn prompt keeps the inventory and the past private');
+      assert.match(p, /who \S+ was before the Isle \(home town, family/, 'the home town is named as the player\'s own');
+      clean(h);
+    } finally { h.close(); }
   },
 
 };
