@@ -7159,6 +7159,238 @@ const S = {
     assert.equal(G.looksBrief(labelled), 'about five foot eight, slim, with a soft waist, slim hips and slim thighs; hair a single ponytail; eyes pale violet with gold rims', 'and its brief still names the hair and the eyes');
     assert.equal(G.looksShort(labelled), 'about five foot eight, slim, with a soft waist, slim hips and slim thighs; hair a single ponytail; eyes pale violet with gold rims. Freckles: a scatter of copper freckles across both shoulders. No horns.', 'and its short form keeps the extra line');
   },
+  // ---------- P7: the critic's gaps ----------
+  // A summary edit typed but not yet saved rides over a sync that picks up the other device's newer save, and saves when the box is left.
+  async summaryEditSurvivesSync() {
+    const A = await begin({ rmSpecies: 'cow', rmName: 'Daisy Clover' });
+    let B;
+    try {
+      assert(await A.turn('I look around.'));
+      const store = A.mock.store, doc = () => onlyAdv(store).data;
+      B = await boot({ setup(w, m) { m.store = store; } }); assert(await B.settle(300, 15000)); assert(await B.idle(15000), 'B did not load');
+      const box = A.$('#summary'); box.focus();
+      const typed = 'MY EDIT: Daisy promised to show me the Creamery on Day 2.';
+      box.value = typed; box.dispatchEvent(new A.window.Event('input', { bubbles: true }));
+      assert(await B.turn('I unpack my bag.'), 'B\'s turn');
+      A.window.dispatchEvent(new A.window.Event('focus')); await A.settle(300, 8000); assert(await A.idle(15000));
+      assert.match(statusText(A), /Picked up the newer save/, 'A picked up B\'s save: ' + statusText(A));
+      assert.match(statusText(A), /summary edit is kept/, 'and says the edit is kept: ' + statusText(A));
+      assert.equal(A.$('#summary').value, typed, 'the box still shows the edit');
+      box.blur(); box.dispatchEvent(new A.window.Event('blur')); await A.settle(300, 6000); assert(await A.idle(10000));
+      assert(String(doc().memory.summary || '').includes('MY EDIT'), 'leaving the box saves the edit: ' + String(doc().memory.summary || '').slice(0, 120));
+      assert.equal(doc().turnCount, 2, 'on B\'s save, not over it');
+      clean(A); clean(B);
+    } finally { A.close(); if (B) B.close(); }
+  },
+
+  // The Override panel left open across a cross-device sync is filled again from the newer state, so Apply cannot write the old one back.
+  async overridePanelFollowsSync() {
+    const A = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    let B;
+    try {
+      const id = onlyAdv(A.mock.store).id;
+      assert(await A.turn('Look around.'));
+      A.click('#toggleHidden'); await A.sleep(50); A.click('#btnOverride'); await A.sleep(50);
+      assert(A.$('#dlgOverride').open, 'the Override panel is open');
+      const stale = JSON.parse(A.$('#ovrState').value).time;
+      B = await boot({ setup(w, m) { m.store = A.mock.store; } }); assert(await B.settle(150, 8000)); assert(await B.idle(20000), 'B did not load');
+      assert(await B.turn('I go to the quad.'), 'B\'s first turn'); assert(await B.turn('I walk on.'), 'B\'s second turn');
+      const fresh = onlyAdv(B.mock.store).data.state.time;
+      assert.notEqual(fresh, stale, 'B moved the clock');
+      A.window.dispatchEvent(new A.window.Event('focus')); assert(await A.idle(20000)); await A.sleep(200);
+      assert.match(statusText(A), /Override panel now shows the newer state/, statusText(A));
+      assert(A.$('#dlgOverride').open, 'the panel stays open');
+      assert.equal(JSON.parse(A.$('#ovrState').value).time, fresh, 'filled again from the newer state');
+      A.click('#ovrStateApply'); assert(await A.idle(8000)); await A.sleep(100);
+      const after = onlyAdv(A.mock.store).data;
+      assert.equal(after.turnCount, 3, 'B\'s turns stand'); assert.equal(after.state.time, fresh, 'Apply writes the newer state, not the old');
+      assert.equal(storedTurns(A.mock.store, id).at(-1).stateAfter.time, fresh);
+      clean(A); clean(B);
+    } finally { A.close(); if (B) B.close(); }
+  },
+
+  // Begin pressed while Claude and the store are still answering (a slow handshake) waits for them: the cast is invented, the
+  // introduction written and the game saved, and a store that is only late is never reported as unavailable.
+  async beginWaitsForTheHandshake() {
+    const h = await boot({ setup(w, m) { m.useLatency = 2500; } });
+    const until = async (fn, max) => { const t0 = Date.now(); while (Date.now() - t0 < max) { if (fn()) return true; await h.sleep(50); } return false; };
+    try {
+      await h.sleep(300);
+      h.click('#btnAdventures'); await h.sleep(50);
+      assert.match(h.$('#dbNotice').hidden ? '' : h.$('#dbNotice').textContent, /still loading/, 'a store that is late is not "unavailable": ' + h.$('#dbNotice').textContent);
+      h.click('#newAdv'); await h.sleep(100);
+      h.type('#cName', 'Tom Ashby'); h.type('#cRmSpecies', 'cow'); h.type('#cRmName', 'Daisy Holm');
+      h.click('#cBegin'); await h.sleep(200);
+      assert.match(h.$('#cNote').textContent, /Begin is available in a moment/, 'Begin waits: ' + h.$('#cNote').textContent);
+      assert(h.$('#cBegin').disabled, 'and is held meanwhile');
+      assert(await until(() => !h.$('#dlgCreate').open, 40000), 'the adventure did not start');
+      assert(await h.idle(30000)); await h.settle(150, 8000);
+      const { data } = onlyAdv(h.mock.store);
+      assert.equal(data.turnCount, 0); assert(data.opening && data.opening.introWritten, 'the roommate introduction was written');
+      assert(h.mock.sampleCalls.some((c) => c.label === 'cast invention'), 'the cast was invented');
+      assert(h.mock.sampleCalls.some((c) => c.label === 'roommate introduction'), 'the introduction was asked for');
+      assert.doesNotMatch(statusText(h), /unavailable/, statusText(h));
+      assert(await h.turn('Look around.'), 'a turn runs');
+      assert.equal(onlyAdv(h.mock.store).data.turnCount, 1, 'and is saved');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // An intimate style example is filled for the bed partner (name and pronouns), never for the roommate as the lover when the act is
+  // with someone else; a solo act names nobody; a kind-tagged example follows the partner, not a bystander of that kind.
+  async sceneExamplesFollowThePartner() {
+    const g = await savedGame({ rmSpecies: 'cow', rmName: 'Daisy Clover', rmGender: 'female' });
+    const gen = g.doc.cast.generated.characters;
+    const other = gen.find((c) => c.key !== 'roommate' && c.first && c.gender === 'male' && c.species !== 'cow') || gen.find((c) => c.key !== 'roommate' && c.first && c.gender === 'male');
+    assert(other, 'a man in the generated cast');
+    const examples = (hh) => blockOf(promptOf(lastTurn(hh)), 'style_examples');
+    for (const [label, act, present] of [['partner', 'Make love to ' + other.first + '.', [other.name]], ['partner, roommate across the room', 'Make love to ' + other.first + '.', [other.name, 'Daisy Clover']], ['solo', 'I masturbate.', []]]) {
+      const h = await bootOn(copyStore(g.store));
+      try {
+        let stage = null;
+        patchTurns(h, (r) => { r.state_updates = [{ key: 'present', value: present }]; if (stage) r.stage = stage; });
+        assert(await h.turn('I wait in my room.'), label + ': the wait turn');
+        const seen = [];
+        for (const s of ['begin', 'enter', 'build']) { stage = s; assert(await h.turn(act), label + ': the ' + s + ' turn'); seen.push(examples(h)); }
+        const all = seen.join('\n');
+        assert(seen.every(Boolean), label + ': every act turn carries style examples');
+        assert.doesNotMatch(all, /\bDaisy\b/, label + ': the examples never name the roommate as the lover: ' + all.slice(0, 300));
+        if (label === 'solo') assert.match(all, /\byour partner\b/i, 'solo: the example names nobody: ' + all.slice(0, 300));
+        else { assert(all.includes(other.first), label + ': the example is filled for ' + other.first + ': ' + all.slice(0, 300)); assert.doesNotMatch(all, /\budder\b/, label + ': the bovine woman\'s example is not shown for a man'); }
+        clean(h);
+      } finally { h.close(); }
+    }
+  },
+
+  // A cursed piece from the Unpriced Table does not come off by hand: a list without it or a remove keeps it on, with a note, and
+  // the narrator is told next turn; at the third level of wardcraft the unbinding is the player's and it comes off.
+  async cursedPieceStaysOn() {
+    const h = await begin({ rmSpecies: 'cat', rmName: 'Mira Sato' });
+    try {
+      const id = onlyAdv(h.mock.store).id, st = () => onlyAdv(h.mock.store).data.state, last = () => storedTurns(h.mock.store, id).at(-1);
+      let updates = [];
+      patchTurns(h, (r) => { r.state_updates = updates; r.time_advance_minutes = 60; });
+      updates = [{ key: 'items.wearing', op: 'set', value: ['a tarnished silver collar'] }];
+      assert(await h.turn('I put on the silver collar from the Unpriced Table.'));
+      assert.deepEqual(st().items.wearing, ['a tarnished silver collar']); assert(st().tf.worn.silver_collar, 'the engine counts the cursed piece');
+      updates = [{ key: 'items.wearing', op: 'set', value: [] }];
+      assert(await h.turn('I take the collar off and throw it in the drawer.'));
+      assert.deepEqual(st().items.wearing, ['a tarnished silver collar'], 'a list without it keeps it on');
+      assert(last().notes.some((n) => /^kept on: a tarnished silver collar \(cursed/.test(n)), 'with a note: ' + last().notes.join(' | '));
+      assert(st().tf.worn.silver_collar, 'still counted');
+      updates = [];
+      assert(await h.turn('I go to bed.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /Note from the engine: The piece did not come off: a tarnished silver collar is cursed/, 'the narrator is told next turn');
+      assert.match(p, /Worn now: a tarnished silver collar/, 'and the Worn line stays');
+      updates = [{ key: 'items.wearing', op: 'remove', value: ['collar'] }];
+      assert(await h.turn('I wrench the collar off.'));
+      assert.deepEqual(st().items.wearing, ['a tarnished silver collar'], 'a remove by key word keeps it on too');
+      h.click('#toggleHidden'); await h.sleep(30); h.click('#btnOverride'); await h.sleep(30);
+      const inp = h.$('#ovrAttitudes [data-skill="wardcraft"]'); assert(inp, 'the wardcraft skill field'); inp.value = '9'; inp.dispatchEvent(new h.window.Event('change', { bubbles: true })); assert(await h.idle(8000)); h.click('[data-close="dlgOverride"]');
+      assert(await h.turn('I draw the unbinding sigil round the collar and lift it off.'));
+      assert.deepEqual(st().items.wearing, [], 'unbound at wardcraft level 3');
+      assert(last().notes.some((n) => /^unbound by wardcraft \(level 3\): a tarnished silver collar/.test(n)), last().notes.join(' | '));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Every invented line (temperament, want, private matter), not the habit alone, is screened against the kind's anatomy.
+  async inventedLinesScreened() {
+    const h = await begin({
+      name: 'Mira Holt', rmSpecies: 'cow', rmGender: 'female',
+      setup(w, m) {
+        m.sampleHandler = (input, o, call) => {
+          const r = m.defaultHandler(input, o, call);
+          if (call.label !== 'cast invention') return r;
+          const d = JSON.parse(r);
+          for (const p of d.people) {
+            if (p.key === 'roommate') { p.temperament = 'calm, with a third arm folded behind her back'; p.want = 'to grow her wings out and show them off on the quad'; p.private = 'keeps a second tail hidden under her coat and files her fangs at night'; p.greeting = 'spreads her wings and folds them again'; }
+            if (p.key === 'runner_human') { p.temperament = 'quietly stubborn'; p.want = 'to pass Alchemy without cheating'; p.private = 'sends money home every month'; }
+          }
+          return JSON.stringify(d);
+        };
+      },
+    });
+    try {
+      const { data } = onlyAdv(h.mock.store);
+      const rm = JSON.stringify(data.roommate);
+      assert.doesNotMatch(rm, /third arm|wings|second tail|fangs/, 'invented anatomy never reaches the roommate\'s temperament, want, private matter or greeting: ' + rm.slice(0, 600));
+      const runner = data.cast.generated.characters.find((c) => c.key === 'runner_human');
+      assert(runner, 'the generated cast includes runner_human');
+      assert.match(JSON.stringify(runner), /pass Alchemy without cheating|sends money home every month|quietly stubborn/, 'harmless invented lines are kept');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // The ladder-era story flags for a charm or a contact (the engine counts those itself) are gone: the narrator is never told a
+  // charm is worn that the engine does not count, and setting one is ignored as an unknown flag.
+  async deadFlagsAreGone() {
+    const flags = loadWorld().initialState.flags;
+    for (const k of ['accepted_a_feather', 'wearing_goblin_charm', 'ran_with_pack', 'swam_in_lake']) assert(!(k in flags), k + ' is no longer a story flag');
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      const id = onlyAdv(h.mock.store).id;
+      patchTurns(h, (r) => { r.state_updates = [{ key: 'flags.wearing_goblin_charm', value: true }]; });
+      assert(await h.turn('I put on the goblin bracelet.'));
+      const t = storedTurns(h.mock.store, id).at(-1);
+      assert(t.notes.some((n) => /ignored unknown flag "wearing_goblin_charm"/.test(n)), t.notes.join(' | '));
+      assert(await h.turn('I look at my wrist.'));
+      assert.doesNotMatch(blockOf(promptOf(lastTurn(h)), 'state'), /wearing_goblin_charm|accepted_a_feather/, 'the narrator is never told a charm the engine does not count');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // A Cast gender edit is a change of body: a look left as it was shown is drawn again for the new sex, and the sheet agrees.
+  async castGenderEditRedrawsTheBody() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm', rmGender: 'female' });
+    try {
+      h.click('#btnCast'); await h.sleep(30);
+      assert.equal(h.$('#cfGender').value, 'female');
+      const before = h.$('#cfLooks').value; assert.match(before, /\bbreasts\b/, 'a bovine woman\'s look has a chest: ' + before);
+      h.$('#cfGender').value = 'male'; h.$('#cfGender').dispatchEvent(new h.window.Event('change', { bubbles: true }));
+      h.click('#cfSave'); assert(await h.idle(8000)); await h.sleep(100);
+      assert.match(h.$('#cfNote').textContent, /drawn again for a man/, h.$('#cfNote').textContent);
+      // The kind's must-nots close a look as negatives ("Not on this body: an udder"), so the body is read without them.
+      const body = (t) => String(t).replace(/(?:^|(?<=\. ))(?:No |Not on this body:)[^.]*\./g, '');
+      const after = h.$('#cfLooks').value;
+      assert(after !== before && !/\bbreasts\b|\bcup\b|\budder\b|\bteats?\b/.test(body(after)), 'the look is a man\'s now: ' + after);
+      h.click('[data-close="dlgCast"]'); await h.sleep(20);
+      assert(await h.turn('I look at Daisy.'));
+      const line = blockOf(promptOf(lastTurn(h)), 'characters').split('\n').find((l) => /\[roommate\]/.test(l)) || '';
+      assert.match(line, /\(Man, he\/him/, line.slice(0, 200)); assert.doesNotMatch(body(line), /\bbreasts\b|\budder\b|\bteats?\b/, line);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Override > Replace state refuses a trimmed JSON with a plain message naming what is missing, never a raw type error; the
+  // records the engine can make again (bonds, skills) need not be in it.
+  async overrideStateNamesWhatIsMissing() {
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      h.click('#toggleHidden'); await h.sleep(30); h.click('#btnOverride'); await h.sleep(30);
+      const S0 = JSON.parse(h.$('#ovrState').value);
+      h.$('#ovrState').value = JSON.stringify({ items: S0.items, attitudes: S0.attitudes, day: S0.day, time: S0.time, location: S0.location, present: S0.present });
+      h.click('#ovrStateApply'); assert(await h.idle(8000)); await h.sleep(100);
+      assert.equal(h.$('#ovrStateNote').textContent, 'Not applied.');
+      assert.match(statusText(h), /Override failed: the state needs flags as well \(Reset to current shows the shape\)/, statusText(h));
+      const S2 = JSON.parse(JSON.stringify(S0)); delete S2.bonds; delete S2.skills;
+      h.$('#ovrState').value = JSON.stringify(S2); h.click('#ovrStateApply'); assert(await h.idle(8000)); await h.sleep(100);
+      assert.equal(h.$('#ovrStateNote').textContent, 'Applied.', statusText(h));
+      h.click('[data-close="dlgOverride"]'); await h.sleep(30);
+      assert(await h.turn('Look around.'));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Pool text written for "{rm_they}" agrees with a they/them person: no "they is", "they has" or "they does" in the world file.
+  async poolTextAgreesWithThey() {
+    const src = fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8');
+    const slips = src.match(/\{rm_they\} (?:is|has|does|was)\b/g) || [];
+    assert.equal(slips.length, 0, 'pool text agrees with a they/them person: ' + slips.join(', '));
+    assert.match(src, /\{rm_they\} \{rm_are\} carrying/, 'the human body line uses the agreeing verb token');
+  },
+
 };
 
 (async () => {
