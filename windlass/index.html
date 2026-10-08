@@ -1116,17 +1116,19 @@
     p.senses = notes.map((t) => personFill(t, p)).join('; ');
     const A = opts.avoid || {}, fresh = (k, t) => !(A[k] && A[k].has(habitKey(t)));
     const free = (k, pool) => { const left = (pool || []).filter((t) => fresh(k, t)); return left.length ? left : (pool || []); };
-    p.temperament = (given.temperament && fresh('temperaments', given.temperament) ? given.temperament : '') || pick(free('temperaments', G.temperaments));
-    // An invented habit is kept unless it names a body part the kind does not have (the looks never take an invented line).
-    p.quirk = (given.quirk && fresh('quirks', given.quirk) && anatomyFits(given.quirk, kindAnatomy(Wc, speciesKey, sp, gender)) ? given.quirk : '') || personFill(pick(free('quirks', G.quirks)), p);
-    p.want = given.want || personFill(pick(opts.wants || G.wants), p);
-    p.privateMatter = given.private || personFill(pick(G.privates), p);
+    // An invented line (temperament, habit, want, private matter, greeting) is kept unless it names a body part the kind does not
+    // have (the looks never take an invented line): anatomy is never the model's to add.
+    let anat = null; const fits = (t) => !!t && anatomyFits(t, anat || (anat = kindAnatomy(Wc, speciesKey, sp, gender)));
+    p.temperament = (given.temperament && fresh('temperaments', given.temperament) && fits(given.temperament) ? given.temperament : '') || pick(free('temperaments', G.temperaments));
+    p.quirk = (given.quirk && fresh('quirks', given.quirk) && fits(given.quirk) ? given.quirk : '') || personFill(pick(free('quirks', G.quirks)), p);
+    p.want = (fits(given.want) ? given.want : '') || personFill(pick(opts.wants || G.wants), p);
+    p.privateMatter = (fits(given.private) ? given.private : '') || personFill(pick(G.privates), p);
     p.course = opts.course || (given.course && fresh('courses', given.course) ? given.course : '') || pick(free('courses', G.courses));
     p.invented = Object.keys(given).length > 0;
     p.hello = sp ? personFill(Array.isArray(sp.hello) ? (pick(sp.hello) || '') : sp.hello, p) : '';  // the kind's greeting customs: one per person
     p.hope = sp ? sp.hope : '';
     p.room = sp && sp.room && sp.room.length ? pick(sp.room) : '';
-    p.greeting = given.greeting || pick(G.greetings);
+    p.greeting = (fits(given.greeting) ? given.greeting : '') || pick(G.greetings);
     // How they talk (a manner, never an accent), from the pool alone, never invented; kept as the pool writes it (speechT), so the
     // pronouns follow a later change of gender.
     p.speechT = pick(free('speech', G.speech)) || ''; p.speech = personFill(p.speechT, p);
@@ -1753,7 +1755,7 @@
   const truthy = (v) => !(v == null || v === false || (typeof v === 'number' && !v) || (typeof v === 'string' && /^\s*(?:false|no|n|0|off|none|null|undefined|nan)?\s*$/i.test(v)));
   const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function applyUpdates(state, updates, prevState, elapsed) {
-    const notes = [], diff = [];
+    const notes = [], diff = [], later = [];   // later: notes for the narrator's next turn
     const rec = (path, from, to) => { if (JSON.stringify(from) !== JSON.stringify(to)) diff.push({ path, from, to }); };
     const progKey = W.progression && W.progression.progressKey;
     for (const u of updates) {
@@ -1793,6 +1795,13 @@
           const arr = cleanStrs(val); let next = Array.isArray(cur) ? cur.slice() : [];
           if (!arr.length && op !== 'remove' && !(Array.isArray(val) && !val.length)) { notes.push('ignored an empty value for ' + key); continue; }   // an explicit [] still clears
           if (op === 'append') next = next.concat(arr.filter((x) => !next.some((old) => old.toLowerCase() === x.toLowerCase()))); else if (op === 'remove') next = next.filter((x) => !arr.some((r) => x.toLowerCase().includes(r.toLowerCase()))); else next = arr;
+          // A cursed piece from the Unpriced Table does not come off by hand (world): a removal, or a new list without it, keeps it
+          // on, and the narrator is told; the player's wardcraft at the third level is the one unbinding the story may have done.
+          if (key === 'wearing' && Array.isArray(cur)) {
+            const held = cur.filter((x) => { const c = cursedCharmOf(x); return c && !next.some((y) => matchesKeys(y, c.keys)); });
+            if (held.length && W.skills && W.skills.wardcraft && skillLevel((state.skills || {}).wardcraft) >= 3) notes.push('unbound by wardcraft (level ' + skillLevel(state.skills.wardcraft) + '): ' + held.join(', '));
+            else if (held.length) { next = next.concat(held); notes.push('kept on: ' + held.join(', ') + ' (cursed; it does not come off by hand, only a wardcraft unbinding at level 3 or the Spa slips it off)'); later.push('The piece did not come off: ' + held.join(', ') + ' is cursed and will not come off by hand, however it was pulled at; say so in passing, as ' + firstName() + ' finds it still on, and leave it in items.wearing. Only a wardcraft unbinding at the third level or the Restoration Spa slips it off.'); }
+          }
           const maxItems = def.maxItems || 30;
           if (next.length > maxItems) { notes.push(key + ' list capped at ' + maxItems + '; oldest entries dropped'); next = next.slice(-maxItems); }
           rec(path, cur, next); state.items[key] = next;
@@ -1825,7 +1834,7 @@
         rec(path, state.flags[key], b); state.flags[key] = b;
       }
     }
-    return { diff, notes };
+    return { diff, notes, later };
   }
   function runProgression(state, daysCrossed, diff) {
     const P = W.progression, notes = [], next = [];
@@ -2269,6 +2278,8 @@
     return out;
   }
   // Worn charms and standing curses: one contact a story day each, read from items.wearing and items.curses by the world's keys.
+  // The cursed charm a worn piece is, by the world's keys (null for an ordinary piece or a world without charms).
+  const cursedCharmOf = (x) => ((W.transformation && W.transformation.charms) || []).find((c) => c.cursed && matchesKeys(x, c.keys)) || null;
   // A cursed piece bites deeper each day worn (1, 2, then 3); a curse lifts when its days are up, with a note to the narrator.
   function sourceExposures(state, tf, notes, next, diff) {
     const T = W.transformation, out = [], items = state.items || {}, who = firstName(), day = Number(state.day) || 1;
@@ -3428,18 +3439,26 @@
   // A style example is { scene, text } (a bare string is an ordinary one). Ordinary examples and those of the scenes asked for
   // are drawn, rotated by the turn count rather than at random so every rebuild in a turn's shedding loop measures the same
   // examples; in an intimate scene, or while a change is under way, the first example is one of that scene's.
-  function pickExemplars(n, scene) {
+  // The style examples for a turn, filled: the scene's (an intimate example is written for "{rm_First}", the roommate, and is
+  // filled for the bed partner instead, or for nobody by name when the act is solo or the partner is not known), then ordinary ones.
+  function pickExemplars(n, scene, partner) {
     const want = Array.isArray(scene) ? scene : [scene && 'intimate', adv && arcActive() && 'change'].filter(Boolean);
     const start = adv ? (adv.turns || []).length : 0, out = [];
     const all = (W.exemplars || []).map((e) => (typeof e === 'string' ? { scene: 'ordinary', text: e } : e))
       .concat(want.includes('intimate') ? (W.sceneExemplars || []).map((x) => ({ scene: 'intimate', text: x })) : []);
-    // An example tagged with a kind (its people have that kind's anatomy), and a sex where it has one, is shown only when someone of
-    // that kind and sex is present.
-    const here = (e) => !!(adv && adv.state) && figuresHere('').some((c) => speciesKeyOf(c) === e.kind && (!e.sex || sexKey(genderOf(c)) === e.sex));
+    // An example tagged with a kind (its people have that kind's anatomy), and a sex where it has one, is shown only for a bed
+    // partner of that kind and sex or, with no partner known, when someone of that kind and sex is present.
+    const here = (e) => partner ? speciesKeyOf(partner) === e.kind && (!e.sex || sexKey(genderOf(partner)) === e.sex) : !!(adv && adv.state) && figuresHere('').some((c) => speciesKeyOf(c) === e.kind && (!e.sex || sexKey(genderOf(c)) === e.sex));
     const mid = all.filter((e) => e.scene && e.scene !== 'ordinary' && want.includes(e.scene) && (!e.kind || here(e))), pool = all.filter((e) => !e.scene || e.scene === 'ordinary');
-    if (mid.length && n > 0) out.push(mid[start % mid.length].text);
-    for (let i = 0; i < pool.length && out.length < n; i++) out.push(pool[(start + i) % pool.length].text);
+    if (mid.length && n > 0) { const e = mid[start % mid.length]; out.push(fill(e.text, e.scene === 'intimate' ? partnerTokens(partner) : null)); }
+    for (let i = 0; i < pool.length && out.length < n; i++) out.push(fill(pool[(start + i) % pool.length].text));
     return out;
+  }
+  // The {rm_*} words of an intimate example as the bed partner's (name, pronouns, verb endings), or nobody's by name.
+  function partnerTokens(c) {
+    if (!c) return { rm_name: 'your partner', rm_Name: 'Your partner', rm_first: 'your partner', rm_First: 'Your partner', rm_last: 'your partner', rm_Last: 'Your partner', rm_they: 'they', rm_them: 'them', rm_their: 'their', rm_theirs: 'theirs', rm_They: 'They', rm_Their: 'Their', rm_themself: 'themself', rm_s: '', rm_es: '', rm_ies: 'y', rm_are: 'are', rm_were: 'were', rm_have: 'have', rm_do: 'do' };
+    const pr = c.pronouns || genderDef(genderOf(c)).pronouns, sg = pr.they !== 'they', first = c.first || String(c.name || '').split(' ')[0], last = c.last || String(c.name || '').split(' ').slice(1).join(' ') || first;
+    return { rm_name: c.name, rm_Name: c.name, rm_first: first, rm_First: first, rm_last: last, rm_Last: cap(last), rm_they: pr.they, rm_them: pr.them, rm_their: pr.their, rm_theirs: pr.theirs, rm_They: cap(pr.they), rm_Their: cap(pr.their), rm_themself: pr.they === 'he' ? 'himself' : pr.they === 'she' ? 'herself' : 'themself', rm_s: sg ? 's' : '', rm_es: sg ? 'es' : '', rm_ies: sg ? 'ies' : 'y', rm_are: sg ? 'is' : 'are', rm_were: sg ? 'was' : 'were', rm_have: sg ? 'has' : 'have', rm_do: sg ? 'does' : 'do' };
   }
   function wordBand() { const b = W.wordBands || {}; return b[adv.settings.density] || b.standard || [240, 460]; }
   // The room above a band: the words past its ceiling the narrator may use when the scene needs them (a look the action asks for, a
@@ -4008,7 +4027,6 @@
     const recentText = recent.map((t) => t.narrative).join('\n');
     // A regeneration note is binding like the director note, so what it names pulls its lore and its people too.
     const lore = (limits && limits.noLore) ? [] : activeLore([turnInput.action, turnInput.director || '', turnInput.rewrite || ''], [recentText], turnInput.forceLore || [], limits && limits.loreBudget, limits && limits.loreList);
-    const exemplars = pickExemplars((limits && limits.exemplars) || 2, scene).map((e) => fill(e));
     const hourNow = slotInfo(S).cur, slot = hourNow.slot;   // the hour's fixture: its own people (who, where, aim) are at it
     // A director or regeneration note's people are part of the turn too, so they reach the cast and the focus line rather than being shut out by it.
     const focusedNames = [...new Set(focusNames(turnInput.action).concat(turnInput.director ? focusNames(turnInput.director) : [], turnInput.rewrite ? focusNames(turnInput.rewrite) : []))];
@@ -4033,6 +4051,10 @@
     // The bed partner in an act: the people the action or the director note names, or (in showingNow) the one other person here; a solo act has none.
     const bed = scene && !sceneSolo(turnInput, sceneRun(turnInput) ? S.scene : null) ? focusedNames : null;
     const showing = W.transformation ? showingNow(S, turnInput.action, scene, (L.castLevel || (L.briefCast ? 'brief' : '')) === 'brief' ? [] : presentCast(S), bed) : null;
+    // The bed partner by name, for the scene's style example: the one showingNow found, else the person the action names, else the
+    // one other person here; a solo act has none.
+    const partner = scene && bed ? ((showing && presentCast(S).find((c) => showing.bed[c.key])) || activeCharacters().find((c) => bed.some((nm) => nameHandles(c).some((hn) => hn.length > 2 && hn.toLowerCase() === String(nm).toLowerCase()))) || (presentCast(S).length === 1 ? presentCast(S)[0] : null)) : null;
+    const exemplars = pickExemplars((limits && limits.exemplars) || 2, scene, partner);
     if (W.transformation) parts.push(x('transformation', transformationBlock(S, limits && limits.compactTransformation, mentioned + ' ' + (turnInput.director || ''), !!(limits && limits.notesChars), turnInput.action + ' ' + (turnInput.director || ''), showing)));
     if (W.skills) parts.push(x('skills', skillsBlock(S, skillsInScene(slot, turnInput.action + '\n' + (turnInput.director || ''), S.location + '\n' + slotInfo(S).cur.name + '\n' + recent[recent.length - 1].narrative))));
     // What the player has been told: every word they have (never shed), then the newest explanations, which give way only at the
@@ -4690,7 +4712,7 @@
     const arcNotes = guard('changes under way', () => withSeed(seed + 'changes', () => advanceArcs(state, notes).concat(advanceTracks(state, notes))), []);
     applied.diff.unshift({ path: 'time', from: stateBefore.day + ' ' + stateBefore.time, to: state.day + ' ' + state.time });
     adv.state = state;
-    adv.pendingNotes = prog.next.concat(tfr.next, arcNotes, bondNotes(state));
+    adv.pendingNotes = prog.next.concat(tfr.next, arcNotes, bondNotes(state), applied.later || []);
     // The turn the glimpse comes out, who it was stays true from then on.
     const seenBy = state.flags.glimpse_told && stateBefore.flags.glimpse_told === false && glimpsePerson();
     if (seenBy) { out.facts.push(adv.player.first + ' now knows ' + seenBy.name + ' is the one ' + adv.player.pronouns.they + ' saw before the letter came: ' + adv.player.glimpse.text); notes.push('the glimpse is out: ' + seenBy.name); }
@@ -5007,7 +5029,7 @@
         xml('player', p.name + ' (' + p.pronouns.they + '/' + p.pronouns.them + '), human, nineteen, first-year, just arrived on the cloud ferry with a duffel bag; the roommate was told to expect a human. What ' + p.first + ' has seen so far: shapes across the ferry deck, and ' + porterBit + '. ' + (human ? 'The roommate is human too, a second-year with a year of the Isle behind ' + r.pronouns.them + '; nothing about the place is ordinary to ' + p.first + ' yet; ' : 'This is the first time ' + p.first + ' has been within arm\'s reach of ' + kindArticle + ' ' + kind + ', and nothing about it is ordinary to ' + p.pronouns.them + ' yet; ') + (heard.length ? p.first + ' has been told nothing, and the only words of this place ' + p.first + ' has are ' + p.pronouns.their + ' own: ' + heard.join(', ') + '.' : p.first + ' has no word for any of it and has been told nothing.')),
         // The glimpse is a secret: in a narrator-only block, which Debug hides while spoilers are off, as in the turn prompts.
         seenRm ? xml('gm_only', 'A secret, kept in this scene: ' + r.first + ' is the one ' + p.first + ' saw three weeks before, in the world below (' + p.first + '\'s words: ' + p.glimpse.text + '). ' + r.first + ' may recognise ' + p.pronouns.them + ' and says nothing of it.', 'note="for the narrator alone"') : '',
-        xml('style_examples', pickExemplars(2).map((e) => fill(e)).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
+        xml('style_examples', pickExemplars(2).join('\n\n'), 'note="register and density only; reuse nothing from them"'),
         xml('rules', 'Write from inside ' + p.first + ': the roommate\'s body arrives through ' + p.first + '\'s senses as the eye and the nose take it in, ' + (human ? '' : 'the non-human parts in particular ') + '(Looks and Close up above), what is new called out as new, with the smell, the sound and the warmth or cool of ' + r.pronouns.them + ' at close range. Leave ' + p.first + '\'s reaction to the player; do not require interest, alarm, touch or any other response. No word of the Isle\'s in the narration (glamour, mythkin, kind, a kind\'s name): ' + (human ? 'the roommate may use them, in ' + r.pronouns.their + ' own mouth, or not.' : 'the body is seen in ' + p.first + '\'s own plain words, as scales or fur or a tail, and only the roommate may name ' + r.pronouns.their + ' kind, in ' + r.pronouns.their + ' own mouth, or not.') + ' Not everything is dialogue. The roommate speaks in ' + r.pronouns.their + ' own voice and gives ' + r.pronouns.their + ' name; ' + p.first + ' says nothing and decides nothing (the player will), though ' + p.first + '\'s reflexes are yours. Show the body plainly and with affection, no sexual detail. The body is exactly what Looks gives and nothing else: add no part, covering, colour, by-sex feature, size or comparison it does not give, nothing under Not on this body, and end each covering where Looks ends it; the height is as Looks gives it, never measured against ' + p.first + '. The clothes are yours to choose by the Dress line, within what the body allows. Nobody explains transformation, mentions engine terms, or treats ' + p.first + ' as special beyond being the new human. End with the offer open, not with a question to the player. Return only the prose.' + (adv.settings.thoughts === false ? '' : ' One inward thought of ' + p.first + '\'s may be set in italics between asterisks (*like this*), short and reflexive, never a decision.'))
       ].filter(Boolean).join('\n\n');
       const ask = (extra) => sample(prompt + (extra ? '\n\n' + xml('note', extra) : ''), { label: 'roommate introduction', modelTier: narrTierFor(null), cache: false, signal: ctl.signal });
@@ -5158,6 +5180,8 @@
   let dirty = false, loadingAdv = false, deletingAdv = false;
   // True while the boot is still loading saves and the page shows its placeholder (set up at boot).
   let bootLoadPending = true, bootPendingFn = () => false; const bootPending = () => bootPendingFn();
+  // Claude and the store have both answered, or failed (the boot's handshake); until then neither is 'unavailable', only late.
+  let handshakeDone = false, handshakeSettled = Promise.resolve();
   // Why the page is refusing an action while it is held.
   const busyMsg = () => deletingAdv ? 'An adventure is being removed.' : loadingAdv ? 'An adventure is still loading.' : 'A turn is already running.';
   async function newerInStore() {
@@ -5186,8 +5210,13 @@
       if (dirty || n.fork) { offerConflict(n); return true; }
       // The reload gives way if the player opens or starts something else meanwhile: their choice stands.
       const was = adv.turns.length, mine = adv; let warning;
+      // An edit typed into the summary box and not yet saved rides over the reload (it is saved when the box is left, as before);
+      // the Override panel, open on the old state, is filled again from the new one, so Apply cannot write the old values back.
+      const typed = summaryDirty ? $('#summary').value : null;
       try { warning = await loadAdventure(adv.id, () => adv === mine && !busy); } catch (e) { if (e && e.code === 'superseded') return false; throw e; }
-      setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). ' + (warning || 'Carry on from here.'), !!warning);
+      if (typed != null) { $('#summary').value = typed; summaryDirty = true; }
+      const refilled = !!$('#dlgOverride').open; if (refilled) openOverride();
+      setStatus('Picked up the newer save from your other device (' + was + ' → ' + adv.turns.length + ' turns). ' + (warning || 'Carry on from here.') + (typed != null ? ' Your summary edit is kept here and saves when you leave the box.' : '') + (refilled ? ' The Override panel now shows the newer state.' : ''), !!warning);
       return true;
     } catch (e) { return false; }
   }
@@ -5532,6 +5561,7 @@
 
   async function listAdventures() {
     const el = $('#advlist'); el.innerHTML = '';
+    if (!db && !handshakeDone) { $('#dbNotice').hidden = false; $('#dbNotice').textContent = 'Your saved adventures are still loading; close this and open Adventures again in a moment.'; $('#saveInfo').textContent = ''; return; }
     if (!db) { $('#dbNotice').hidden = false; $('#dbNotice').textContent = 'Saving is not available in this view. You can still play; use Export to keep a copy.'; $('#saveInfo').textContent = 'Saving is unavailable in this view. Export your adventure regularly to keep a copy.'; return; }
     $('#dbNotice').hidden = true; $('#saveInfo').textContent = 'Every turn is saved automatically to the same store on every device; open the page anywhere and it starts from the most recent save. A page left open checks for newer saves on its own.';
     try {
@@ -6321,7 +6351,7 @@
     // kinds met, the lore, contact and influence), not only the label. A look left as it was shown is drawn again for the new kind
     // (seeded, as Redraw is); a look typed by hand stays as typed; the close-up notes are the new kind's.
     const kindNow = c.species || poolKindOf(raceOf(c)) || (raceOf(c) ? 'custom' : null), kindNew = typedKind ? poolKindOf(typedKind) || 'custom' : kindNow;
-    const told = castTold(c); let redrawn = false, kindNote = '', hello = (filled && filled.hello) || '';
+    const told = castTold(c); let redrawn = false, redrawnAs = '', kindNote = '', hello = (filled && filled.hello) || '';
     if (kindNew !== kindNow && !(filled && filled.extras.species)) {
       const sp = kindNew !== 'custom' ? speciesPool(W, kindNew) : null, fits = !!sp && sp.genders.includes(o.gender), hasLooks = !!String(c.looks || '').trim();
       if (sp && !fits && hasLooks && !looksTyped) { o.race = raceOf(c); kindNote = ' The kind is kept: this world gives the ' + speciesRace(W, kindNew) + ' no body for ' + String(gender.label || o.gender).toLowerCase() + '. Choose a gender the kind has, or write the Looks by hand.'; }
@@ -6332,9 +6362,19 @@
         if (p && hasLooks && !looksTyped) {
           Object.assign(o, { looks: p.looks, looksV: p.looksV, looksByHand: false }); redrawn = true;
           if (c.gen && 'looks' in c.gen) o.gen = Object.assign({}, c.gen, o.gen || {}, { looks: p.looks, senses: p.senses });
-          kindNote = ' The looks were drawn again for the ' + speciesRace(W, kindNew) + '.';
+          kindNote = ' The looks were drawn again for the ' + speciesRace(W, kindNew) + '.'; { const r = speciesRace(W, kindNew); redrawnAs = (/^[aeiou]/i.test(r) ? 'an ' : 'a ') + r; }
         } else if (!sp && hasLooks && !looksTyped) kindNote = ' This world does not describe the ' + typedKind + ', so the Looks still give the old body: edit them to fit.';
       }
+    }
+    // A change of gender is a change of body: a look left as it was shown is drawn again for the new sex (the chest, the by-sex lines
+    // and the kind's must-nots for it), seeded as Redraw is; a look typed by hand stays as typed.
+    const kindKept = o.species || kindNow;
+    if (!redrawn && kindKept && kindKept !== 'custom' && sexKey(o.gender) !== sexKey(genderOf(c)) && !looksTyped && !c.looksByHand && String(c.looks || '').trim() && !(filled && filled.looks)) {
+      const sp = speciesPool(W, kindKept), as = o.gender === 'female' ? 'a woman' : o.gender === 'male' ? 'a man' : 'this body';
+      if (sp && sp.genders.includes(o.gender)) {
+        const p = withSeed(adv.id + ':' + key + ':sex:' + o.gender, () => castDraw(key, kindKept, o.gender, { dressRole: (c.dress && c.dress.role) || 'student', unlike: c }));
+        if (p) { Object.assign(o, { looks: p.looks, looksV: p.looksV, looksByHand: false, breasts: p.breasts || '' }); redrawn = true; redrawnAs = as; if (c.gen && 'looks' in c.gen) o.gen = Object.assign({}, c.gen, o.gen || {}, { looks: p.looks }); kindNote += ' The looks were drawn again for ' + as + '.'; }
+      } else if (sp) kindNote += ' This world gives the ' + speciesRace(W, kindKept) + ' no body for ' + String(gender.label || o.gender).toLowerCase() + ', so the Looks still give the old body: write them by hand to fit.';
     }
     // The roommate's sheet tells the kind's greeting custom ("hugs people hello, the way bovine mythkin do"): a new kind brings its own.
     if (hello && o.species && o.species !== c.species && c.gen && c.gen.hello && hello !== c.gen.hello) {
@@ -6350,7 +6390,7 @@
     const target = isRm ? (cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o, spName ? { speciesName: spName } : {})) : added ? Object.assign(added, o) : (cs.overrides[key] = Object.assign({}, cs.overrides[key] || {}, o));
     if (looksTyped) delete target.looksV;
     if (rmSeeds) retellRmSeeds(rmSeeds);
-    if (redrawn && (told.present || told.named)) { const r = speciesRace(W, o.species); noteRedrawnBody(Object.assign({}, c, o), 'looks, as ' + (/^[aeiou]/i.test(r) ? 'an ' : 'a ') + r); }
+    if (redrawn && (told.present || told.named)) noteRedrawnBody(Object.assign({}, c, o), 'looks, as ' + redrawnAs);
     if (name !== c.name) { const held = cs.added.find((a) => a.key === key) || cs.overrides[key]; held.former = [c.name, oldFirst].concat(c.former || []).filter((n, i, arr) => n && n.length > 2 && n !== name && n !== parts.first && arr.indexOf(n) === i).slice(0, 6); }
     if (isRm) relabelRoommate([c.name, name], [raceOf(c), c.speciesName, adv.roommate.race, adv.roommate.speciesName], o.race);
     renamePresent(c, { name, first: parts.first, last: parts.last });
@@ -7095,7 +7135,7 @@
   // restoreWait: a restored creation screen holds Begin until Claude and the save list are ready (see the boot).
   // createOwn: the player has begun a creation of their own, not the one restored from a draft (see bootSuperseded).
   // beginLossOk: the player has been told that Begin loses the open adventure's unsaved changes and goes ahead anyway.
-  let createCtl = null, createToken = 0, createT0 = 0, createBackTried = false, bootRestoring = false, createClosed = false, restoreWait = false, createOwn = false, beginLossOk = false;
+  let createCtl = null, createToken = 0, createT0 = 0, createBackTried = false, bootRestoring = false, createClosed = false, restoreWait = false, createOwn = false, beginLossOk = false, beginWaiting = false;
   const RESTORE_WAIT = 'Getting Claude and your saves ready; Begin is available in a moment.';
   const createSecs = () => ((performance.now() - createT0) / 1000).toFixed(1);
   const CREATE_DRAFT_KEY = 'windlass.createDraft', CREATE_LOG_KEY = 'windlass.createLog', CREATE_DRAFT_MAX_MS = 6 * 3600 * 1000;
@@ -7151,7 +7191,15 @@
   document.addEventListener('visibilitychange', () => { if (createCtl) createTrace('page ' + document.visibilityState + ' at ' + createSecs() + ' s into the invention'); });
   window.addEventListener('pagehide', (e) => { if (createCtl) createTrace('page unloading' + (e.persisted ? ' (kept for back/forward)' : '') + ' at ' + createSecs() + ' s into the invention'); });
   $('#cBegin').onclick = async () => {
-    if (restoreWait) { $('#cNote').textContent = RESTORE_WAIT; return; }
+    if (restoreWait || beginWaiting) { $('#cNote').textContent = RESTORE_WAIT; return; }
+    // Begun while the page is still asking for Claude and the store (a slow handshake on a fresh load), the game would start with
+    // nobody invented and nothing saved, and 'saving unavailable' would be said of a store that is only late: both are waited for.
+    if (!handshakeDone && !(db && sample)) {
+      beginWaiting = true; $('#cBegin').disabled = true; $('#cNote').textContent = RESTORE_WAIT;
+      try { await Promise.race([handshakeSettled, new Promise((r) => setTimeout(r, 20000))]); }
+      finally { beginWaiting = false; $('#cBegin').disabled = false; if ($('#cNote').textContent === RESTORE_WAIT) $('#cNote').textContent = ''; }
+      if (!$('#dlgCreate').open) return;
+    }
     if (createCtl) { if (!createCtl.signal.aborted) createTrace('Begin now pressed at ' + createSecs() + ' s'); createCtl.abort(); return; }
     if (busy) { $('#cNote').textContent = introRunning ? 'Your roommate\'s introduction is still being written; wait a moment.' : 'A turn is already running in the current adventure; wait for it to finish first.'; return; }
     // A save that failed after this screen opened (a turn still running when New adventure was pressed) is asked about here, once.
@@ -7204,7 +7252,7 @@
   $('#ovrEventAdd').onclick = async () => { const f = $('#ovrEvent').value.trim(); if (!f) return; const add = (m) => { if (Array.isArray(m.events)) m.events.push(f); }; add(adv.memory); keepEditInSnapshots({ memory: add }); $('#ovrEvent').value = ''; renderRail(); if (await persist()) setStatus('Event added.'); };
   $('#ovrNoteAdd').onclick = async () => { const f = $('#ovrNote').value.trim(); if (!f) return; adv.pendingNotes = (adv.pendingNotes || []).concat([f]); keepEditInSnapshots({ pending: { added: [f], removed: [] } }); $('#ovrNote').value = ''; renderRail(); if (await persist()) setStatus('Engine note queued for the next turn.'); };
   $('#ovrNoteClear').onclick = async () => { keepEditInSnapshots({ pending: { added: [], removed: (adv.pendingNotes || []).slice() } }); adv.pendingNotes = []; renderRail(); if (await persist()) setStatus('Engine notes cleared.'); };
-  $('#ovrStateApply').onclick = async () => { let parsed; try { parsed = JSON.parse($('#ovrState').value); } catch (e) { $('#ovrStateNote').textContent = 'Not valid JSON.'; return; } const ok = await overrideApply((s) => { if (!parsed || typeof parsed !== 'object' || !parsed.items || !parsed.attitudes) throw new Error('state needs items and attitudes'); Object.keys(s).forEach((k) => delete s[k]); Object.assign(s, parsed); }, 'state replaced'); $('#ovrStateNote').textContent = ok ? 'Applied.' : 'Not applied.'; };
+  $('#ovrStateApply').onclick = async () => { let parsed; try { parsed = JSON.parse($('#ovrState').value); } catch (e) { $('#ovrStateNote').textContent = 'Not valid JSON.'; return; } const ok = await overrideApply((s) => { const need = ['items', 'attitudes', 'flags', 'present', 'day', 'time', 'location'], missing = !parsed || typeof parsed !== 'object' || Array.isArray(parsed) ? need : need.filter((k) => !(k in parsed)); if (missing.length) throw new Error('the state needs ' + missing.join(', ') + (missing.length < need.length ? ' as well' : '') + ' (Reset to current shows the shape)'); Object.keys(s).forEach((k) => delete s[k]); Object.assign(s, parsed); if (W.skills) ensureSkills(s); if (bondModel()) ensureBonds(s); ensureTold(s); }, 'state replaced'); $('#ovrStateNote').textContent = ok ? 'Applied.' : 'Not applied.'; };
   $('#ovrStateReset').onclick = () => { $('#ovrState').value = JSON.stringify(adv.state, null, 1); $('#ovrStateNote').textContent = ''; };
   $('#ovrReplyApply').onclick = async () => { $('#ovrReplyNote').textContent = 'working…'; const r = await applyManualReply($('#ovrAction').value.trim(), $('#ovrReply').value); $('#ovrReplyNote').textContent = r; };
 
@@ -7297,6 +7345,7 @@
     if (!$('#dlgCreate').open) { if (createClosed) showPreviewNote(); else openCreate(DEFAULT_WORLD); }
   })();
   const bootDone = () => { bootLoadPending = false; }; bootLoad.then(bootDone, bootDone);
+  handshakeSettled = Promise.allSettled([sampleReady, bootLoad]); handshakeSettled.then(() => { handshakeDone = true; });
   if (bootDraft) Promise.race([Promise.allSettled([sampleReady, bootLoad]), new Promise((r) => setTimeout(r, 20000))]).then(() => {
     if (!restoreWait) return;   // the restored screen has given way to a fresh one, which needs no wait
     restoreWait = false; $('#cBegin').disabled = false; if ($('#cNote').textContent === RESTORE_WAIT) $('#cNote').textContent = '';
