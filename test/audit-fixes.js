@@ -7391,6 +7391,20 @@ const S = {
     assert.match(src, /\{rm_they\} \{rm_are\} carrying/, 'the human body line uses the agreeing verb token');
   },
 
+  async passersbyNamedByWhatShows() {
+    // A passerby with "a tail" could be any of half the kinds: the narrator is told to pin each person by the feature that tells
+    // what they are, in ordinary animal words, while the Isle's own words stay unsaid until the player learns them.
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      assert(await h.turn('I walk through the dining hall.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /a passerby included, is pinned by what shows, in ordinary animal words/, 'the turn prompt asks for people to be pinned by what shows');
+      assert.match(p, /never a bare "a tail" or "ears" that many kinds share/, 'a bare tail is ruled out');
+      assert.doesNotMatch(p, /\(scales on a forearm, a tail, ears that move\)/, 'the old example of a bare tail is gone');
+      clean(h);
+    } finally { h.close(); }
+  },
+
 };
 
 (async () => {
