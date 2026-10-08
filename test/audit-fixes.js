@@ -7405,6 +7405,18 @@ const S = {
     } finally { h.close(); }
   },
 
+  async carriedItemsAreThePlayersOwn() {
+    // The inventory reaches the narrator in the state, so a roommate once spoke of the player's forty dollars unasked: what the
+    // player carries is known to others only once shown, used in front of them or said on the page.
+    const h = await begin({ rmSpecies: 'cow', rmName: 'Daisy Holm' });
+    try {
+      assert(await h.turn('I sit down to eat.'));
+      const p = promptOf(lastTurn(h));
+      assert.match(p, /nobody knows of an item, or how much money, until \S+ shows it, uses it in front of them or says so on the page/, 'the turn prompt keeps the inventory private');
+      clean(h);
+    } finally { h.close(); }
+  },
+
 };
 
 (async () => {
