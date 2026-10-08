@@ -3554,7 +3554,7 @@ const S = {
     };
     for (const [k, m] of Object.entries(TR.species)) for (const t of m) { const ways = (looksKind(Wd, k) || {}).ways || []; pairUp(k + '.' + t.key, own(k, t.key) || (ways.includes(t.key) && F._ways) || F._, t.stages); }
     for (const side of ['woman', 'man']) for (const t of TR[side]) pairUp(side + '.' + t.key, own(side, t.key) || F._, t.stages);
-    assert.deepEqual(twice, [], 'felt options that restate the stage line they share a note with');
+    assert.deepEqual(twice, [], 'felt options that restate the stage line they share a note with: ' + twice.map((x) => x.split(' "')[0]).join(', '));
   },
 
   // 21c. The world data agrees with itself. Every hand row keeps the hand the lore pins (a bovine hand is two hooved fingers and a
@@ -7389,6 +7389,128 @@ const S = {
     const slips = src.match(/\{rm_they\} (?:is|has|does|was)\b/g) || [];
     assert.equal(slips.length, 0, 'pool text agrees with a they/them person: ' + slips.join(', '));
     assert.match(src, /\{rm_they\} \{rm_are\} carrying/, 'the human body line uses the agreeing verb token');
+  },
+
+  // Three more kinds, the horse, the donkey and the mouse or rat (one kind, drawn mouse-like or rat-like by the ears' range). Each
+  // is in the world's lists and lore, has felt lines for every part and weights that sum to a body, can be drawn as the roommate
+  // and as cast with looks that pass the composer's rules, carries its own must-nots (never the bovine's udder, milk and horns),
+  // and has tracks the engine advances. The mouse or rat draws both leans across seeds.
+  async horseDonkeyMouseKinds() {
+    const G = loadGenerator(HTML, WORLDS, { random: mulberry32(global.__WL_SEED) }), Wg = G.W, LK = Wg.genPools.looks, T = Wg.transformation, TRS = T.tracks.species;
+    const kinds = ['horse', 'donkey', 'mouse'], byKey = (k, key) => TRS[k].find((t) => t.key === key), F = T.felt;
+    const feltOf = (k, key) => { let e = F[k + '.' + key] || F[key]; if (typeof e === 'string') e = F[e]; return e; };
+    const roles = Wg.castRoles.concat(Wg.minorRoles), allows = (r, k) => [].concat(r.species).includes(k);
+    const closing = (k, g) => { const A = LK.kinds[k].absent; return ' ' + [].concat(A[g] || [], A.all || []).map((x, i) => (i ? 'no ' : 'No ') + String(x).replace(/^(?:an?|the) /i, '')).join(', ') + '.'; };
+    for (const k of kinds) {
+      assert(Wg.creation.roommate.species.includes(k), k + ' can be the roommate');
+      assert(Wg.castRoles.some((r) => allows(r, k)) && roles.filter((r) => allows(r, k)).length >= 2, k + ' is dealt into the cast by more than one role, one of them a cast role');
+      const gl = Wg.creation.glimpses.find((g) => g.kind === k); assert(gl && gl.label && gl.text && (gl.cues || []).length && (gl.names || []).length, k + ' has a glimpse with cues and names');
+      const lore = Wg.lore.find((l) => l.species === k); assert(lore && lore.text.length <= 800 && lore.keys.length, k + ' has a short lore entry');
+      assert.equal(T.species[k].element, 'earth', k + ' has an element'); assert(T.sexChange[k] && T.sexChange[k].to === 'female', k + ' may carry a body toward a woman\'s');
+      assert(T.species[k].ladder.length >= 5 && T.species[k].habits.length >= 4 && T.species[k].noticed.length && T.species[k].gone.length, k + ' has its ladder, habits, noticed and gone lines');
+      const M = TRS[k], ways = LK.kinds[k].ways;
+      for (const sex of ['women', 'men']) assert.equal(M.filter((t) => !t.sex || t.sex === sex).reduce((a, t) => a + t.weight, 0), 100, k + ' weights sum to 100 for ' + sex);
+      for (const t of M) { assert(t.stages.length >= 3 && t.stages.length <= 5, k + ' ' + t.key + ' has three to five stages'); if (!ways.includes(t.key)) { const e = feltOf(k, t.key); assert(e && e.on && e.mid && e.end, k + '.' + t.key + ' is felt'); } }
+      assert(ways.every((w) => byKey(k, w)), k + ' ways are tracks');
+      assert(LK.kinds[k].parts.every((p) => byKey(k, p)), k + ' parts are tracks');
+      assert(M.every((t) => !t.sex), k + ' has no by-sex feature of its own');
+      assert.equal(Wg.genPools.species[k].genders.join(), 'female,male', k + ' has both sexes');
+      const named = k === 'mouse' ? 'mouse or rat' : k;
+      assert(Wg.premise.includes(named) && Wg.premiseNarrator.includes(named), k + ' is in both premises');
+      assert.equal(T.species[k].race, k === 'mouse' ? 'Mouse or rat mythkin' : k[0].toUpperCase() + k.slice(1) + ' mythkin');
+      assert.doesNotMatch(JSON.stringify([M, LK.kinds[k].parts, Wg.genPools.species[k], T.species[k].ladder]), /\budder|\bmilk|\bteats?\b|\bhorns\b/i, k + ' carries nothing of the bovine\'s udder, milk or horns (the horn of a hoof is not one)');
+    }
+    assert.match(Wg.rules.join(' '), /bovine, horse, donkey, rabbit and mouse or rat mythkin earth/, 'the three kinds have their element in the rules');
+    // The hooved kinds follow the bovine hand; the horse is tall and long-legged with a long flowing tail and mane, the donkey shorter and
+    // sturdier with long upright ears, a tufted tail and a short upright mane, the mouse or rat small with round ears high on the head,
+    // a long thin nearly bare tail and whiskers; the donkey's dark cross is a drawn marking.
+    for (const k of ['horse', 'donkey']) {
+      for (const row of Object.values(byKey(k, 'hands').range)) assert.match(row, /^Two (?:\w+ )*fingers and a (?:\w+ )*thumb/, k + ' hand row is two fingers and a thumb: ' + row);
+      assert.deepEqual(byKey(k, 'hands').stages, byKey('cow', 'hands').stages, k + ' follows the bovine hand');
+      assert.match(Wg.lore.find((l) => l.species === k).text, /hands of two hooved fingers and a hooved thumb/); assert.match(byKey(k, 'toes_and_hooves').stages.at(-1), /single \w+ hoof on each foot/);
+      assert.deepEqual(LK.kinds[k].absent.all, ['horns', 'teats or milk'], k + ' must-nots'); assert(LK.kinds[k].counts.some((c) => /three hooves on each hand/.test(c)));
+    }
+    assert(LK.kinds.donkey.height.female[1] < LK.kinds.horse.height.female[1] + 2 && LK.kinds.donkey.height.male[1] < LK.kinds.horse.height.male[1], 'the donkey is shorter than the horse');
+    assert.match(byKey('horse', 'tail').range.standard, /flowing/); assert.match(byKey('donkey', 'tail').range.standard, /tufted/); assert.deepEqual(byKey('donkey', 'tail').range, byKey('cow', 'tail').range, 'the donkey\'s tail is the cow\'s');
+    assert.match(byKey('horse', 'spine_mane').range.standard, /long mane/); assert.match(byKey('donkey', 'spine_mane').range.standard, /short upright mane/);
+    assert.match(byKey('horse', 'ears').range.standard, /out to the sides/); assert.match(byKey('donkey', 'ears').range.standard, /upright/);
+    assert.match(byKey('mouse', 'ears').range.least, /rat/); assert.match(byKey('mouse', 'ears').range.most, /large, round.*mouse/i); assert.match(byKey('mouse', 'tail').range.standard, /thin and nearly bare/);
+    assert.match(Wg.lore.find((l) => l.species === 'mouse').text, /large for a mouse, smaller for a rat/);
+    assert(LK.kinds.donkey.draws.some((d) => d.label === 'cross' && d.pool.some((p) => /shoulders/.test(p)) && d.pool.some((p) => /absent/.test(p))), 'the donkey\'s cross is a drawn marking, and may be absent');
+    // Drawn looks: the height then the figure and its parts, hair and eyes, the kind's parts, the must-nots to close; the horse tall, the
+    // donkey shorter, the mouse or rat small.
+    const inches = (L) => { const m = /^About (\w+) foot(?: (\w+))?;/.exec(L) || [], w = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven']; return w.indexOf(m[1]) * 12 + (m[2] ? w.indexOf(m[2]) : 0); };
+    const mean = {}, ears = new Set(), cross = new Set();
+    for (const k of kinds) for (const g of Wg.genPools.species[k].genders) {
+      const hs = [];
+      for (let i = 0; i < 200; i++) {
+        const L = String(G.genPerson(Wg, { species: k, gender: g }).looks || ''), tag = k + ' ' + g + ' #' + i + ': ', s = L.replace(/\.$/, '').split(/\. (?=[A-Z])/), body = L.replace(/ No [a-z][^.]*\.$/, '');
+        assert.match(s[0], /^About \w+ foot(?: \w+)?; (\w+), with /, tag + 'height then figure: ' + s[0]); hs.push(inches(L));
+        assert((LK.figures[g] || []).some((f) => s[0].includes('; ' + f.word + ', with ')), tag + 'a figure of the world\'s: ' + s[0]); assert.doesNotMatch(s[0], /\b(?:heavy|thick)\b/, tag + 'no heavy build');
+        assert.match(s[1] || '', /\bhair\b[^]*; [^;]*\beyes\b[^;]*$/i, tag + 'hair then eyes: ' + s[1]);
+        assert(L.endsWith(closing(k, g)), tag + 'the must-nots close the paragraph: ' + L.slice(-80));
+        assert.doesNotMatch(body, /\budder|\bmilk|\bhorns?\b/i, tag + 'nothing of the bovine in the body: ' + body);
+        assert.doesNotMatch(L, /\{|\byou(?:r)?\b|[A-Z][a-z]+: /, tag + 'no token, no "you", no label');
+        for (const [re, what] of [[/\bhands?\b|\bfingers\b/i, 'hands'], [/\bfeet\b|\bfoot\b|\bhooves\b|\btoes\b/i, 'feet'], [/\bears?\b/i, 'ears'], [/\bface\b|\bmuzzle\b/i, 'face'], [/\btail\b/i, 'tail']]) assert.match(body, re, tag + 'names the ' + what);
+        if (g === 'female') assert.match(L, /\b(?:an?|neat|small|full|soft|generous|big) (?:AA|A|B|C|D|DD|E)\b|\b(?:AA|A|B|C|D|DD|E) cup\b/, tag + 'a woman has a chest');
+        if (k !== 'mouse') { assert.match(body, /\bhooved\b|\bhoof\b/, tag + 'hooved'); assert.match(body, /\bmane\b/, tag + 'a mane'); assert.match(body, /two (?:\w+ )*fingers and a (?:\w+ )*thumb/i, tag + 'the bovine hand'); assert.match(body, /\bhoof on each foot\b/, tag + 'one hoof on each foot'); }
+        if (k === 'horse') assert.match(body, /flowing/, tag + 'a flowing tail or mane');
+        if (k === 'donkey') { assert.match(body, /upright (?:\w+ )*ears/, tag + 'upright ears'); cross.add(/cross faint over the shoulders/.test(body) ? 'faint' : /cross absent/.test(body) ? 'absent' : /cross dark/.test(body) ? 'dark' : 'none'); }
+        if (k === 'mouse') { assert.match(body, /\bwhiskers\b/, tag + 'whiskers'); assert.match(body, /nearly bare/, tag + 'a near-hairless tail'); assert.match(body, /round(?:ed)? ears/i, tag + 'round ears'); ears.add(/as a rat's/.test(body) ? 'rat' : /as a mouse's/.test(body) ? 'mouse' : 'standard'); assert.doesNotMatch(body, /\bfurred tail\b/); }
+      }
+      (mean[k] = mean[k] || {})[g] = hs.reduce((a, b) => a + b, 0) / hs.length;
+    }
+    assert(mean.horse.female > mean.donkey.female && mean.horse.male > mean.donkey.male && mean.horse.female > mean.mouse.female + 6 && mean.horse.female >= 68, 'the horse is tall, the donkey shorter, the mouse or rat small: ' + JSON.stringify(mean));
+    assert.deepEqual([...ears].sort(), ['mouse', 'rat', 'standard'], 'the mouse or rat draws both leans across seeds, and the standard between them');
+    assert(cross.has('dark') && cross.has('faint') && cross.has('absent'), 'the donkey\'s cross is dark, faint or absent across seeds: ' + [...cross]);
+    // As the roommate, from the kind's name or its race: drawn fresh, composed, with the must-nots, and the cast around them composed too.
+    for (const [typed, k, gender, name] of [['horse', 'horse', 'female', 'Briar Moorcroft'], ['Donkey mythkin', 'donkey', 'male', 'Silas Pennywell'], ['mouse or rat', 'mouse', 'female', 'Pippa Larder']]) {
+      const h = await begin({ rmSpecies: typed, rmName: name, rmGender: gender });
+      try {
+        const { data } = onlyAdv(h.mock.store), rm = data.roommate;
+        assert.equal(rm.species, k, typed + ' is the ' + k + ' kind'); assert.equal(rm.race, T.species[k].race);
+        assert.match(rm.looks, /^About \w+ foot(?: \w+)?; \w+, with /, 'the roommate\'s looks are composed: ' + rm.looks);
+        assert(rm.looks.endsWith(closing(k, gender)), 'and closed by the kind\'s must-nots: ' + rm.looks.slice(-80));
+        assert.equal(rm.looksV, 3); assert(rm.senses && !/\{/.test(rm.senses), 'close-up lines are filled: ' + rm.senses);
+        for (const c of [].concat(data.cast.generated.characters, data.cast.generated.minors || [])) if (c.species && TRS[c.species]) assert.match(c.looks, /^About (?:\w+ foot(?: \w+)?|[\w ]+ feet, adult in proportion); /, c.name + ' looks are composed');
+        assert(await h.turn('I look at ' + rm.first + '.'));
+        assert.match(promptOf(lastTurn(h)), new RegExp(rm.looks.slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the roommate\'s looks reach the narrator');
+        clean(h);
+      } finally { h.close(); }
+    }
+    // As cast: a glimpse typed in the kind's own words (a whinny, a bray, a squeak or a rat) seeds someone of the kind in the cast.
+    const h2 = await boot({});
+    try {
+      assert(await h2.settle(150, 6000));
+      for (const [t, kind] of [['Someone whose laugh ended on a whinny', 'horse'], ['A long rasping bray on a station platform', 'donkey'], ['A squeak and a scurry on the stairs', 'mouse'], ['A rat in a stairwell', 'mouse'], ['A horse girl with a mane', 'horse']]) {
+        if (!h2.$('#dlgCreate').open) { h2.click('#btnAdventures'); h2.$('#newWorld').value = 'sundered'; h2.click('#newAdv'); await h2.settle(150, 6000); }
+        const had = new Set(advDocs(h2.mock.store).map(([p]) => p));
+        h2.type('#cGlimpse', t); h2.click('#cBegin'); assert(await h2.idle(30000), 'creating did not finish: ' + t); await h2.settle(150, 6000);
+        const d = advDocs(h2.mock.store).filter(([p]) => !had.has(p))[0][1].data, g = d.player.glimpse, gen = d.cast.generated;
+        assert.equal(g.kind, kind, JSON.stringify(t) + ' is ' + kind);
+        const who = gen.characters.concat(gen.minors || []).find((c) => c.key === g.who);
+        assert(who && who.species === kind, 'someone of the kind in the cast is the one seen: ' + JSON.stringify(g));
+        assert.match(who.looks, /^About \w+ foot(?: \w+)?; \w+, with /, who.name + ' looks are composed: ' + who.looks);
+        assert(who.looks.endsWith(closing(kind, who.gender)), who.name + ' carries the must-nots: ' + who.looks.slice(-80));
+      }
+      clean(h2);
+    } finally { h2.close(); }
+    // The tracks advance: with the kind's influence at the top and every part open, the engine tells its parts one a turn, in the kind's own words.
+    for (const k of kinds) {
+      const M = TRS[k], open = Object.fromEntries(M.map((t) => [t.key, { open: true }]));
+      const { h, id } = await seededTf({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'female', name: 'Ana Reyes' }, () => baseTf(k, 100, { lean: 0, face: 15, tracks: heldParts(M, open) }), { pace: 'unbounded' });
+      try {
+        patchTurns(h, (r) => { r.time_advance_minutes = 15; r.exposures = []; });
+        const prompts = [];
+        for (let i = 0; i < 8; i++) { assert(await h.turn('I get on with the day.')); prompts.push(promptOf(lastTurn(h))); }
+        const tr = onlyAdv(h.mock.store).data.state.tf.prog[k].tracks, begun = M.filter((t) => tr[t.key].told >= 1);
+        assert(begun.length >= 2 && M.reduce((n, t) => n + tr[t.key].told, 0) >= 6, k + ' tells its parts, a waypoint a turn: ' + JSON.stringify(M.map((t) => [t.key, tr[t.key].told])));
+        assert(storedTurns(h.mock.store, id).some((t) => t.notes.some((n) => new RegExp('^change begins: ' + k + ' ').test(n))), k + ' notes a part beginning');
+        assert(prompts.some((p) => new RegExp('Note from the engine: A new part begins \\(' + T.species[k].name).test(p)), k + ' is told to the narrator by its name');
+        assert(prompts.some((p) => M.some((t) => p.includes(t.stages[0]))), k + ' tells its own stage lines');
+        clean(h);
+      } finally { h.close(); }
+    }
   },
 
 };

@@ -33,7 +33,11 @@ const LEAKS = {
   goblin: { female: [/\btusks?\b/i], male: [] },
   fairy: { female: [/\btinted\b/i], male: [] },
   rabbit: { female: [] },
-  harpy: { female: [] }
+  harpy: { female: [] },
+  // The horse, the donkey and the mouse or rat have no by-sex features of their own; what they must never carry is the bovine's.
+  horse: { female: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i], male: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i] },
+  donkey: { female: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i], male: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i] },
+  mouse: { female: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i], male: [/\bhorns?\b/i, /\budder\b/i, /\bmilk\b/i] }
 };
 const WATCH = [
   [/\bwhole shape\b|\bwolf'?s shape\b|\bon all fours\b/i, 'an animal\'s whole shape'],
@@ -49,19 +53,19 @@ const KIND_WATCH = {
 // one, arm and leg covering, spine, and the by-sex features, by the world's own names for the parts (genPools.looks.names).
 const FEATURES = {
   all: [[/\bhands?\b|\bfingers\b/i, 'hands'], [/\bfeet\b|\bfoot\b|\bpaws?\b|\bhooves\b|\bhoof\b|\btalons?\b|\btoes\b|\bshanks\b/i, 'feet'], [/\bears?\b|\bcrest\b/i, 'ears'], [/\bface\b|\bmuzzle\b/i, 'face'], [/\beyes\b/i, 'eyes'], [/\bhair\b/i, 'hair']],
-  tail: { wolf: 'Tail', cow: 'Tail', fox: 'Tail', cat: 'Tail', rabbit: 'Tail', harpy: 'Tail', mer: 'In water' },
-  arms: { wolf: 'Arms', cow: 'Arms', fox: 'Arms', cat: 'Arms', rabbit: 'Arms', harpy: 'Arms', mer: 'Arms', dryad: 'Arms', fairy: 'Sheen', goblin: 'Skin' },
-  legs: { wolf: 'Legs', cow: 'Legs', fox: 'Legs', cat: 'Legs', rabbit: 'Legs', harpy: 'Legs', mer: 'Legs', dryad: 'Legs', fairy: 'Sheen', goblin: 'Skin' },
-  spine: { wolf: 'Spine', cow: 'Spine', fox: 'Spine', cat: 'Spine', rabbit: 'Spine', harpy: 'Legs', mer: 'Spine', dryad: 'Spine', fairy: 'Sheen' },
-  female: { wolf: ['Nipples'], cow: ['Teats and udder'], fox: ['Nipples'], cat: ['Nipples'], rabbit: ['Nipples'], mer: [], dryad: ['In season'], goblin: [], fairy: [], harpy: [] },
-  male: { wolf: ['Mantle'], cow: ['Horns'], fox: ['Bib'], cat: ['Neck'], mer: ['Colours'], dryad: ['Shoulders', 'In season'], goblin: ['Frame'], fairy: ['Frame'] }
+  tail: { wolf: 'Tail', cow: 'Tail', fox: 'Tail', cat: 'Tail', rabbit: 'Tail', harpy: 'Tail', mer: 'In water', horse: 'Tail', donkey: 'Tail', mouse: 'Tail' },
+  arms: { wolf: 'Arms', cow: 'Arms', fox: 'Arms', cat: 'Arms', rabbit: 'Arms', harpy: 'Arms', mer: 'Arms', dryad: 'Arms', fairy: 'Sheen', goblin: 'Skin', horse: 'Arms', donkey: 'Arms', mouse: 'Arms' },
+  legs: { wolf: 'Legs', cow: 'Legs', fox: 'Legs', cat: 'Legs', rabbit: 'Legs', harpy: 'Legs', mer: 'Legs', dryad: 'Legs', fairy: 'Sheen', goblin: 'Skin', horse: 'Legs', donkey: 'Legs', mouse: 'Legs' },
+  spine: { wolf: 'Spine', cow: 'Spine', fox: 'Spine', cat: 'Spine', rabbit: 'Spine', harpy: 'Legs', mer: 'Spine', dryad: 'Spine', fairy: 'Sheen', horse: 'Mane', donkey: 'Mane', mouse: 'Spine' },
+  female: { wolf: ['Nipples'], cow: ['Teats and udder'], fox: ['Nipples'], cat: ['Nipples'], rabbit: ['Nipples'], mer: [], dryad: ['In season'], goblin: [], fairy: [], harpy: [], horse: [], donkey: [], mouse: [] },
+  male: { wolf: ['Mantle'], cow: ['Horns'], fox: ['Bib'], cat: ['Neck'], mer: ['Colours'], dryad: ['Shoulders', 'In season'], goblin: ['Frame'], fairy: ['Frame'], horse: [], donkey: [], mouse: [] }
 };
 // A young animal's word has no place in an adult's looks ("like a calf's"); "to the calf" is the leg.
 const YOUNG = /\b(?:kitten|pup|cub|foal|kid|chick|fawn|calf|calve)s?'s?(?=[\s.,;:]|$)|(?<!\b(?:to|at|below|above|mid-)\s?)\b(?:an?|the|like|like an?|like the|as|as an?|as the) (?:kitten|pup|cub|foal|kid|chick|fawn|calf)s?\b/i;
 const CUP = /\b(?:an?|neat|small|full|soft|generous|big) (AA|A|B|C|D|DD|E|F|G)\b|\b(AA|A|B|C|D|DD|E|F|G) cup\b/;
 const HEIGHT = /^About (?:\w+ foot(?: \w+)?|[\w ]+ feet, adult in proportion)(?:;|$)/;
 // At the standard extent the coverings stop where the doc draws them: the hands to the elbows, the feet to the hips fading at the navel.
-const BOUNDS = { wolf: ['elbow', 'navel'], cow: ['elbow', 'navel'], fox: ['elbow', 'navel'], cat: ['elbow', 'navel'], mer: ['elbow', 'navel'], dryad: ['elbow', 'navel'], rabbit: ['elbow'], harpy: ['navel'] };
+const BOUNDS = { wolf: ['elbow', 'navel'], cow: ['elbow', 'navel'], fox: ['elbow', 'navel'], cat: ['elbow', 'navel'], mer: ['elbow', 'navel'], dryad: ['elbow', 'navel'], rabbit: ['elbow'], harpy: ['navel'], horse: ['elbow', 'navel'], donkey: ['elbow', 'navel'], mouse: ['elbow', 'navel'] };
 // No figure is heavy and no part of a build is thick or heavy: the figures run from petite and slight to full and solid.
 const HEAVY = /\b(?:heavy|thick)\b/i;
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\']/g, '\\$&');
