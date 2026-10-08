@@ -12,6 +12,12 @@
 // Knobs: mock.disable = {db:true, sample:true, downloads:true}; mock.sampleHandler(input, opts, call) -> string | {text, truncated} | throws {code,message}
 //        mock.dbFail = (op, path) => error|null ; mock.dbDelay = (op, path) => extra ms ; mock.dbLatency ; mock.sampleLatency ; mock.downloadsDecline
 //        mock.useLatency: ms before each claude.use() answers (a slow runtime handshake)
+//        mock.chunkLatency: ms between the four streamed pieces of a reply (a long scene still writing)
+//        mock.permissions: what claude.use('permissions') answers ({state(name), manage()}); null when unset, as in a view without the capability
+//        mock.dbGate = (op, path) => a promise to hold that operation until it settles, or null (a gate instead of a guessed delay)
+//        mock.allowStoreEdits: let a scenario edit a document in mock.store after the page has read or written it. Without it the page's
+//        next write to that document throws 'store edited behind the page's back' (recorded as a violation): the page holds its own
+//        copy and writes it back over the edit, so the edit would silently never reach it. Edit a store before boot, or use the UI.
 
 const MAX_DOC = 256 * 1024, MAX_DOCS = 5000, MAX_PROMPT = 65536;
 const utf8 = (s) => (typeof Buffer !== 'undefined' ? Buffer.byteLength(s, 'utf8') : new TextEncoder().encode(s).length);
@@ -24,14 +30,19 @@ function mergeDeep(a, b) { const out = Object.assign({}, a); for (const [k, v] o
 const err = (code, message, extra) => Object.assign({ code, message }, extra || {});
 
 // A plain object from any realm (the page's jsdom window or Node): not an array, a Date, a Map or a class instance.
+// What the page last read or wrote at each path, per store Map (shared by every page open on the same Map, so a second device's
+// write is not taken for an edit behind the first one's back). A page booting on a store starts it afresh: a scenario may edit a
+// store between one page closing and the next booting on it.
+const pageSeen = new WeakMap();
+const seenOf = (store, mock) => { let m = pageSeen.get(store); if (!m || mock.claimed !== store) { mock.claimed = store; pageSeen.set(store, (m = new Map())); } return m; };
 const isPlain = (o) => !!o && typeof o === 'object' && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null || (Object.getPrototypeOf(Object.getPrototypeOf(o)) === null && o.constructor && o.constructor.name === 'Object'));
 
 function install(window, opts) {
   opts = opts || {};
   const mock = {
     violations: [], sampleCalls: [], dbLog: [], downloadsLog: [], store: new Map(),
-    disable: {}, dbFail: null, dbDelay: null, dbLatency: 2, sampleLatency: 3, useLatency: 0, downloadsDecline: false, sampleHandler: null,
-    inflight: new Map(), pending: 0, calls: { db: 0, sample: 0 },
+    disable: {}, dbFail: null, dbDelay: null, dbGate: null, dbLatency: 2, sampleLatency: 3, useLatency: 0, chunkLatency: 1, permissions: null, downloadsDecline: false, sampleHandler: null,
+    inflight: new Map(), pending: 0, calls: { db: 0, sample: 0 }, allowStoreEdits: false,
   };
   const violate = (kind, detail) => { mock.violations.push({ kind, detail }); };
   // A contract rejection: record it, then hand back the error to throw.
@@ -50,12 +61,24 @@ function install(window, opts) {
     if (kind === 'doc' && segs.length % 2 !== 0) throw badPath('db: document path needs an even number of segments: ' + path);
     if (kind === 'col' && segs.length % 2 !== 1) throw badPath('db: collection path needs an odd number of segments: ' + path);
   }
-  const snapOf = (path) => { const e = mock.store.get(path); const data = e ? deepFreeze(JSON.parse(JSON.stringify(e.data))) : undefined; return { id: path.split('/').pop(), exists: !!e, data: () => data, metadata: { fromCache: false, hasPendingWrites: false } }; };
+  // The page saw this document as it now is: its own write, or a read of a newer revision (the page takes up another device's save
+  // only when its rev moved; a read of an edit that left rev alone is not taken up, the page writes its own copy over it).
+  const saw = (path, read) => { const e = mock.store.get(path), seen = seenOf(mock.store, mock); if (!e) { seen.delete(path); return; }
+    if (read && seen.has(path) && (JSON.parse(seen.get(path)) || {}).rev === (e.data || {}).rev) return; seen.set(path, JSON.stringify(e.data)); };
+  // Before the page writes: the document must still be what the page last saw, unless the scenario allowed edits.
+  const unchangedSincePage = (path) => {
+    const seen = seenOf(mock.store, mock).get(path), e = mock.store.get(path);
+    if (mock.allowStoreEdits || seen == null || !e || JSON.stringify(e.data) === seen) return;
+    violate('store-edited', path + ' was changed in mock.store after the page read or wrote it');
+    throw new Error('store edited behind the page\'s back: ' + path + ' (edit the store before boot, change it through the page, or set mock.allowStoreEdits)');
+  };
+  const snapOf = (path) => { saw(path, true); const e = mock.store.get(path); const data = e ? deepFreeze(JSON.parse(JSON.stringify(e.data))) : undefined; return { id: path.split('/').pop(), exists: !!e, data: () => data, metadata: { fromCache: false, hasPendingWrites: false } }; };
   async function op(name, path, fn, bytes) {
     mock.calls.db++; mock.pending++;
     try {
       if (mock.disable.db) throw err('not_granted', 'db not granted');
       if (mock.dbFail) { const f = mock.dbFail(name, path); if (f) { await wait(mock.dbLatency); throw f; } }
+      if (mock.dbGate) { const g = mock.dbGate(name, path); if (g) await g; }   // held until the scenario resolves the promise
       const write = name === 'set' || name === 'update' || name === 'delete';
       if (write) {
         const n = mock.inflight.get(path) || 0; if (n > 0) violate('overlapping-writes', name + ' ' + path + ' while another write to the same doc is in flight');
@@ -78,9 +101,9 @@ function install(window, opts) {
     const ref = {
       id: path.split('/').pop(), path,
       get: () => op('get', path, () => snapOf(path)),
-      set: (data) => { const b = checkBody(data, path); return op('set', path, () => { if (!mock.store.has(path) && mock.store.size >= MAX_DOCS) throw reject('doc-quota', 'quota_exceeded', 'database holds at most ' + MAX_DOCS + ' documents; refused ' + path); const e = mock.store.get(path); mock.store.set(path, { data: b.parsed, version: (e ? e.version : 0) + 1 }); }, b.bytes); },
-      update: (data) => { const b = checkBody(data, path); return op('update', path, () => { const e = mock.store.get(path); if (!e) throw reject('update-missing-doc', 'invalid_argument', 'update requires the document to exist: ' + path); const merged = mergeDeep(e.data, b.parsed); const b2 = utf8(JSON.stringify(merged)); if (b2 > MAX_DOC) throw reject('doc-too-large', 'invalid_argument', path + ' would be ' + b2 + ' bytes after the merge (cap ' + MAX_DOC + ')'); mock.store.set(path, { data: merged, version: e.version + 1 }); }, b.bytes); },
-      delete: () => op('delete', path, () => { mock.store.delete(path); }),
+      set: (data) => { const b = checkBody(data, path); return op('set', path, () => { unchangedSincePage(path); if (!mock.store.has(path) && mock.store.size >= MAX_DOCS) throw reject('doc-quota', 'quota_exceeded', 'database holds at most ' + MAX_DOCS + ' documents; refused ' + path); const e = mock.store.get(path); mock.store.set(path, { data: b.parsed, version: (e ? e.version : 0) + 1 }); saw(path); }, b.bytes); },
+      update: (data) => { const b = checkBody(data, path); return op('update', path, () => { const e = mock.store.get(path); if (!e) throw reject('update-missing-doc', 'invalid_argument', 'update requires the document to exist: ' + path); unchangedSincePage(path); const merged = mergeDeep(e.data, b.parsed); const b2 = utf8(JSON.stringify(merged)); if (b2 > MAX_DOC) throw reject('doc-too-large', 'invalid_argument', path + ' would be ' + b2 + ' bytes after the merge (cap ' + MAX_DOC + ')'); mock.store.set(path, { data: merged, version: e.version + 1 }); saw(path); }, b.bytes); },
+      delete: () => op('delete', path, () => { mock.store.delete(path); saw(path); }),
       acquire: (o) => op('acquire', path, () => ({ acquired: true, version: 1, holder: o && o.holder })),
       onSnapshot: (next) => { let live = true; Promise.resolve().then(() => live && next(snapOf(path))); return () => { live = false; }; },
       collection: (p) => colRef(path + '/' + p),
@@ -135,6 +158,7 @@ function install(window, opts) {
     const p = typeof input === 'string' ? input : (Array.isArray(input) ? input.map((m) => (m && m.content) || '').join('\n') : '');
     if (/<output_format>/.test(p)) return 'turn';
     if (/You maintain the long-term memory/.test(p)) return 'memory fold';
+    if (/These are standing facts from an interactive story/.test(p)) return 'facts fold';
     if (/Rewrite it to between/.test(p)) return 'length fit';
     if (/Write the roommate's first appearance/.test(p)) return 'roommate introduction';
     if (/Invent the people listed in <people>/.test(p)) return 'cast invention';
@@ -179,7 +203,7 @@ function install(window, opts) {
       const upto = i === parts ? full.length : Math.floor((full.length * i) / parts);
       const delta = full.slice(sent.length, upto);
       if (delta) { sent += delta; if (options.onText) { try { options.onText({ text: sent, delta }); } catch (e) {} } }
-      if (i < parts) { await wait(1); if (options.signal && options.signal.aborted) { call.outcome = 'cancelled'; throw err('cancelled', 'aborted', { text: sent }); } }
+      if (i < parts) { await wait(mock.chunkLatency); if (options.signal && options.signal.aborted) { call.outcome = 'cancelled'; throw err('cancelled', 'aborted', { text: sent }); } }
     }
     if (options.signal && options.signal.aborted) { call.outcome = 'cancelled'; throw err('cancelled', 'aborted', { text: sent }); }
     call.outcome = res.truncated ? 'truncated' : 'ok';
@@ -199,7 +223,8 @@ function install(window, opts) {
     const prompt = typeof input === 'string' ? input : input.map((m) => m.content).join('\n');
     if (/Rewrite it to between/.test(prompt)) return words(120, ['The', 'corridor', 'hums', 'with', 'distant', 'voices', 'as', 'you', 'walk', 'on.']);
     if (/You maintain the long-term memory/.test(prompt)) return 'Day 1: the player arrived at the house, met the roommate, learned the house rules and settled into the shared room. Nothing else of note happened that day.';
-    if (/Write the roommate's first appearance/.test(prompt)) { const nm = /<roommate>\s*Name: ([^(]+?) \(/.exec(prompt); const full = nm ? nm[1].trim() : 'Your roommate'; const first = full.split(' ')[0]; return words(130, [first, 'looks', 'up', 'from', 'a', 'half-unpacked', 'box', 'and', 'gives', 'you', 'a', 'tired,', 'friendly', 'wave.', '"' + full + ',"', 'the', 'roommate', 'says.']); }
+    if (/These are standing facts from an interactive story/.test(prompt)) return ((/<facts>\n([\s\S]*?)\n<\/facts>/.exec(prompt) || [, ''])[1]).split('\n').slice(0, 8).join('\n');
+    if (/Write the roommate's first appearance/.test(prompt)) { const nm = /<roommate>\s*(?:Full name|Name): ([^(]+?) \(/.exec(prompt); const full = nm ? nm[1].trim() : 'Your roommate'; const first = full.split(' ')[0]; return words(130, [first, 'looks', 'up', 'from', 'a', 'half-unpacked', 'box', 'and', 'gives', 'you', 'a', 'tired,', 'friendly', 'wave.', '"' + full + ',"', 'the', 'roommate', 'says.']); }
     if (/Invent the people listed in <people>/.test(prompt)) {
       const block = (/<people>([\s\S]*?)<\/people>/.exec(prompt) || [, ''])[1];
       const L = 'abcdefghijklmnopqrstuvwxyz'; let idx = 0;
@@ -238,6 +263,7 @@ function install(window, opts) {
       if (name === 'db') return mock.disable.db ? null : dbNs;
       if (name === 'sample') return mock.disable.sample ? null : sample;
       if (name === 'downloads') return mock.disable.downloads ? null : dlNs;
+      if (name === 'permissions') return mock.permissions;
       return null;
     },
   });

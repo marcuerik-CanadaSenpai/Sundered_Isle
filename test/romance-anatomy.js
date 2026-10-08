@@ -50,7 +50,7 @@ async function main() {
       'on-page intimacy must preserve consent and player agency');
     assert.match(prompt, /Body detail \(binding\)/, 'scene-specific anatomical guidance must reach the narrator');
     assert.match(prompt, /Do not replace a named feature with generic warmth or euphemism/, 'established anatomy must not be euphemized');
-    assert.match(prompt, /Narrative length:.*640 words/i, 'the rich scene band must be enforced for romance');
+    assert.match(prompt, new RegExp('Narrative length: ' + h.window.WINDLASS_WORLDS.sundered.wordBands.rich.join(' to ') + ' words, and up to ' + h.window.WINDLASS_WORLDS.sundered.wordRoom.rich + ' words when the scene needs it'), 'the rich scene band and its room must be given for romance');
     assert(await h.turn('I read the program quietly in the huge courtyard'), 'ordinary turn did not finish');
     assert(prompts.length > 1, 'the ordinary storyteller prompt was not captured');
     assert.doesNotMatch(prompts[1], /Romance scene pacing \(binding\)/,
@@ -113,13 +113,22 @@ async function main() {
     assert(await h.turn('Stay at the table', { director: 'Luna arrives and sits down.' }), 'director-arrival turn did not finish');
     assert.match(prompts[13], /Focus: the action or director note names Luna/,
       'a person the director note brings in must be in focus, not shut out by it');
-    assert.match(prompts[13], /Luna \(Werewolf\).*gender: Woman.*she\/her/,
+    assert.match(prompts[13], /Luna \(Werewolf\) \[npc\d+\] \(Woman, she\/her/,
       'cast edits must preserve an explicit gender and matching pronouns in the storyteller prompt');
     assert.match(prompts[13], /unless the action or the director note invites it/,
       'the focus rule must leave room for the director note');
     assert(await h.turn('Stay at the table', { director: 'Have Luna write 100 words in her journal.' }), 'in-story writing turn did not finish');
     assert.doesNotMatch(prompts[14], /at most 110 words/, 'words a character writes in the story must not set the narrative length');
     assert.equal(fits.length, 4, 'an in-story word count must not trigger a length fit');
+    // The describe forms are a length too, and a requested minimum in them is a floor.
+    assert(await h.turn('Stay at the table', { director: 'Describe Luna in 700 words.' }), 'describe-length turn did not finish');
+    assert.match(prompts[15], /Narrative length: at most 770 words; 595 to 770/, '"describe her in N words" must set the length');
+    assert.match(prompts[15], /The action looks at Luna: her whole Looks and Dress may be given again/, 'a description asked for by name is a look');
+    assert.equal(fits.length, 4, 'a reply under an asked ceiling with no floor is kept as written');
+    assert(await h.turn('Stay at the table', { director: 'Describe Luna in at least 700 words.' }), 'describe-minimum turn did not finish');
+    assert.match(prompts[16], /Narrative length: at most 875 words; at least 700, as the director note requires/, '"describe her in at least N words" must set a floor');
+    assert.equal(fits.length, 5, 'a reply below that floor is expanded');
+    assert.match(fits[4], /Rewrite it to between 700 and 875 words/, 'into the asked band');
 
     const [adventurePath, adventure] = [...h.mock.store.entries()].find(([path]) => /^adventures\/[^/]+$/.test(path));
     assert.equal(adventure.data.settings.density, 'standard', 'the regression must exercise the default manual density');

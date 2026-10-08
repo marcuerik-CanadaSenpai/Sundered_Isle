@@ -25,6 +25,7 @@ async function startCow(h, opts) {
   if (opts.world) { h.click('#btnAdventures'); h.$('#newWorld').value = opts.world; h.click('#newAdv'); await h.sleep(50); }
   assert(h.$('#dlgCreate').open, 'creation must be open');
   h.type('#cRmSpecies', 'cow'); h.type('#cRmName', 'Daisy Clover'); h.type('#cName', 'Erik Marcu');
+  if (h.$('#cGlimpse') && !h.$('#cGlimpseRow').hidden) h.type('#cGlimpse', 'A face that was two faces for a second');
   h.click('#cBegin');
   await h.sleep(opts.at || 1500);
   assert.match(h.$('#cNote').textContent, /Inventing/, 'the cast must be being invented');
@@ -59,12 +60,14 @@ async function reloadRestoresIn(world) {
     assert(h.$('#dlgCreate').open, 'the boot load must not close or reset the restored creation');
     assert.equal(h.$('#createTitle').textContent, title, 'same world');
     assert.equal(h.$('#cName').value, 'Erik Marcu'); assert.equal(h.$('#cRmSpecies').value, 'cow'); assert.equal(h.$('#cRmName').value, 'Daisy Clover');
+    if (world === 'sundered') assert.equal(h.$('#cGlimpse') && h.$('#cGlimpse').value, 'A face that was two faces for a second', 'what you think you saw comes back too');
     assert(!h.$('#cRestoreNote').hidden && /reloaded/.test(h.$('#cRestoreNote').textContent), 'a plain explanation must be shown');
     assert(!h.$('#status').classList.contains('bad'), 'no error: ' + h.$('#status').textContent);
     assert.equal(h.$('#summaryNote').textContent, 'no saves yet');
     h.click('#cBegin'); assert(await h.idle(30000), 'creation did not finish'); await h.settle(150, 6000);
     assert.equal(advDocs(h.mock).length, 1, 'the restored creation is saved');
     assert.equal(advDocs(h.mock)[0][1].data.worldId, world);
+    if (world === 'sundered') assert.equal((advDocs(h.mock)[0][1].data.player.glimpse || {}).key, 'faces', 'and the adventure begins with it');
     assert.equal(h.window.localStorage.getItem('windlass.createDraft'), null);
     assert.match(debugCreate(h), /page loaded with a creation left unfinished/, 'Debug must record the reload');
     clean(h);
@@ -287,6 +290,48 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // The preview behind a closed creation screen is never saved: a Settings change, a Cast save and a turn on it write no adventure,
+  // and the next load opens the creation screen again. With a real save loading slowly behind it, a Settings change made meanwhile
+  // does not make the preview the newest save, and the real game opens.
+  async previewIsNeverSaved() {
+    const setDensity = async (h, v) => { h.click('#btnSettings'); h.$('#setDensity').value = v; h.$('#setDensity').dispatchEvent(new h.window.Event('change')); await h.sleep(200); h.click('[data-close="dlgSettings"]'); };
+    const store = new Map();
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      h.click('#dlgCreate [data-close]'); await h.sleep(100);
+      await setDensity(h, 'rich'); assert(await h.idle(8000));
+      assert.equal(advDocs(h.mock).length, 0, 'a Settings change saved the preview');
+      assert.doesNotMatch(h.$('#summaryNote').textContent, /^saved/, 'the preview is said to be saved: ' + h.$('#summaryNote').textContent);
+      h.click('#btnCast'); await h.sleep(20); h.$('#cfName').value = 'Bess Morrow'; h.click('#cfSave'); assert(await h.idle(8000)); h.click('[data-close="dlgCast"]');
+      assert.equal(advDocs(h.mock).length, 0, 'a Cast save saved the preview');
+      assert(await h.turn('I look around.', { refused: true }), 'a turn ran on the preview');
+      assert.match(h.$('#status').textContent, /preview/, 'the refused turn says why: ' + h.$('#status').textContent);
+      assert.equal(advDocs(h.mock).length, 0, 'a turn saved the preview');
+      clean(h);
+    } finally { h.close(); }
+    const again = await boot({ setup(w, m) { m.store = store; } });
+    try { assert(await again.settle(150, 6000)); assert(again.$('#dlgCreate').open, 'the next load opens the creation screen'); clean(again); } finally { again.close(); }
+
+    const real = new Map(); let id;
+    const a = await boot({ setup(w, m) { m.store = real; } });
+    try {
+      assert(await a.settle(150, 6000)); a.type('#cName', 'Owen Pryce'); a.type('#cRmSpecies', 'cow'); a.click('#cBegin'); assert(await a.idle(30000)); await a.settle(150, 6000);
+      assert(await a.turn('I look around.')); id = advDocs(a.mock)[0][0].split('/')[1];
+    } finally { a.close(); }
+    // The saves query is held by a gate, so the change is made on the preview while the real save is still loading.
+    let release, held = false; const gate = new Promise((r) => { release = r; });
+    const b = await boot({ setup(w, m) { m.store = real; m.dbGate = (op, p) => (op === 'query' && p === 'adventures' ? ((held = true), gate) : null); } });
+    try {
+      await b.until(() => held, 'the saves query to be held');
+      await setDensity(b, 'rich');
+      release(); assert(await b.idle(15000)); await b.settle(150, 6000);
+      assert.equal(advDocs(b.mock).length, 1, 'the preview was saved beside the real game');
+      assert.match(b.$('#playerLine').textContent, /Owen Pryce/, 'the real game opens: ' + b.$('#playerLine').textContent);
+      assert.equal(b.window.localStorage.getItem('windlass.last'), id, 'and this device points at it');
+      clean(b);
+    } finally { b.close(); }
+  },
   // With a save in the store, the save loads behind the restored creation, so Cancel lands on it.
   async reloadWithSave() {
     const h0 = await boot({}); await h0.settle(150, 6000); h0.click('#cBegin'); assert(await h0.idle(20000)); await h0.settle(150, 6000);
@@ -318,6 +363,28 @@ const S = {
         clean(h);
       } finally { h.close(); }
     }
+  },
+  // A cast invention reply with a line of prose before the list of people fills every slot, not just the first; a batch that gives no one
+  // is kept with the adventure (at most three), so Erik's empty batches can be read afterwards.
+  async proseBeforeList() {
+    const h = await boot({ setup(w, m) {
+      m.sampleHandler = (input, o, call) => { const out = m.defaultHandler(input, o, call); return call.label === 'cast invention' ? 'Here are the people:\n' + JSON.stringify(JSON.parse(out).people, null, 1) + '\nI hope they suit the story.' : out; };
+    } });
+    try {
+      assert(await h.settle(150, 6000)); h.click('#cBegin'); assert(await h.idle(30000)); await h.settle(150, 6000);
+      const inv = advDocs(h.mock)[0][1].data.cast.generated.invention;
+      assert(inv.notes.length && inv.notes.every((n) => /: (\d) of \1 invented/.test(n) || !/invented in/.test(n)), 'every slot of every batch filled: ' + JSON.stringify(inv.notes));
+      assert(inv.notes.some((n) => /invented in/.test(n))); assert.equal(inv.emptyRaw, undefined, 'no empty batch to keep');
+      clean(h);
+    } finally { h.close(); }
+    const g = await boot({ setup(w, m) { m.sampleHandler = (input, o, call) => (/cast invention/.test(call.label) ? 'I cannot think of anyone right now.' : m.defaultHandler(input, o, call)); } });
+    try {
+      assert(await g.settle(150, 6000)); g.click('#cBegin'); assert(await g.idle(30000)); await g.settle(150, 6000);
+      const inv = advDocs(g.mock)[0][1].data.cast.generated.invention;
+      assert(Array.isArray(inv.emptyRaw) && inv.emptyRaw.length >= 1 && inv.emptyRaw.length <= 3, 'empty batches kept: ' + JSON.stringify(inv.emptyRaw));
+      assert(inv.emptyRaw.every((t) => t === 'I cannot think of anyone right now.'));
+      clean(g);
+    } finally { g.close(); }
   },
   async noUnhandled() {
     const h = await boot({ setup(w, m) { slowInvention(w, m); } });

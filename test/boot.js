@@ -4,6 +4,7 @@
 const fs = require('fs'), path = require('path');
 const { JSDOM, ResourceLoader, VirtualConsole } = require('jsdom');
 const { install } = require('./mock-claude');
+const { mulberry32 } = require('./lib/rng');
 
 const DEFAULT_HTML = process.env.WL_HTML || path.join(__dirname, '..', 'windlass', 'index.html');
 const DEFAULT_WORLDS = process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds');
@@ -39,6 +40,12 @@ async function boot(o) {
       window.scrollTo = () => {};
       window.Element.prototype.scrollTo = window.Element.prototype.scrollTo || function () {};
       if (!window.Blob.prototype.text) window.Blob.prototype.text = function () { return new Promise((res, rej) => { const r = new window.FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsText(this); }); };
+      // Every random draw in the page comes from one seeded generator, so a run that failed on seed N fails again on seed N.
+      // boot({ seed }) wins, then global.__WL_SEED (set per scenario by audit-fixes.js), then WL_SEED; with none the page keeps
+      // Math.random. A shared seed is offset by the boots already made under it, so two devices on one store draw apart.
+      const base = global.__WL_SEED != null ? global.__WL_SEED : (process.env.WL_SEED && process.env.WL_SEED !== 'random' ? Number(process.env.WL_SEED) >>> 0 : null);
+      const seed = o.seed != null ? o.seed : base != null ? (base + (boot.count = (boot.count || 0) + 1) - 1) >>> 0 : null;
+      if (seed != null) window.Math.random = mulberry32(seed);
       mock = install(window, o);
       if (o.setup) o.setup(window, mock);
     },
@@ -59,7 +66,17 @@ async function boot(o) {
     // diagnostics(): everything a scenario should treat as a failure.
     diagnostics: () => ({ errors: errors.slice(), violations: mock.violations.slice() }),
     // turn(text, {max, director}): type an action, press Take turn, wait for the whole turn (model calls, fit, fold, save) to finish.
-    turn: async (text, o2 = {}) => { const before = mock.sampleCalls.length; $('#action').value = text; if (o2.director != null) $('#director').value = o2.director; api.click('#send'); const t0 = Date.now(); while (Date.now() - t0 < 600 && mock.sampleCalls.length === before) await sleep(10); return api.idle(o2.max || 20000); },
+    // True only if a model call began and the page went quiet: a turn the page refused (still loading, nothing typed, busy) is false.
+    // {refused: true} expects the refusal: true when no model call began within 600 ms.
+    turn: async (text, o2 = {}) => {
+      const before = mock.sampleCalls.length; $('#action').value = text; if (o2.director != null) $('#director').value = o2.director; api.click('#send');
+      const t0 = Date.now(); while (Date.now() - t0 < (o2.refused ? 600 : 5000) && mock.sampleCalls.length === before) await sleep(10);
+      const started = mock.sampleCalls.length > before;
+      if (o2.refused) return !started;
+      return started && api.idle(o2.max || 20000);
+    },
+    // until(pred, what, ms): wait for a condition instead of sleeping a guessed time; throws naming what it waited for.
+    until: async (pred, what, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (pred()) return true; await sleep(5); } throw new Error('timed out after ' + ms + ' ms waiting for ' + (what || String(pred))); },
     close: () => window.close(),
   };
   await sleep(30);
