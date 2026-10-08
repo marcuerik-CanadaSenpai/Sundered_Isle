@@ -58,6 +58,8 @@ const S = {
     const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
     try {
       const bands = h.window.WINDLASS_WORLDS.sundered.wordBands;
+      // The first turn after creation keeps its band whatever it says (the opening's own suggestions are talk), so the talk turns start on the second.
+      assert(await h.turn('I unpack my bag.'), 'the opening turn did not finish');
       for (const a of ['Say: Where did you grow up?', '"Do you ever miss home?" I ask quietly.', 'Ask Rin what she studies.', 'Tell her about my sister.', 'Answer her honestly.',
         'Say: Come and sit with me.', 'Say: Sit down. Drink this.', 'Say: I am tired. I want to go home.']) {
         assert(await h.turn(a), a + ' did not finish');
@@ -211,7 +213,7 @@ const S = {
         assert.match(act, /Body detail \(binding\)/);
         assert.doesNotMatch(act, TALK, a + ' leaves the talk');
         assert.doesNotMatch(fmt, /"talk":|would say or ask next/, a + ': no talk field and no talk suggestions');
-        assert.match(act, new RegExp('Narrative length: at most ' + bands.rich[1] + ' words'), a + ' takes the rich band');
+        assert.match(act, new RegExp('Narrative length: ' + bands.rich.join(' to ') + ' words, and up to ' + h.window.WINDLASS_WORLDS.sundered.wordRoom.rich + ' words when the scene needs it'), a + ' takes the rich band and its room');
         assert.doesNotMatch(act, /Scene note \(binding\)/, 'a kiss is not yet an act');
         assert.doesNotMatch(act, /fade to black|off-page/i);
         assert.equal(talkOf(h), 0, a + ' ends the talk');
@@ -295,6 +297,7 @@ const S = {
       const bands = h.window.WINDLASS_WORLDS.sundered.wordBands;
       h.click('#btnSettings'); h.$('#setDensity').value = 'rich'; h.$('#setDensity').dispatchEvent(new h.window.Event('change')); assert(await h.idle(8000));
       assert.match(h.$('#setDensityNote').textContent, /a short exchange of talk a step below the setting/i, 'the Settings note says so');
+      assert(await h.turn('I unpack my bag.'), 'the opening turn did not finish');   // the first turn after creation is never stepped down
       assert(await h.turn('Say: Where did you grow up?'));
       const act = section(promptOf(lastTurn(h)), 'action');
       assert.match(act, TALK);
@@ -321,6 +324,28 @@ const S = {
       const act = section(promptOf(lastTurn(h)), 'action');
       assert.match(act, /The change continues/, 'the change note is in the prompt');
       assert.doesNotMatch(act, TALK, 'a change on the page gets no talk note');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // A consent-first ask in plain act words ("Ask Rin if I may touch her breasts") is romance, not a talk turn: the romance pacing
+  // and body detail lines, the rich band and no talk note, with no scene note or stage (consent is never presumed). A plain
+  // question stays a talk turn.
+  async consentAskIsRomanceNotTalk() {
+    const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
+    try {
+      const bands = h.window.WINDLASS_WORLDS.sundered.wordBands;
+      for (const a of ['Ask Rin if I may touch her breasts.', 'I ask Rin if I can touch her breasts.', 'Ask her whether I can suck her nipples.', 'Say: May I touch your breasts?', '"Can I touch your breasts?" I ask.']) {
+        assert(await h.turn(a), a + ' did not finish');
+        const p = promptOf(lastTurn(h)), act = section(p, 'action');
+        assert.doesNotMatch(act, TALK, a + ' is no talk turn');
+        assert.match(act, /Romance scene pacing \(binding\)/, a + ' is romance');
+        assert.match(act, /Body detail \(binding\)/, a + ' gets the body detail line');
+        assert.match(act, new RegExp('Narrative length: ' + bands.rich.join(' to ') + ' words, and up to ' + h.window.WINDLASS_WORLDS.sundered.wordRoom.rich + ' words when the scene needs it'), a + ' takes the rich band and its room');
+        assert.doesNotMatch(p, /Scene note \(binding\)|"stage":/, a + ' is not the act');
+      }
+      assert(await h.turn('Ask Rin what she studies.'));
+      assert.match(section(promptOf(lastTurn(h)), 'action'), TALK, 'a plain question is still a talk turn');
       clean(h);
     } finally { h.close(); }
   },

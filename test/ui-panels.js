@@ -151,6 +151,46 @@ const S = {
     } finally { h.close(); }
   },
 
+  // Debug before the first turn shows the roommate's introduction prompt. When the roommate is the one the player saw, that secret
+  // is masked there with spoilers off, as it is in a turn's prompt, and shown with spoilers on.
+  async debugHidesIntroSecret() {
+    let h = null;
+    for (let s = 1; s <= 12 && !h; s++) {
+      const x = await boot({ seed: 9200 + s });
+      try {
+        assert(await x.settle(150, 6000), 'boot did not settle');
+        x.type('#cRmSpecies', 'cow'); x.type('#cRmName', 'Daisy Holm'); x.type('#cGlimpse', 'Hooves under a long skirt on a station platform');
+        x.click('#cBegin'); assert(await x.idle(30000), 'creating the adventure did not finish'); await x.settle(150, 6000);
+      } catch (e) { x.close(); throw e; }
+      if (docOf(x.mock.store).player.glimpse.who === 'roommate') h = x; else x.close();
+    }
+    assert(h, 'the roommate was never the one seen in twelve games');
+    try {
+      h.click('#btnDebug'); await h.sleep(20);
+      const off = h.$('#dbgPrompt').textContent;
+      assert.match(off, /roommate's first appearance/, 'Debug shows the introduction prompt: ' + off.slice(0, 120));
+      assert(!off.includes('saw three weeks before'), 'spoilers off, Debug shows who the player saw');
+      assert(off.includes('narrator-only secrets, hidden while spoilers are off'), 'and masks it as a turn\'s secrets are masked');
+      h.click('[data-close="dlgDebug"]'); h.click('#toggleHidden'); h.click('#btnDebug'); await h.sleep(20);
+      assert(h.$('#dbgPrompt').textContent.includes('saw three weeks before'), 'spoilers on, the secret shows');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // A pace changed in Settings reaches the rail's Humanity row at once, not on the next turn.
+  async settingsPaceRedrawsRail() {
+    const h = await reopen(copyStore(await game()), { spoilers: true });
+    try {
+      for (const [pace, at] of [['slow', 60], ['unbounded', 15]]) {
+        h.click('#btnSettings'); h.$('#setPace').value = pace; fire(h, h.$('#setPace'), 'change'); assert(await h.idle(8000)); h.click('[data-close="dlgSettings"]');
+        const row = dd(h, 'Humanity');
+        assert(row, 'spoilers on, the rail has a Humanity row');
+        assert.match(row.textContent, new RegExp('doors answer at ' + at + '\\+'), pace + ' pace: ' + row.textContent);
+      }
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 4. Condition is the player's own knowledge and shows as separate entries, not one comma-joined line (the narrator-kept Discoveries
   // list keeps its newest entries open and the earlier ones behind one tap; a short one needs no tap.
   async itemsShowAsEntries() {
@@ -504,6 +544,34 @@ const S = {
     } finally { u.close(); }
   },
 
+  // Every explanation stays in the Learned panel, not only the newest twenty: twenty-four told over eight turns are all listed and
+  // counted, after a reload too, and one told again later is not recorded a second time.
+  async learnedPanelKeepsAll() {
+    const h = await reopen(copyStore(await game()));
+    let store;
+    const listed = (x) => [...x.document.querySelectorAll('#learned li')].map((li) => li.textContent);
+    const all = (x, when) => { for (let k = 1; k <= 24; k++) assert(listed(x).some((t) => t.includes('house rule ' + k + ' of Kettle Hall')), when + ': explanation ' + k + ' is not listed'); assert.match(text(x, '#learnedCount'), /^24 learned$/, when); };
+    try {
+      let n = 0;
+      h.mock.sampleHandler = (input, o, call) => {
+        const out = h.mock.defaultHandler(input, o, call); if (!/^turn/.test(call.label)) return out;
+        const r = JSON.parse(out); n += 1;
+        r.facts = n <= 8 ? [1, 2, 3].map((k) => 'Told: house rule ' + ((n - 1) * 3 + k) + ' of Kettle Hall') : ['Told: house rule 1 of Kettle Hall'];
+        return JSON.stringify(r);
+      };
+      for (let i = 1; i <= 8; i++) assert(await h.turn('I listen.'), 'turn ' + i + ' did not finish');
+      all(h, 'after eight turns');
+      assert(await h.turn('I listen again.'), 'the ninth turn did not finish');
+      const last = turnDocs(h.mock.store).flatMap((d) => d.turns || [d]).filter(Boolean).sort((a, b) => a.n - b.n).at(-1);
+      assert(!last.notes.some((x) => /^told: /.test(x)), 'an explanation already recorded is recorded again: ' + JSON.stringify(last.notes));
+      all(h, 'after it is told again');
+      store = copyStore(h.mock.store);
+      clean(h);
+    } finally { h.close(); }
+    const r = await reopen(store);
+    try { all(r, 'after a reload'); clean(r); } finally { r.close(); }
+  },
+
   // 13. Phone action bar (from a report on a ~412 px phone: open it took most of the screen; tucked, the suggestions could not be
   // touched or swiped). Tucked, the bar keeps its tab and one sideways-scrolling row of suggestion chips, nothing else, and a
   // chip tap opens the bar with that text in the action box. Open, the bar is capped at 45% of the screen and scrolls inside
@@ -625,24 +693,63 @@ const S = {
     } finally { s.close(); }
   },
 
-  // 14. Redraw of someone the story has already put on the page keeps their name and what a scene showed (looks, clothes, way of
-  // speaking), and says so; it still draws the traits the story has not told.
+  // 14. Redraw of someone the story has already put on the page keeps the name (already in the story) and draws the rest again, as
+  // for anyone: the looks, the clothes, the way of speaking and the traits the story has not told. The panel says so, keeps nothing
+  // for having been seen, and the narrator is told before the next turn that the earlier descriptions no longer hold.
   async castRedrawShown() {
     const base = await game(), store = copyStore(base), doc = docOf(store);
     const p = doc.cast.generated.characters.find((c) => c.key === 'gamer'); doc.state.present = doc.state.present.concat([p.name]);
+    // A way of speaking no pool holds, so a new draw cannot land on it by chance.
+    const odd = 'answers every question with another question'; p.gen.speech = odd; p.gen.speechT = odd;
     const h = await reopen(store);
     try {
       h.click('#btnCast'); h.click(h.$('#castList [data-key="gamer"]')); await h.sleep(20);
       assert(h.$('#cfRedraw') && h.$('#cfRedrawSays'), 'the Cast panel has a Redraw button and says what it changes');
-      assert.match(text(h, '#cfRedrawSays'), /keeps .*the name \(already in the story\).*the looks, clothes and way of speaking \(already seen in a scene\)/, text(h, '#cfRedrawSays'));
-      assert.doesNotMatch(text(h, '#cfRedrawSays'), /pools: the name/, 'nor does it promise a new name');
+      const says = text(h, '#cfRedrawSays');
+      assert.match(says, /pools: looks, clothes, way of speaking, .*It keeps .*the name \(already in the story\)/, says);
+      assert.doesNotMatch(says, /pools: the name/, 'nor does it promise a new name');
+      assert.doesNotMatch(says, /already seen in a scene/, 'nothing is kept for having been seen');
+      assert.match(says, /the narrator is told the body was drawn again/, says);
+      assert.equal(h.$('#cfSpeech').value, odd, 'the form shows the way of speaking before the redraw');
       h.click('#cfRedraw'); assert(await h.idle(8000)); await h.sleep(20);
-      const o = Object.assign({}, p, docOf(h.mock.store).cast.overrides.gamer);
+      const saved = docOf(h.mock.store), o = Object.assign({}, p, saved.cast.overrides.gamer);
       assert.equal(o.name, p.name, 'a person already on the page keeps the name'); assert.equal(h.$('#cfName').value, p.name);
-      assert.equal(o.looks, p.looks, 'and the looks a scene showed'); assert.deepEqual(o.dress, p.dress, 'and the clothes');
-      assert.equal(o.gen.speechT, p.gen.speechT, 'and the way of speaking');
+      assert.notEqual(o.looks, p.looks, 'the looks are drawn again'); assert.equal(h.$('#cfLooks').value, o.looks, 'and the form shows them');
+      assert.notEqual(o.dress.taste, p.dress.taste, 'and the clothes');
+      assert.notEqual(o.gen.speechT, odd, 'and the way of speaking'); assert.notEqual(h.$('#cfSpeech').value, odd);
       assert.notEqual(o.gen.temperament, p.gen.temperament, 'the traits the story has not told are drawn again');
       assert(o.sheet.includes(o.gen.temperament.slice(1)) && !o.sheet.includes(p.gen.temperament.slice(1)), 'and the full sheet tells the new temperament: ' + o.sheet);
+      assert((saved.pendingNotes || []).some((n) => n.startsWith('Cast edit: ' + p.name + ' was drawn again')), 'the narrator is told before the next turn: ' + JSON.stringify(saved.pendingNotes));
+      assert.match(text(h, '#cfNote'), /^Redrawn and saved: looks, clothes, way of speaking, .*The narrator is told/, text(h, '#cfNote'));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Redraw on the roommate before the first turn draws her body again (looks, clothes, way of speaking) although the opening has
+  // named her: the name stays, the note says what was drawn, and the first turn's prompt carries the new look, not the old one,
+  // with a note telling the narrator that the earlier description no longer holds.
+  async castRedrawRoommateTurnZero() {
+    const h = await boot({});
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      h.type('#cRmSpecies', 'cow'); h.type('#cRmName', 'Daisy Holm');
+      h.click('#cBegin'); assert(await h.idle(30000), 'creating the adventure did not finish'); await h.settle(150, 6000);
+      const rm = docOf(h.mock.store).roommate;
+      h.click('#btnCast'); await h.sleep(20); h.click(h.$('#castList [data-key="roommate"]')); await h.sleep(20);
+      assert.match(text(h, '#cfRedrawSays'), /pools: looks, clothes, way of speaking/, text(h, '#cfRedrawSays'));
+      h.click('#cfRedraw'); assert(await h.idle(8000)); await h.sleep(20);
+      const o = Object.assign({}, rm, docOf(h.mock.store).cast.overrides.roommate);
+      assert.equal(o.name, 'Daisy Holm', 'the name the opening used is kept'); assert.equal(h.$('#cfName').value, 'Daisy Holm');
+      assert.notEqual(o.looks, rm.looks, 'the looks are drawn again'); assert.equal(h.$('#cfLooks').value, o.looks, 'and the form shows them');
+      assert.notEqual(o.dress.taste, rm.dress.taste, 'and the clothes');
+      assert.equal(o.species, rm.species, 'the kind is kept');
+      assert.match(text(h, '#cfNote'), /^Redrawn and saved: looks, clothes, way of speaking, .*The narrator is told/, text(h, '#cfNote'));
+      h.click('[data-close="dlgCast"]');
+      assert(await h.turn('I say hello to Daisy.'));
+      const p = promptOf(h.mock.sampleCalls.filter((c) => /^turn/.test(c.label)).at(-1));
+      assert(p.includes(o.looks.replace(/\.$/, '')), 'the first turn carries the new look');
+      assert(!p.includes(rm.looks.replace(/\.$/, '')), 'and not the old one');
+      assert(p.includes('Cast edit: Daisy Holm was drawn again'), 'and tells the narrator the earlier description no longer holds');
       clean(h);
     } finally { h.close(); }
   },
@@ -672,7 +779,7 @@ const S = {
       assert.equal(call.opts.modelTier, 'quick', 'the call is on the invention tier');
       assert.match(prompt, /Fields: first, last, course, temperament, quirk, want, private\./, 'the model is asked for the name and the traits');
       const looks = h.$('#cfLooks').value;
-      assert(looks && /^Height: /.test(looks), 'the look is composed by the engine: ' + looks);
+      assert(looks && /^About /.test(looks), 'the look is composed by the engine: ' + looks);
       assert(prompt.includes('Looks (the world\'s own, fixed): "' + looks.replace(/\.$/, '') + '"'), 'and the model is told the engine\'s look, to keep');
       assert.doesNotMatch(looks + h.$('#cfSheet').value + h.$('#cfBrief').value, /three breasts|second tail|second pair of arms/, 'the model\'s anatomy never lands');
       assert.equal(h.$('#cfSpecies').value, 'Human', 'the kind typed is kept word for word');
@@ -698,7 +805,7 @@ const S = {
       assert.match(text(n, '#cfNote'), /from the pools/, text(n, '#cfNote'));
       assert.equal(n.mock.sampleCalls.length, 0, 'no model call without Claude');
       assert.equal(n.$('#cfWhere').value, 'the boathouse, mending oars', 'a typed field is never overwritten');
-      assert(n.$('#cfName').value && n.$('#cfName').value !== 'New character' && /^Height: /.test(n.$('#cfLooks').value) && n.$('#cfSheet').value && n.$('#cfSpeech').value, 'the pools filled the rest');
+      assert(n.$('#cfName').value && n.$('#cfName').value !== 'New character' && /^About /.test(n.$('#cfLooks').value) && n.$('#cfSheet').value && n.$('#cfSpeech').value, 'the pools filled the rest');
       clean(n);
     } finally { n.close(); }
     // A phone: both buttons are there, in a wrapping row, with a tap-sized height.

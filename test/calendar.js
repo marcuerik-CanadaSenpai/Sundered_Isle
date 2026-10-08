@@ -4,8 +4,10 @@
 // are tied to them instead of shutting without a word. Run one scenario by name: node calendar.js eventDayAims
 // Against another build: WL_HTML=<index.html> WL_WORLDS=<worlds dir> node calendar.js
 const assert = require('node:assert/strict');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), vm = require('vm');
 const { boot } = require('./boot');
+const WORLDS = process.env.WL_WORLDS || path.join(__dirname, '..', 'windlass', 'worlds');
+const loadWorld = () => { const ctx = { window: { WINDLASS_WORLDS: {} } }; vm.runInNewContext(fs.readFileSync(path.join(WORLDS, 'sundered.js'), 'utf8'), ctx); return ctx.window.WINDLASS_WORLDS.sundered; };
 
 let unhandled = 0; process.on('unhandledRejection', () => { unhandled += 1; });
 const turnCalls = (h) => h.mock.sampleCalls.filter((c) => /^turn/.test(c.label));
@@ -34,7 +36,8 @@ function quiet(h, minutes) {
   };
 }
 async function play(h, action, minutes) { quiet(h, minutes == null ? 15 : minutes); assert(await h.turn(action), 'turn: ' + action); return promptOf(turnCalls(h).at(-1)); }
-async function setClock(h, day, time) { h.type('#ovrDay', String(day)); h.type('#ovrTime', time); h.click('#ovrClockSet'); assert(await h.settle(150, 6000), 'the clock override did not settle'); }
+// The clock, and the place when one is given, set through the Override panel.
+async function setClock(h, day, time, loc) { h.type('#ovrDay', String(day)); h.type('#ovrTime', time); h.type('#ovrLocation', loc || ''); h.click('#ovrClockSet'); assert(await h.settle(150, 6000), 'the clock override did not settle'); }
 async function loadSave(save) {
   const h = await boot({
     setup: (w, mock) => {
@@ -62,10 +65,32 @@ const S = {
       assert(/Today: the cross-species mixer from 19:00, the quad: /.test(clock), 'Day 1 before the mixer names it as today: ' + clock);
       await setClock(h, 2, '09:30');
       clock = sec(await play(h, 'I walk to the library.'), 'clock');
-      assert(/Next event: the Creamery fair, Day 6 Saturday 15:30, the Creamery yard: [^\n]+\. A chance, not a scene: Owen goes only by choice, and missing it costs nothing\./.test(clock), 'the clock names the next event: ' + clock);
+      assert(/Next event: the Creamery fair, Day 6 Saturday 15:30 until 23:00, the Creamery yard: [^\n]+\. A chance, not a scene: Owen goes only by choice, and missing it costs nothing\./.test(clock), 'the clock names the next event, with its end: ' + clock);
       assert(/Day 6 Saturday \([^)]*EVENT the Creamery fair 15:30/.test(clock), 'the coming days mark the event\'s day: ' + clock);
       assert(!/mixer/.test(clock), 'the mixer is once only and over: ' + clock);
       assert(/Day 6 Saturday: the Creamery fair 15:30/.test(h.document.querySelector('#clock').title), 'the header clock\'s tooltip names it: ' + h.document.querySelector('#clock').title);
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // The header clock reads the calendar as the prompt's clock does, from one helper: during the exams the slot says the exams, not
+  // the class they stand in for (the tooltip too); on the full-moon run's evening it does not say the dusk run; on the Human Society's
+  // evening not the tea.
+  async headerSlotFollowsCalendar() {
+    const h = await begin();
+    try {
+      const slot = () => h.$('#clock .slot span').textContent;
+      await setClock(h, 22, '09:30');
+      const p = await play(h, 'I find my seat.');
+      assert(/Now: the midterm exams/.test(sec(p, 'clock')), 'the prompt\'s clock names the exams: ' + sec(p, 'clock'));
+      assert(/midterm exams/.test(slot()) && !/Glamour Theory/.test(slot()), 'the header slot names the exams, not the class: ' + slot());
+      assert(!/Glamour Theory/.test(h.$('#clock').title), 'and the tooltip does not name the class: ' + h.$('#clock').title);
+      await setClock(h, 9, '19:45');
+      await play(h, 'I walk out to the Moon Field.');
+      assert(!/dusk run/.test(slot()), 'on the run\'s evening the header does not say the dusk run: ' + slot());
+      await setClock(h, 11, '19:45');
+      await play(h, 'I go down to the common room.');
+      assert(!/Human Society tea/.test(slot()), 'on the Society\'s evening the header does not say the tea: ' + slot());
       clean(h);
     } finally { h.close(); }
   },
@@ -191,9 +216,35 @@ const S = {
     } finally { h.close(); }
   },
 
+  // The fair runs from the afternoon into the evening, as its own words say: at 20:00 on its day the clock's Now is the fair, the
+  // day's event is still the fair (until 23:00) and not yet the Moon run, and its people still lean toward it; at dinner the clock does
+  // not call the evening fair next while calling the run the next event; after 23:00 the fair is over, the run is next and nobody's
+  // aim points at the fair.
+  async fairRunsIntoTheEvening() {
+    const h = await begin();
+    try {
+      await setClock(h, 6, '20:00');
+      let p = await play(h, 'I walk through the stalls.');
+      assert(/Now: the Creamery fair/.test(sec(p, 'clock')), 'at 20:00 the clock\'s Now is the fair: ' + sec(p, 'clock'));
+      assert(/Today: the Creamery fair from 15:30 until 23:00/.test(sec(p, 'clock')), 'the fair is today\'s event until 23:00: ' + sec(p, 'clock'));
+      assert(!/Next event: the Moonrunners/.test(sec(p, 'clock')), 'the run is not yet the next event: ' + sec(p, 'clock'));
+      const listed = ['roommate', 'creamery', 'warren', 'stall'].filter((k) => sec(p, 'characters').includes('[' + k + ']'));
+      assert(listed.length >= 3, 'the fair\'s people are in the cast: ' + listed.join(', '));
+      for (const k of listed) assert(/Aim now: be at the Creamery fair \(/.test(aimOf(p, k)), k + ' still leans toward the fair at 20:00: ' + aimOf(p, k));
+      await setClock(h, 6, '18:05');
+      p = await play(h, 'I eat dinner.');
+      assert(!(/Next: 19:30 the Creamery fair/.test(sec(p, 'clock')) && /Next event: the Moonrunners/.test(sec(p, 'clock'))), 'at dinner the clock does not call the fair both next and over: ' + sec(p, 'clock'));
+      await setClock(h, 6, '23:30');
+      p = await play(h, 'I walk back to Kettle Hall.');
+      assert(/Next event: the Moonrunners' full-moon run, Day 9 Tuesday 19:30/.test(sec(p, 'clock')), 'after 23:00 the run is the next event: ' + sec(p, 'clock'));
+      assert(!/Creamery fair \(/.test(sec(p, 'characters')), 'and no aim still points at the fair');
+      clean(h);
+    } finally { h.close(); }
+  },
+
   // 3. Skipping an event costs nothing: Owen spends the fair's afternoon elsewhere and the clock passes it; the state the engine
-  // keeps (flags, items) is what it was, no engine note speaks of the fair, nobody's aim still points at it, and the clock
-  // moves on to the next event (the full-moon run on Day 9).
+  // keeps (flags, items) is what it was, no engine note speaks of the fair, and once the fair is over (it runs until 23:00) nobody's
+  // aim still points at it and the clock moves on to the next event (the full-moon run on Day 9).
   async skipCostsNothing() {
     const h = await begin();
     try {
@@ -208,6 +259,9 @@ const S = {
       const notes = storedTurns(h, id).slice(-2).flatMap((t) => t.notes || []).join(' | ');
       assert(!/fair|missed|skipp/i.test(notes), 'no engine note speaks of the skipped fair: ' + notes);
       p = await play(h, 'I go to dinner.');
+      assert(/Today: the Creamery fair from 15:30 until 23:00/.test(sec(p, 'clock')), 'at dinner the fair is still on into the evening: ' + sec(p, 'clock'));
+      await setClock(h, 6, '23:30');
+      p = await play(h, 'I walk back to Kettle Hall.');
       assert(/Next event: the Moonrunners' full-moon run, Day 9 Tuesday 19:30/.test(sec(p, 'clock')), 'the clock moves on to the next event: ' + sec(p, 'clock'));
       assert(!/Creamery fair \(/.test(sec(p, 'characters')), 'no aim still points at the fair once it is over');
       clean(h);
@@ -251,6 +305,14 @@ const S = {
       assert(!/Next chance/.test(gm2), 'below the line no next chance is named: ' + (gm2.match(/Gluttony[^\n]*/) || [''])[0]);
       clean(h);
     } finally { h.close(); }
+  },
+
+  // The world's events carry only the fields the engine reads (the ones the calendar's own comment lists), so no field can sit on
+  // every event and mean nothing; and the fair has an end of its own.
+  async eventFieldsDocumented() {
+    const W = loadWorld(), known = ['key', 'day', 'once', 'time', 'until', 'name', 'where', 'who', 'for', 'instead', 'ask', 'aim', 'aims', 'opens'];
+    for (const e of W.calendar.events) { const odd = Object.keys(e).filter((k) => !known.includes(k)); assert.deepEqual(odd, [], e.key + ' carries a field the engine does not read: ' + odd.join(', ')); }
+    const fair = W.calendar.events.find((e) => e.key === 'fair'); assert(fair && /^\d\d:\d\d$/.test(fair.until || ''), 'the fair has an end of its own: ' + (fair && fair.until));
   },
 
   // The humanity line is set by the pace, so the closed places answer for a like share of the game on every pace: a fresh game on the

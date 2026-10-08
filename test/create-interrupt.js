@@ -290,6 +290,48 @@ const S = {
       clean(h);
     } finally { h.close(); }
   },
+  // The preview behind a closed creation screen is never saved: a Settings change, a Cast save and a turn on it write no adventure,
+  // and the next load opens the creation screen again. With a real save loading slowly behind it, a Settings change made meanwhile
+  // does not make the preview the newest save, and the real game opens.
+  async previewIsNeverSaved() {
+    const setDensity = async (h, v) => { h.click('#btnSettings'); h.$('#setDensity').value = v; h.$('#setDensity').dispatchEvent(new h.window.Event('change')); await h.sleep(200); h.click('[data-close="dlgSettings"]'); };
+    const store = new Map();
+    const h = await boot({ setup(w, m) { m.store = store; } });
+    try {
+      assert(await h.settle(150, 6000), 'boot did not settle');
+      h.click('#dlgCreate [data-close]'); await h.sleep(100);
+      await setDensity(h, 'rich'); assert(await h.idle(8000));
+      assert.equal(advDocs(h.mock).length, 0, 'a Settings change saved the preview');
+      assert.doesNotMatch(h.$('#summaryNote').textContent, /^saved/, 'the preview is said to be saved: ' + h.$('#summaryNote').textContent);
+      h.click('#btnCast'); await h.sleep(20); h.$('#cfName').value = 'Bess Morrow'; h.click('#cfSave'); assert(await h.idle(8000)); h.click('[data-close="dlgCast"]');
+      assert.equal(advDocs(h.mock).length, 0, 'a Cast save saved the preview');
+      assert(await h.turn('I look around.', { refused: true }), 'a turn ran on the preview');
+      assert.match(h.$('#status').textContent, /preview/, 'the refused turn says why: ' + h.$('#status').textContent);
+      assert.equal(advDocs(h.mock).length, 0, 'a turn saved the preview');
+      clean(h);
+    } finally { h.close(); }
+    const again = await boot({ setup(w, m) { m.store = store; } });
+    try { assert(await again.settle(150, 6000)); assert(again.$('#dlgCreate').open, 'the next load opens the creation screen'); clean(again); } finally { again.close(); }
+
+    const real = new Map(); let id;
+    const a = await boot({ setup(w, m) { m.store = real; } });
+    try {
+      assert(await a.settle(150, 6000)); a.type('#cName', 'Owen Pryce'); a.type('#cRmSpecies', 'cow'); a.click('#cBegin'); assert(await a.idle(30000)); await a.settle(150, 6000);
+      assert(await a.turn('I look around.')); id = advDocs(a.mock)[0][0].split('/')[1];
+    } finally { a.close(); }
+    // The saves query is held by a gate, so the change is made on the preview while the real save is still loading.
+    let release, held = false; const gate = new Promise((r) => { release = r; });
+    const b = await boot({ setup(w, m) { m.store = real; m.dbGate = (op, p) => (op === 'query' && p === 'adventures' ? ((held = true), gate) : null); } });
+    try {
+      await b.until(() => held, 'the saves query to be held');
+      await setDensity(b, 'rich');
+      release(); assert(await b.idle(15000)); await b.settle(150, 6000);
+      assert.equal(advDocs(b.mock).length, 1, 'the preview was saved beside the real game');
+      assert.match(b.$('#playerLine').textContent, /Owen Pryce/, 'the real game opens: ' + b.$('#playerLine').textContent);
+      assert.equal(b.window.localStorage.getItem('windlass.last'), id, 'and this device points at it');
+      clean(b);
+    } finally { b.close(); }
+  },
   // With a save in the store, the save loads behind the restored creation, so Cancel lands on it.
   async reloadWithSave() {
     const h0 = await boot({}); await h0.settle(150, 6000); h0.click('#cBegin'); assert(await h0.idle(20000)); await h0.settle(150, 6000);

@@ -28,7 +28,7 @@ The mock store: a scenario that edits an adventure in `mock.store` after the pag
 
 Scenario comments carry no numbers: the scenario's name is its id.
 
-Old saves: `migrate-history.js` takes eight earlier builds out of git (the list is at its top), plays ten turns on each, opens the save on the current page and plays three more. Before changing what the game saves, add the last build before the change to that list. A clone without those commits skips them with a note; with none of them it exits 3 and shows as SKIP.
+Old saves: `migrate-history.js` takes nine earlier builds out of git (the list is at its top), plays ten turns on each, opens the save on the current page and plays three more. Before changing what the game saves, add the last build before the change to that list. A clone without those commits skips them with a note; with none of them it exits 3 and shows as SKIP.
 
 Voice: the mock writes filler, so the suite checks what the narrator is shown (`voice-tics`, `pacing-scenes`, `prompt-budget`) but never what a real model writes. `node narration-lint.js <a save's turns directory or an exported .json>` reports that from a game played on the real model: the tics `voice-tics.js` lists, four-word phrases recurring in more than a fifth of the turns, sentences a paragraph, speech per turn and turns ending on an open line; `--gate` exits 1 when one misses its target (the targets are at the top of the file). It is not part of `npm test`.
 

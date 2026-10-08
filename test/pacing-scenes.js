@@ -56,7 +56,9 @@ const S = {
     try {
       for (const a of ['Fuck her.', 'Keep fucking her until you finish inside her.', 'Play with your nipples and masturbate.', 'Suck her nipples.', 'Climb on top of her and ride her.',
         'Strip her slowly.', 'Take off her top.', 'Slide your cock into her.', 'Cum inside her.', 'Pick up the pace and thrust harder.', 'Engage in lovemaking.', 'Lick her pussy until she comes.',
-        'Pick up the pace and jack hammer her pussy.', 'Let\'s have sex.', 'I have sex with her.', 'Make her orgasm with your mouth.', 'Go down on her.', 'Finger her slowly.', 'Rub her nipples.', 'Eat her out.', 'Bend her over the desk.']) {
+        'Pick up the pace and jack hammer her pussy.', 'Let\'s have sex.', 'I have sex with her.', 'Make her orgasm with your mouth.', 'Go down on her.', 'Finger her slowly.', 'Rub her nipples.', 'Eat her out.', 'Bend her over the desk.',
+        // A question asked and answered in the action, then the act in a clause of its own, is the act; so is the player's own body named with "my".
+        '"Can I take off your top?" I ask, and she nods, so I take off her top.', 'May I? I slide my cock into her.']) {
         assert(await h.turn(a), a + ' did not finish');
         const p = promptOf(lastTurn(h));
         assert.match(p, /Romance scene pacing \(binding\)/, a + ' gets the romance pacing');
@@ -64,10 +66,16 @@ const S = {
       }
       assert(await h.turn('Take her hand', { director: 'engage in lovemaking' }), 'director turn did not finish');
       assert.match(promptOf(lastTurn(h)), /Scene note \(binding\)/, 'a director note that names the act is a scene on its own, with no "kiss" in the action');
+      assert(await h.turn('Take her hand', { director: 'Could we have them make love now?' }), 'director question did not finish');
+      assert.match(promptOf(lastTurn(h)), /Scene note \(binding\)/, 'a director note put as a question asks the narrator, not the partner: it opens the act');
       // A kiss, a date or a hug is romance, with the romance lines, but not yet an act with a stage. So is turning sex down, or
       // asking or talking about it: the engine never presumes consent.
       for (const a of ['I kiss Rin.', 'Kiss her again, slower.', 'I hug Rin.', 'Say: I do not want to have sex tonight.', 'I am not ready for sex yet, I tell her.',
-        'Ask Rin about sexual customs on the Isle.', 'Tell her no sex until we know each other better.', 'I joke that she is sex on legs.', 'Ask Rin whether she has ever made love.']) {
+        'Ask Rin about sexual customs on the Isle.', 'Tell her no sex until we know each other better.', 'I joke that she is sex on legs.', 'Ask Rin whether she has ever made love.',
+        // A consent-first ask in plain act words is romance too, however it is phrased: asked about her, asked of her in direct
+        // speech, or a quoted question the player asks; so is a bed or an undressing asked about.
+        'Ask Rin if I may touch her breasts.', 'Ask her whether I can suck her nipples.', 'Say: May I touch your breasts?', '"Can I touch your breasts?" I ask.', 'Say: Would you let me suck your nipples?',
+        'I ask if I can take her to bed.', 'Ask Rin whether I may undress her.', 'Say: May I undress you?', 'Say: Can I take you to bed?']) {
         assert(await h.turn(a), a + ' did not finish');
         const p = promptOf(lastTurn(h));
         assert.match(p, /Romance scene pacing \(binding\)/, a + ' is romance');
@@ -150,8 +158,8 @@ const S = {
       act = section(promptOf(lastTurn(h)), 'action');
       assert.match(act, /turn 3 of this act\. The last turn ended at entry/);
       assert.match(act, /carry it one stage on, to a build: a change of position, pace or act/);
-      // Its band is the rich one while the scene is on, whatever the words.
-      assert.match(act, new RegExp('Narrative length: at most ' + h.window.WINDLASS_WORLDS.sundered.wordBands.rich[1] + ' words'));
+      // Its band is the rich one, with its room, while the scene is on, whatever the words.
+      assert.match(act, new RegExp('Narrative length: ' + h.window.WINDLASS_WORLDS.sundered.wordBands.rich.join(' to ') + ' words, and up to ' + h.window.WINDLASS_WORLDS.sundered.wordRoom.rich + ' words when the scene needs it'));
       // Verbs of the act that happen to open like leaving keep the scene.
       for (const a of ['Run your hands down her back.', 'Go down on her.', 'Stop teasing and take her.', 'Eat her out.']) {
         const n = sceneOf(h).n;
@@ -388,14 +396,15 @@ const S = {
     } finally { h.close(); }
   },
 
-  // 11b. A director note that skips time or moves on ends the act as the action would: no "stop mid-act" and no scene carried over,
+  // A director note that skips time or moves on, put plainly or as a question, ends the act as the action would: no "stop mid-act" and no scene carried over,
   // even beside an act word, and the skip is not read as the player's peak. A skip turned down, a cut to the act, or a writing note
   // ends nothing.
   async directorSkipLeaves() {
     const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
     try {
       narratorSays(h); h.say.stage = 'build';
-      for (const [a, d] of [['Kiss her.', 'Skip to the next morning.'], ['Make love to her.', 'Then jump ahead to breakfast.'], ['Hold her.', 'Go back to the dorm.'], ['Kiss her neck.', 'They get dressed and leave.']]) {
+      for (const [a, d] of [['Kiss her.', 'Skip to the next morning.'], ['Make love to her.', 'Then jump ahead to breakfast.'], ['Hold her.', 'Go back to the dorm.'], ['Kiss her neck.', 'They get dressed and leave.'],
+        ['Keep going.', 'Can we skip ahead to the next morning?'], ['Hold her.', 'Could you jump ahead to breakfast?']]) {
         assert(await h.turn('Make love to her.', { director: '' }));
         assert(await h.turn('Make love to her.', { director: '' })); assert.equal(sceneOf(h).n, 2, 'the act is under way');
         assert(await h.turn(a, { director: d }));
@@ -464,6 +473,59 @@ const S = {
         clean(h);
       } finally { h.close(); }
     }
+  },
+
+  // An act ends when the narrator takes the partner out of the scene: a reply mid-act whose state leaves nobody else present (she
+  // pulls away and goes) closes the act, with its beat, and the next turn gets no scene note, stage field or act suggestions. No act
+  // begins with nobody else there either, and the note says so rather than calling it an end. A solo act goes on with nobody else there.
+  async actEndsWhenPartnerGone() {
+    const h = await begin({ rmSpecies: 'human', rmName: 'Rin Kitsuragi' });
+    try {
+      narratorSays(h);
+      h.say.stage = 'begin';
+      assert(await h.turn('Make love to her.'));
+      assert.deepEqual(sceneOf(h), { n: 1, stage: 'begin' });
+      h.say.stage = 'build'; h.say.state_updates = [{ key: 'present', op: 'set', value: [stateOf(h).present[0]] }];
+      assert(await h.turn('Hold her hips.'));
+      delete h.say.state_updates;
+      assert.equal(stateOf(h).present.length, 1, 'only the player is here');
+      assert.deepEqual(sceneOf(h), { n: 0, stage: '' }, 'the act ends when the partner has gone, whatever stage the narrator named');
+      assert(lastStored(h).notes.includes('act: ended, nobody else here'), JSON.stringify(lastStored(h).notes));
+      assert(lastStored(h).beats.includes('The act ended.'), 'the memory keeps the act\'s end: ' + JSON.stringify(lastStored(h).beats));
+      assert(await h.turn('Call after her.'));
+      const p = promptOf(lastTurn(h));
+      assert.doesNotMatch(p, /Scene note \(binding\)|"stage":/, 'the next turn is no act');
+      assert.doesNotMatch(section(p, 'output_format'), /next moves in the act/, 'and its suggestions are ordinary');
+      h.say.stage = 'begin'; h.say.state_updates = [{ key: 'present', op: 'set', value: [stateOf(h).present[0]] }];
+      assert(await h.turn('Make love to her.'));
+      delete h.say.state_updates;
+      assert.deepEqual(sceneOf(h), { n: 0, stage: '' }, 'no act opens with nobody else here');
+      assert(lastStored(h).notes.includes('act: not begun, nobody else here'), JSON.stringify(lastStored(h).notes));
+      assert(!lastStored(h).notes.includes('act: ended, nobody else here') && !lastStored(h).beats.includes('The act ended.'), 'an act that never began did not end: ' + JSON.stringify(lastStored(h).notes.concat(lastStored(h).beats)));
+      // A solo act has no partner to lose.
+      h.say.stage = 'begin';
+      assert(await h.turn('I masturbate.'));
+      assert.deepEqual(sceneOf(h), { n: 1, stage: 'begin' }, 'a solo act opens with nobody else here');
+      assert(stateOf(h).scene.solo, 'and is marked solo');
+      h.say.stage = 'build';
+      assert(await h.turn('Keep going, slowly.'));
+      assert.deepEqual(sceneOf(h), { n: 2, stage: 'build' }, 'and goes on');
+      // Whoever the player thinks of, alone is alone: a partner word in a solo act neither ends it nor keeps one from opening.
+      assert(await h.turn('Keep going, thinking of her.'));
+      assert.deepEqual(sceneOf(h), { n: 3, stage: 'build' }, 'a solo act goes on through a thought of someone');
+      assert(stateOf(h).scene.solo, 'and stays solo');
+      assert(!lastStored(h).notes.some((n) => /^act: (?:ended|not begun)/.test(n)) && !lastStored(h).beats.includes('The act ended.'), 'nothing ended: ' + JSON.stringify(lastStored(h).notes.concat(lastStored(h).beats)));
+      h.say.stage = 'none';
+      assert(await h.turn('I stop and rest.'));
+      assert.deepEqual(sceneOf(h), { n: 0, stage: '' });
+      h.say.stage = 'begin';
+      assert(await h.turn('I masturbate, thinking of her.'));
+      assert.match(promptOf(lastTurn(h)), /nobody arrives and nothing interrupts/, 'the scene note speaks of a solo act');
+      assert.deepEqual(sceneOf(h), { n: 1, stage: 'begin' }, 'a solo act opens with nobody else here, whoever is thought of');
+      assert(stateOf(h).scene.solo, 'and is solo');
+      assert(!lastStored(h).notes.includes('act: not begun, nobody else here'), JSON.stringify(lastStored(h).notes));
+      clean(h);
+    } finally { h.close(); }
   },
 };
 

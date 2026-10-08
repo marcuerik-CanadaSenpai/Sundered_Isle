@@ -78,6 +78,7 @@ async function main() {
       assert.equal(resent.length, 0, 'turn ' + n + ': beats the summary already holds were sent again: ' + resent.slice(0, 3).join(' | '));
       // What the writer read is on the turn itself when shedding cut it.
       const t = stored().at(-1); const cut = (t.notes || []).find((x) => /^prompt near the size cap/.test(x)) || '';
+      assert.doesNotMatch(cut, /discoveries/, 'turn ' + n + ': the shed note names only limits that exist (the world has no discoveries item): ' + cut);
       // A stage that drops the lore's lists of parts sends the entries without them, as it costs them, so the lore the turn does not
       // name stays inside the stage's budget (the cow's entry, the only kind here changing the player or in the scene, is outside it).
       if (/without the lists of parts/.test(cut)) {

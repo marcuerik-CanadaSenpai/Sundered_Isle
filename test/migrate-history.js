@@ -11,7 +11,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const { spawnSync } = require('child_process');
 const { boot } = require('./boot');
 
-const BUILDS = ['501a5c7', 'b0c6a7f', '3ab47bb', '00a6f76', '9c35fd8', 'f73fe18', '133d19a', '10ae2ee'];
+const BUILDS = ['501a5c7', 'b0c6a7f', '3ab47bb', '00a6f76', '9c35fd8', 'f73fe18', '133d19a', '10ae2ee', 'b6a6209'];
 const ROOT = path.join(__dirname, '..');
 const git = (...a) => spawnSync('git', ['-C', ROOT].concat(a), { encoding: 'buffer', maxBuffer: 64 << 20 });
 const J = (x) => JSON.parse(JSON.stringify(x));
