@@ -34,7 +34,7 @@ window.WINDLASS_WORLDS.sundered = {
     'Change and relationships: transformation is a continuing thread in bodily life, self-perception and relationships, not a checklist or a separate subplot. Its effects may complicate routines, clothes, touch or attention. The player decides whether those changes feel welcome, frightening, alien, comforting or meaningful; never assign that judgment or a new identity. NPCs have their own views and stakes: affection, curiosity, concern, attraction, disagreement or fear may coexist, vary by person, and create earned tension (over staying human, restoration or a romance\'s future) without making anyone a mouthpiece or coercing the player, who stays free to refuse, repair, leave or change course.',
     'Keep to the Looks: a person\'s body is exactly what their Looks give, and the Looks are the whole of it. Add no part, covering, colour, by-sex feature, size or comparison they do not give, and nothing listed as not on this body; a covering ends where the Looks say it ends (at the elbows; at the hips, fading out at the navel), and a by-sex feature of a kind belongs to that sex alone unless that person\'s Looks give it (a bovine man\'s horns, a wolf woman\'s further nipples). Every kind keeps working hands; nobody takes an animal\'s whole shape or changes with the moon; merfolk have legs on land. Clothes are not part of the Looks: each person dresses by their Dress line, in garments of your choosing that the body allows (a tail, hooves, wings or horns shape what can be worn), and nobody remarks on the fit; no two in one scene in the same main garment unless the setting gives a uniform; what comes off in a scene stays off until someone puts it back on.',
     'Anatomical accuracy: anatomy and secondary sex traits are not inherently sexual. When a body is visible, touched or changing, describe its established features in neutral, precise terms (location, movement, texture, practical effect): a bovine woman\'s udder low on the belly with four teats (in milk, it lets down when she is aroused), the bovine hand of two hooved fingers and a hooved thumb that grips, an established wolf woman\'s further pairs of small nipples down the belly below the breasts. Do not replace a named feature with generic warmth or euphemism. Genitals are only the parts the source gives a body (a man\'s penis and testicles; a woman\'s clitoris, labia and vagina), named when the action touches them: neutral outside sex, plain within it, in {first}\'s own words when the player used plain ones (cock, pussy, cum, fuck), never a euphemism; never infer anatomy or function from species, pronouns or appearance. Breasts differ from woman to woman as her sheet gives them (cup, nipple size, areola width, puffiness) and are described as given, never as stock small breasts; bovine women\'s are full and veined, with long thick nipples like teats. A body going from a man\'s to a woman\'s grows breasts by stages as the engine\'s steps give them (buds, the swell, the areola\'s mound, the grown shape), never all at once.',
-    'Overlapping transformations: species paths can progress together on one body; they do not compete for a limited number of parts and one path never erases another. Keep every established feature unless a newly announced step changes that same structure; where paths affect the same structure, describe the latest established form there while preserving unrelated traits. Mixed traits are possible, but do not call {first} a chimera or invent a new structure; the player chooses any identity or label.',
+    'Overlapping transformations: kinds share the body, but each part shows one kind\'s form at a time. A second kind changes the parts still untouched first, and takes over a part another kind has already changed only gradually, a step at a time, as the engine notes say: the old form gives way as the new one arrives. Keep every established feature unless a note changes that same part; parts no kind has touched stay as they are, and senses, appetites and temper of different kinds run side by side. Mixed bodies are possible, but do not call {first} a chimera or invent a new structure; the player chooses any identity or label.',
     'Individuality: species customs, exposure methods, role descriptions, opening beats and recurring setting events are possibilities, not scripts for every person or scene. Let the generated person\'s temperament, want, attitude and actual history decide what they do; do not repeat a stock gesture, food or image as a required beat. A role or exposure method never dictates a person\'s personality, attraction or consent. The orientation mixer and the Dean\'s speech happen once, not again when their lore is mentioned.',
     'NPC agency: people have lives and may occasionally initiate a conversation, make an offer, or choose to join a public errand when their location, aim and relationship make it plausible. They do not wait passively for the player, but they also do not crowd, interrupt a focused or private scene, presume consent, or decide the player\'s response. Let disagreement and competing desires appear through character-specific behavior, with room for the player to accept, refuse or redirect.',
     'What people know: each character knows only what they could have seen or been told; nobody is omniscient about {first}. What {first} carries (the money, the phone, the letter, anything in a pocket or the bag) and who {first} was before the Isle (home town, family, schooling, work, past, the thing {first} saw) are {first}\'s own: <player> is for you, not for them, and nobody knows an item, a sum of money or a fact of {first}\'s past until {first} shows it, uses it in front of them or says so on the page. Nobody notices a change in {first} before {first} has; afterwards they notice only what is plainly visible, when they have cause to look, and they never name or predict it; if {first} ignores a change, nobody presses. Animals and keen-nosed mythkin may react without words (a sniff, an ear, room made on a ledge), only after {first} has noticed. Mythkin treat transformation as ordinary and private: no explaining, announcing or advertising methods unasked, and no asking how {first} feels unless close. Never mention influence, thresholds, numbers or engine terms.',
@@ -1633,28 +1633,28 @@ window.WINDLASS_WORLDS.sundered = {
     tracks: {
       species: {
         wolf: [
-          { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with claws and fingertip pads', standard: 'Five strong fingers, pads on tips and palm, blunt claws', most: 'Shorter, thicker fingers with heavy pads and furred backs; still hands that grip and hold' }, endsAs: 'five strong fingers with pads on the tips and palm and blunt claws',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with claws and fingertip pads', standard: 'Five strong fingers, pads on tips and palm, blunt claws', most: 'Shorter, thicker fingers with heavy pads and furred backs; still hands that grip and hold' }, endsAs: 'five strong fingers with pads on the tips and palm and blunt claws',
             stages: [
               'Nails thicker and harder from the root, growing to a blunt point however short they are cut.',
               'Fingertip skin thickens into the first of the pads. Touch through them is duller for texture and sharper for pressure and warmth.',
               'The nails are claws: curved, rooted deeper, the quick grown down into them. A pad on every fingertip and one forming across the palm; knuckles heavier. Fine grip has to be relearned.',
               'Five fingers, a pad on each tip and one across the palm, the nails grown to claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
             ] },
-          { key: 'forearm_pelt', name: 'Forearm pelt', weight: 4, range: { least: 'Backs of the hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders, joining the ruff' }, endsAs: 'pelt from the backs of the hands to the elbows',
+          { key: 'forearm_pelt', slot: 'coat_arms', name: 'Forearm pelt', weight: 4, range: { least: 'Backs of the hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders, joining the ruff' }, endsAs: 'pelt from the backs of the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, range: { least: 'Four clawed toes and a small dewclaw on a broad foot', standard: 'Four clawed, padded toes and a dewclaw', most: 'Tight wolf toes with heavy claws' }, endsAs: 'four clawed, padded toes and a dewclaw',
+          { key: 'toes_and_claws', slot: 'feet', name: 'Toes and claws', weight: 4, range: { least: 'Four clawed toes and a small dewclaw on a broad foot', standard: 'Four clawed, padded toes and a dewclaw', most: 'Tight wolf toes with heavy claws' }, endsAs: 'four clawed, padded toes and a dewclaw',
             stages: [
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
               'Four toes, blunt claws that do not sheathe and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low, close to a human stance on a long paw', standard: 'Heel raised a hand\'s width, weight on the toes', most: 'A full hock: long foot, heel high, a deep backward bend' }, endsAs: 'paws: weight on the toes and one broad pad, the heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low, close to a human stance on a long paw', standard: 'Heel raised a hand\'s width, weight on the toes', most: 'A full hock: long foot, heel high, a deep backward bend' }, endsAs: 'paws: weight on the toes and one broad pad, the heel raised',
             stages: [
               'The arches ache, then tighten; the ball of the foot takes more of the weight.',
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
@@ -1662,7 +1662,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
               'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised. Quiet on hard floors, and balance is better than it ever was.'
             ] },
-          { key: 'leg_and_hip_pelt', name: 'Leg and hip pelt', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'pelt from paws to hips, fading out at the navel',
+          { key: 'leg_and_hip_pelt', slot: 'coat_legs', name: 'Leg and hip pelt', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'pelt from paws to hips, fading out at the navel',
             stages: [
               'Leg hair denser, in the coat\'s colour, from the ankle up.',
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
@@ -1670,7 +1670,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
               'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 8, range: { least: 'Slim, to the back of the knee', standard: 'A full brush to the calf', most: 'Thick and heavy, to the ankle' }, endsAs: 'a full brush to the calf',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 8, range: { least: 'Slim, to the back of the knee', standard: 'A full brush to the calf', most: 'Thick and heavy, to the ankle' }, endsAs: 'a full brush to the calf',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A finger\'s length of bone and muscle under tight skin. It twitches when startled, and sitting has to allow for it.',
@@ -1678,7 +1678,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Longer and thickening, with a full coat. It carries real weight, the hips answer it in walking, and it wags. It has to be kept track of.',
               'A full tail, expressive and readable by anyone who looks. Stroked along the lie it is felt up the whole spine, and the root is the most sensitive place on the back of the body.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 6, range: { least: 'Pointed and furred, set a little high', standard: 'Tall wolf ears set high', most: 'Large, tall and heavily furred' }, endsAs: 'tall furred wolf ears set high',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 6, range: { least: 'Pointed and furred, set a little high', standard: 'Tall wolf ears set high', most: 'Large, tall and heavily furred' }, endsAs: 'tall furred wolf ears set high',
             stages: [
               'The rims thicken and run hot. Hearing sharpens at the high end.',
               'The tops draw to a soft point, with fine fur along the edge.',
@@ -1686,21 +1686,21 @@ window.WINDLASS_WORLDS.sundered = {
               'Tall, furred outside and in, moved up from where ears were, which is smooth skin under hair now. They flatten and prick with feeling and cannot be stopped. Anything worn on the ears or over the head is a problem.',
               'Full wolf ears, warm to hold, each turning independently and giving every feeling away. Rubbed at the base, the whole body leans into the hand.'
             ] },
-          { key: 'teeth_and_jaw', name: 'Teeth and jaw', weight: 4, range: { least: 'Canines a little long', standard: 'Long canines, shearing back teeth', most: 'Long canines that show with the mouth at rest, a heavy jaw' }, endsAs: 'long canines and shearing back teeth',
+          { key: 'teeth_and_jaw', slot: 'face', name: 'Teeth and jaw', weight: 4, range: { least: 'Canines a little long', standard: 'Long canines, shearing back teeth', most: 'Long canines that show with the mouth at rest, a heavy jaw' }, endsAs: 'long canines and shearing back teeth',
             stages: [
               'The canines ache at the root like new teeth coming.',
               'Upper canines longer and sharper; lips and tongue have to learn them.',
               'Lower canines follow. The bite is stronger and the jaw muscle stands at the hinge.',
               'Four long canines that show in a smile and more in a yawn, and back teeth that shear. A careful bite can hold without breaking skin.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the wolf shows in ears, eyes and teeth only', standard: 'A faint cast: a broad nose with a wolf\'s tip, the jaw slightly forward', most: 'A short blunt muzzle with the wolf\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with the wolf\'s faint cast',
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the wolf shows in ears, eyes and teeth only', standard: 'A faint cast: a broad nose with a wolf\'s tip, the jaw slightly forward', most: 'A short blunt muzzle with the wolf\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with the wolf\'s faint cast',
             stages: [
               'The tip of the nose runs cool and damp.',
               'The skin at the tip darkens and takes a fine pebbled grain. The nostrils flare wider and move when scenting.',
               'The bridge broadens a little, and nose and jaw sit slightly further forward than they did.',
               'The same face, plainly the person\'s own, with something of the wolf in it; canines behind the lips.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes bright in the dark',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes bright in the dark',
             stages: [
               'Night is less dark; shapes hold in an unlit room.',
               'A ring of {eye} at the edge of the iris, spreading inward. The eyes throw light back in the dark.',
@@ -1712,7 +1712,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The growl comes on purpose now, and a whine that does not. The speaking voice has a rougher low edge.',
               'A full growl under the voice, a bark of a laugh, and a howl that must be let out sometimes and carries a long way. A low growl of contentment, close to, is felt as much as heard.'
             ] },
-          { key: 'spine_ruff', name: 'Spine ruff', weight: 4, range: { least: 'A narrow line of fur up the spine', standard: 'A hand-wide ruff from tail to nape', most: 'A mane down the back and over the shoulders' }, endsAs: 'a ruff of longer fur from the tail to the nape',
+          { key: 'spine_ruff', slot: 'coat_back', name: 'Spine ruff', weight: 4, range: { least: 'A narrow line of fur up the spine', standard: 'A hand-wide ruff from tail to nape', most: 'A mane down the back and over the shoulders' }, endsAs: 'a ruff of longer fur from the tail to the nape',
             stages: [
               'A line of gooseflesh down the spine that comes with anger or cold and stays a moment after.',
               'Fine hair along the backbone, starting at the base of the spine.',
@@ -1796,7 +1796,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         cow: [
-          { key: 'hands', name: 'Hands', weight: 7, range: { least: 'Two fingers and a thumb, each ending in a small thin hoof', standard: 'Two hooved fingers and a hooved thumb', most: 'Two heavy fingers and a thumb, all hooved to the first joint; still hands that grip and hold' }, endsAs: 'two hooved fingers and a hooved thumb',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 7, range: { least: 'Two fingers and a thumb, each ending in a small thin hoof', standard: 'Two hooved fingers and a hooved thumb', most: 'Two heavy fingers and a thumb, all hooved to the first joint; still hands that grip and hold' }, endsAs: 'two hooved fingers and a hooved thumb',
             stages: [
               'Nails thicker, harder and broader, curving round the fingertips.',
               'The fingers move in pairs, first with second and third with fourth, and resist being spread. The skin between each pair tightens.',
@@ -1804,14 +1804,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The paired tips close into one and the nail wraps each end in a small hard cap, the start of a hoof. Fine work has to be relearned.',
               'Two thick fingers and a thumb, each ending in a small smooth hoof. Strong and sure, and still hands that hold and write. The skin behind each hoof is soft and very sensitive.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Hooves to mid-thigh', standard: 'Hooves to hips, fading out at the navel', most: 'Hooves to hips, and over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'Short coat from hooves to hips, fading out at the navel',
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: { least: 'Hooves to mid-thigh', standard: 'Hooves to hips, fading out at the navel', most: 'Hooves to hips, and over belly, ribs and back, short and fine on the chest; all but the face' }, endsAs: 'Short coat from hooves to hips, fading out at the navel',
             stages: [
               'An itch down the shins, then the leg hair coming in denser and rougher from the ankle up, in the coat\'s colour.',
               'Undercoat on the lower leg, short and close, the skin beneath it hot; an itch as it comes in that scratching only stirs.',
@@ -1819,14 +1819,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
               'Coat from the hooves up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 5, endsAs: 'two toes in a split hoof with dewclaws behind',
+          { key: 'toes_and_hooves', slot: 'feet', name: 'Toes and hooves', weight: 5, endsAs: 'two toes in a split hoof with dewclaws behind',
             stages: [
               'Toenails thicker, harder and broader, curving down over the toe ends. Socks and shoes begin to disagree with them.',
               'The middle toes press together into two groups and stop moving separately. The big toe and the little toe shorten.',
               'Each group has joined into one thick toe, the nails spreading over them as two hard shells with a cleft between. The shortened toes have ridden up behind the ankle as small dewclaws. Shoes fit badly at the front.',
               'A cloven hoof: two toes cased in hard horn, a soft bulb behind them, tender to the floor, and two dewclaws above. Nothing with a closed toe fits; the hooves sound on hard floors.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 9, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 9, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
             stages: [
               'The arches ache, then tighten; weight moves forward onto the toes.',
               'The heel lifts and resists coming down. The calves shorten and harden.',
@@ -1834,34 +1834,34 @@ window.WINDLASS_WORLDS.sundered = {
               'Weight is carried on the toe tips alone. Balance is narrow; gait, stairs and standing still all have to be relearned, and the hips and back shift to help.',
               'Standing on two hooves per foot, the heel raised, the long foot coated down to the horn. Sure on rough ground, loud on hard floors, slow to turn.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 6, range: { least: 'To mid-thigh, a small tuft', standard: 'To the knee, tufted', most: 'To the ankle, a heavy tuft' }, endsAs: 'a slim tail to the knee, tufted',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 6, range: { least: 'To mid-thigh, a small tuft', standard: 'To the knee, tufted', most: 'To the ankle, a heavy tuft' }, endsAs: 'a slim tail to the knee, tufted',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of thin, flexible tail in short coat. It flicks by itself, and sitting and waistbands have to allow for it.',
               'Longer, thin as a rope, with a tuft of long hair starting at the tip. It swishes with annoyance and lifts with pleasure before either is known.',
               'A slim tail ending in a full tuft. It swishes, flicks and curls with mood, and the root is sensitive to touch.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 5, range: { least: 'Small furred ears set a little low', standard: 'Cow ears out to the sides', most: 'Large, wide ears' }, endsAs: 'furred cow ears out to the sides',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 5, range: { least: 'Small furred ears set a little low', standard: 'Cow ears out to the sides', most: 'Large, wide ears' }, endsAs: 'furred cow ears out to the sides',
             stages: [
               'The ears run warm and feel heavy. Low sounds carry further.',
               'They lengthen sideways and round out, with soft fur on the backs.',
               'Wide and furred, set out to the sides of the head, turning toward sound on their own. Anything worn on the ears is a problem.',
               'Soft cow ears that swivel, droop when tired and flick when bothered. Stroked, they bring a deep, heavy calm.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the cow shows in ears and eyes only', standard: 'A faint cast: a broad soft nose, the jaw slightly forward', most: 'A short broad muzzle with a cow\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint bovine cast',
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the cow shows in ears and eyes only', standard: 'A faint cast: a broad soft nose, the jaw slightly forward', most: 'A short broad muzzle with a cow\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint bovine cast',
             stages: [
               'The nose runs cool and damp.',
               'The nose broadens and softens at the tip, the skin there smooth and darker; the nostrils widen.',
               'Nose and jaw sit slightly further forward than they did; the lips are fuller.',
               'The same face, plainly the person\'s own, with something of the cow in it, and a mild steady look.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, dark-lashed, wide-seeing eyes',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, dark-lashed, wide-seeing eyes',
             stages: [
               'The lashes grow long and thick.',
               'The eyes are larger and turning {eye}. The edges of sight reach further round.',
               'Large {eye} eyes under heavy lashes, seeing nearly all the way round and less sharply up close. Sudden movement at the edge of sight startles.'
             ] },
-          { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'a strip of coat from the tail to the nape',
+          { key: 'spine_strip', slot: 'coat_back', name: 'Spine strip', weight: 3, endsAs: 'a strip of coat from the tail to the nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
@@ -1940,7 +1940,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         fox: [
-          { key: 'tail', name: 'Tail', weight: 8, range: { least: 'One slim tail', standard: 'One thick pale-tipped tail, a second with age', most: 'Two or three full tails' }, endsAs: 'one thick pale-tipped tail',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 8, range: { least: 'One slim tail', standard: 'One thick pale-tipped tail, a second with age', most: 'Two or three full tails' }, endsAs: 'one thick pale-tipped tail',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A finger\'s length of bone and muscle under tight skin. It twitches when startled, and sitting has to allow for it.',
@@ -1948,33 +1948,33 @@ window.WINDLASS_WORLDS.sundered = {
               'Long and thickening fast, with a dense coat that doubles its width. It balances every quick turn and has to be kept track of.',
               'A thick brush with a pale tip, as wide as a thigh and nearly weightless. It wraps the body in sleep and gives every feeling away, and the root is very sensitive.'
             ] },
-          { key: 'second_tail', name: 'Second tail', weight: 5, needs: [{ track: 'tail', stage: 'finished' }], extentWith: 'tail', range: { least: 'None', standard: 'A second with age', most: 'Two or three full tails' }, endsAs: 'a second full tail',
+          { key: 'second_tail', slot: 'tail', name: 'Second tail', weight: 5, needs: [{ track: 'tail', stage: 'finished' }], extentWith: 'tail', range: { least: 'None', standard: 'A second with age', most: 'Two or three full tails' }, endsAs: 'a second full tail',
             stages: [
               'A second ache beside the root of the first, and a second lump.',
               'A second tail, shorter and slimmer, moving in step with the first unless attention is paid.',
               'Two full tails that move together or apart at will. Among kitsune it marks age and craft, and is noticed. More may follow in time.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 7, range: { least: 'Pointed and furred, a little high', standard: 'Large triangular ears set high', most: 'Very large, heavily tufted' }, endsAs: 'large triangular ears set high',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 7, range: { least: 'Pointed and furred, a little high', standard: 'Large triangular ears set high', most: 'Very large, heavily tufted' }, endsAs: 'large triangular ears set high',
             stages: [
               'The rims thin and run hot. Small high sounds sharpen.',
               'The tops draw to points and the ears widen at the base, with fine fur along the edge.',
               'Large and triangular, sitting higher on the skull, dark-backed, turning toward sound on their own.',
               'Large fox ears set high, each swivelling independently and catching the smallest sound. They flatten and prick with feeling, and stroked at the base they bring a shiver.'
             ] },
-          { key: 'teeth', name: 'Teeth', weight: 3, endsAs: 'small sharp teeth and fine canines',
+          { key: 'teeth', slot: 'face', name: 'Teeth', weight: 3, endsAs: 'small sharp teeth and fine canines',
             stages: [
               'The canines ache at the root.',
               'Canines longer and needle-fine; the smaller teeth sharpen.',
               'Small sharp teeth and fine canines that show in a grin. The bite is quick and exact more than strong.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the fox shows in ears and eyes', standard: 'A faint cast: a narrow nose, a pointed chin', most: 'A short fine muzzle with a fox\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint vulpine cast',
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face; the fox shows in ears and eyes', standard: 'A faint cast: a narrow nose, a pointed chin', most: 'A short fine muzzle with a fox\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint vulpine cast',
             stages: [
               'The tip of the nose runs cool and damp.',
               'The tip darkens and narrows; the nostrils move when scenting.',
               'The nose is finer and the chin more pointed, both a little further forward. The cheekbones stand higher.',
               'The same face, plainly the person\'s own, with something of the fox in it, and a sly cast to the eyes.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'slit-pupilled eyes, bright at dusk',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'slit-pupilled eyes, bright at dusk',
             stages: [
               'Dusk is brighter than it was.',
               'The iris turns {eye} from the edge inward, and the pupils narrow toward slits in bright light.',
@@ -2046,28 +2046,28 @@ window.WINDLASS_WORLDS.sundered = {
               'Restless enough to walk half the night; the temper runs short. Appetite drops.',
               'Every midwinter: loud and restless, the musk strong, and any woman of the kind in season known by scent. It passes with the season.'
             ] },
-          { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with small claws', standard: 'Slim fingers, pads and small dark claws', most: 'Short quick fingers with full pads and furred backs; still hands' }, endsAs: 'Slim fingers, pads and small dark claws',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 5, range: { least: 'Human-shaped hands with small claws', standard: 'Slim fingers, pads and small dark claws', most: 'Short quick fingers with full pads and furred backs; still hands' }, endsAs: 'Slim fingers, pads and small dark claws',
             stages: [
               'Nails thicker and harder from the root, growing to a blunt point however short they are cut.',
               'Fingertip skin thickens into the first of the pads. Touch through them is duller for texture and sharper for pressure and warmth.',
               'The nails are claws: curved, rooted deeper, the quick grown down into them. A pad on every fingertip and one forming across the palm; knuckles heavier. Fine grip has to be relearned.',
               'Five fingers, a pad on each tip and one across the palm, the nails grown to claws that do not sheathe. Still a hand that writes and holds. On bare skin the claws are felt.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Dark gloves to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Dark gloves from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'Dark gloves to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Dark gloves from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, endsAs: 'Four clawed toes and a dewclaw',
+          { key: 'toes_and_claws', slot: 'feet', name: 'Toes and claws', weight: 4, endsAs: 'Four clawed toes and a dewclaw',
             stages: [
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
               'Four toes, blunt claws that do not sheathe and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a narrow paw', standard: 'Heel raised, weight on the toes', most: 'A full hock on a long narrow foot' }, endsAs: 'Narrow paws, heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a narrow paw', standard: 'Heel raised, weight on the toes', most: 'A full hock on a long narrow foot' }, endsAs: 'Narrow paws, heel raised',
             stages: [
               'The arches ache, then tighten; the ball of the foot takes more of the weight.',
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
@@ -2075,7 +2075,7 @@ window.WINDLASS_WORLDS.sundered = {
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
               'A paw: the long foot furred to the claws, weight on the toes and the broad pad, the heel raised. Quiet on hard floors, and balance is better than it ever was.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Stockings to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, dark stockings below the knee',
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: { least: 'Stockings to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, dark stockings below the knee',
             stages: [
               'Leg hair denser, in the coat\'s colour, from the ankle up.',
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
@@ -2083,7 +2083,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
               'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
+          { key: 'spine_strip', slot: 'coat_back', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
@@ -2091,21 +2091,21 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         cat: [
-          { key: 'hands', name: 'Hands', weight: 6, range: { least: 'Human hands with sheathing claws', standard: 'Padded fingers with claws that sheathe', most: 'Short soft-padded fingers with furred backs; still hands' }, endsAs: 'five padded fingers with claws that sheathe',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 6, range: { least: 'Human hands with sheathing claws', standard: 'Padded fingers with claws that sheathe', most: 'Short soft-padded fingers with furred backs; still hands' }, endsAs: 'five padded fingers with claws that sheathe',
             stages: [
               'Nails thicker and narrower, curving to points.',
               'The fingertips soften into small pads. The last joint of each finger loosens and bends back further than before.',
               'The nails are curved claws that draw back into the fingertip and slide out when the fingers flex. They come out with temper or pleasure before the mind decides.',
               'Five supple fingers with soft pads and sharp claws that sheathe completely. A hand that can be velvet or hooks; kneading something soft is a deep comfort.'
             ] },
-          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, needs: [{ track: 'hands', stage: 3 }], endsAs: 'Four toes, the claws sheathed, and a dewclaw',
+          { key: 'toes_and_claws', slot: 'feet', name: 'Toes and claws', weight: 4, needs: [{ track: 'hands', stage: 3 }], endsAs: 'Four toes, the claws sheathed, and a dewclaw',
             stages: [
               'Toenails thicker and harder, growing forward to points. Socks and shoes begin to disagree with them.',
               'The big toe shorter and set higher on the inside of the foot, no longer taking weight. Push-off and balance are slightly off.',
               'Four toes thicker and closer together, each nail a claw that reaches the floor. The first toe has ridden up the inside of the foot as a dewclaw. Shoes fit badly at the front.',
               'Four toes, sharp claws that sheathe and slide out and a pad under each that feels every texture; the dewclaw high on the inside. Nothing with a closed toe fits.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a soft paw', standard: 'Heel raised, weight on the toes', most: 'A full hock' }, endsAs: 'Soft silent paws, heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 8, needs: [{ track: 'toes_and_claws', stage: 2 }], range: { least: 'Heel low on a soft paw', standard: 'Heel raised, weight on the toes', most: 'A full hock' }, endsAs: 'Soft silent paws, heel raised',
             stages: [
               'The arches ache, then tighten; the ball of the foot takes more of the weight.',
               'Skin under the ball of the foot thickens into one broad pad. The sole behind it turns soft and tender from disuse.',
@@ -2113,34 +2113,34 @@ window.WINDLASS_WORLDS.sundered = {
               'The foot is markedly longer and the heel rides off the floor, so the leg seems to have a second knee bending backward (it is the ankle). Fur over the top of the foot. Gait, stairs and balance all have to be relearned.',
               'A paw: the long foot narrow and soft-padded, furred to the claws, weight on the toes and the broad pad, the heel raised. It makes no sound on any floor, and balance is better than it ever was.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 7, range: { least: 'Slim, to the knee', standard: 'Long, to the ankle', most: 'Longer than the leg and thick-furred' }, endsAs: 'a long expressive tail',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 7, range: { least: 'Slim, to the knee', standard: 'Long, to the ankle', most: 'Longer than the leg and thick-furred' }, endsAs: 'a long expressive tail',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of slim tail in short fur. It twitches at the tip with attention, and sitting has to allow for it.',
               'Long and supple, moving all the time: a slow wave for thought, a lash for temper, upright for welcome.',
               'A long tail that balances every leap and speaks every mood. It curls round what its owner likes, and stroked at the base it arches the whole back.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 6, range: { least: 'Small points', standard: 'Pointed cat ears set high', most: 'Large, tufted at the tips' }, endsAs: 'pointed cat ears set high',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 6, range: { least: 'Small points', standard: 'Pointed cat ears set high', most: 'Large, tufted at the tips' }, endsAs: 'pointed cat ears set high',
             stages: [
               'The rims thin and run warm. High sounds sharpen.',
               'The tops draw to points, with fine fur along the edges.',
               'Pointed and furred, sitting higher on the skull, each turning toward sound on its own.',
               'Pointed cat ears set high, swivelling apart to follow two sounds at once and flattening with temper. Rubbed behind, they bring a purr.'
             ] },
-          { key: 'whiskers_and_face', name: 'Whiskers and face', weight: 6, face: true, range: { least: 'The person\'s own human face; the cat shows in ears, eyes and whiskers', standard: 'A faint cast: a short broad nose, a small chin', most: 'A short blunt muzzle with a cat\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint feline cast, whiskered',
+          { key: 'whiskers_and_face', slot: 'face', name: 'Whiskers and face', weight: 6, face: true, range: { least: 'The person\'s own human face; the cat shows in ears, eyes and whiskers', standard: 'A faint cast: a short broad nose, a small chin', most: 'A short blunt muzzle with a cat\'s nose; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a faint feline cast, whiskered',
             stages: [
               'Fine dots appear on the upper lip, tender to the touch.',
               'Stiff pale hairs grow from the dots and above the brows. They feel the air move.',
               'The nose shortens and broadens a little, the tip darkening; the chin is smaller and the cheeks fuller at the whisker pads.',
               'The same face, plainly the person\'s own, with something of the cat in it, and whiskers that read a gap\'s width and a draught\'s direction.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'slit-pupilled eyes that shine in the dark',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 4, endsAs: 'slit-pupilled eyes that shine in the dark',
             stages: [
               'Night is less dark, and movement shows before shape.',
               'The iris turns {eye} and the pupils narrow to slits in bright light. The eyes shine in the dark.',
               '{eye} eyes with slit pupils that open wide and black in dim light or at play. A slow blink is affection.'
             ] },
-          { key: 'teeth_and_tongue', name: 'Teeth and tongue', weight: 4, endsAs: 'needle fangs and a rough tongue',
+          { key: 'teeth_and_tongue', slot: 'face', name: 'Teeth and tongue', weight: 4, endsAs: 'needle fangs and a rough tongue',
             stages: [
               'The canines ache at the root, and the tongue feels rough against the teeth.',
               'Fine sharp fangs. The tongue\'s surface has grown small backward hooks.',
@@ -2212,14 +2212,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Hears a woman\'s calling from far off; bristles at other toms, and the voice yowls without leave.',
               'Through spring and summer: wakeful and restless, the scent strong, and any season nearby known by scent.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, fading out at the navel',
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: { least: 'Paws to mid-thigh', standard: 'Paws to hips, fading out at the navel', most: 'Paws to hips, and over belly, ribs and back; all but the face' }, endsAs: 'Coat from paws to hips, fading out at the navel',
             stages: [
               'Leg hair denser, in the coat\'s colour, from the ankle up.',
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
@@ -2227,7 +2227,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
               'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'spine_line', name: 'Spine line', weight: 3, endsAs: 'A line of coat from tail to nape',
+          { key: 'spine_line', slot: 'coat_back', name: 'Spine line', weight: 3, endsAs: 'A line of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
@@ -2235,21 +2235,21 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         rabbit: [
-          { key: 'hands', name: 'Hands', weight: 4, range: { least: 'Human hands with blunt claws', standard: 'Furred backs, short blunt claws', most: 'Short furred fingers; still hands' }, endsAs: 'furred backs, short blunt claws and soft bare palms',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 4, range: { least: 'Human hands with blunt claws', standard: 'Furred backs, short blunt claws', most: 'Short furred fingers; still hands' }, endsAs: 'furred backs, short blunt claws and soft bare palms',
             stages: [
               'Nails thicker and blunter.',
               'Fine fur on the backs of the hands and fingers.',
               'The nails are short blunt claws, good for digging; the palms stay bare and soft, with no pads.',
               'Five fingers furred on the backs with short blunt claws and soft bare palms. Deft, gentle hands that dig and groom well.'
             ] },
-          { key: 'toes', name: 'Toes', weight: 4, endsAs: 'four long furred toes, blunt-clawed',
+          { key: 'toes', slot: 'feet', name: 'Toes', weight: 4, endsAs: 'four long furred toes, blunt-clawed',
             stages: [
               'Toenails thicker and blunter. Socks and shoes begin to disagree with them.',
               'The big toe shortens and draws in beside the others.',
               'Four long toes close together with blunt claws; the first toe is gone into the foot. Fur grows between and under them.',
               'Four long toes, furred above and below, with blunt claws for grip and digging. Nothing with a closed toe fits.'
             ] },
-          { key: 'hind_feet', name: 'Hind feet', weight: 9, needs: [{ track: 'toes', stage: 2 }], range: { least: 'Longer than a human\'s, heel down', standard: 'Long, furred to the sole', most: 'Very long, up on the toes' }, endsAs: 'long feet furred to the sole',
+          { key: 'hind_feet', slot: 'feet', name: 'Hind feet', weight: 9, needs: [{ track: 'toes', stage: 2 }], range: { least: 'Longer than a human\'s, heel down', standard: 'Long, furred to the sole', most: 'Very long, up on the toes' }, endsAs: 'long feet furred to the sole',
             stages: [
               'The arches ache, and the feet feel long in their shoes.',
               'The foot lengthens from heel to toe, and fine fur spreads over the top of it.',
@@ -2257,19 +2257,19 @@ window.WINDLASS_WORLDS.sundered = {
               'Long, narrow and powerful, furred on the sole, with a spring in the ankle that wants to be used. Walking is short steps; standing still, the whole long foot lies flat.',
               'Long hind feet, furred to the sole and silent, flat at rest and up on the toes at speed. They thump the ground hard when alarmed, without leave.'
             ] },
-          { key: 'belly_fur', name: 'Belly fur', weight: 4, needs: [{ track: 'leg_and_hip_coat', stage: 'finished' }], extentWith: 'leg_and_hip_coat', range: { least: 'None', standard: 'Pale belly fur to just under the breasts', most: 'Pale belly fur to just under the breasts' }, endsAs: 'soft pale fur from the hips to just under the breasts',
+          { key: 'belly_fur', slot: 'coat_legs', name: 'Belly fur', weight: 4, needs: [{ track: 'leg_and_hip_coat', stage: 'finished' }], extentWith: 'leg_and_hip_coat', range: { least: 'None', standard: 'Pale belly fur to just under the breasts', most: 'Pale belly fur to just under the breasts' }, endsAs: 'soft pale fur from the hips to just under the breasts',
             stages: [
               'Fine pale down from the navel upward.',
               'Soft pale fur over the belly, shorter and finer than the coat.',
               'Soft pale belly fur from the hips to just under the breasts, the softest coat on the body and the most sensitive to a hand.'
             ] },
-          { key: 'bob_tail', name: 'Bob tail', weight: 4, range: { least: 'A small tuft', standard: 'A round bob', most: 'A full soft scut' }, endsAs: 'a short round tail, pale beneath',
+          { key: 'bob_tail', slot: 'tail', name: 'Bob tail', weight: 4, range: { least: 'A small tuft', standard: 'A round bob', most: 'A full soft scut' }, endsAs: 'a short round tail, pale beneath',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump there.',
               'A short stub in soft fur that flicks up when startled.',
               'A short round bob tail, pale beneath, that lifts and flashes with alarm or delight. Touch at its base is felt up the spine.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 9, range: { least: 'Hand-length', standard: 'Long and upright', most: 'Very long, or lopped and hanging' }, endsAs: 'long upright ears',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 9, range: { least: 'Hand-length', standard: 'Long and upright', most: 'Very long, or lopped and hanging' }, endsAs: 'long upright ears',
             stages: [
               'The ears run warm. Faint sounds sharpen.',
               'They lengthen upward, the tops rounding, with fine fur along the edges.',
@@ -2277,20 +2277,20 @@ window.WINDLASS_WORLDS.sundered = {
               'Long and upright, furred outside and thin enough inside to show the light. They rise with interest and lie back with fear. Anything worn on the head is a problem.',
               'Long rabbit ears, each turning independently, warm and velvet to hold. Stroked from base to tip, they loosen the whole body.'
             ] },
-          { key: 'nose_and_lip', name: 'Nose and lip', weight: 6, face: true, range: { least: 'The person\'s own human face; the rabbit shows in ears, eyes and whiskers', standard: 'A faint cast: a cleft nose, a faintly split lip', most: 'A short soft muzzle with a rabbit\'s nose and lip; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a cleft nose and a faintly split lip',
+          { key: 'nose_and_lip', slot: 'face', name: 'Nose and lip', weight: 6, face: true, range: { least: 'The person\'s own human face; the rabbit shows in ears, eyes and whiskers', standard: 'A faint cast: a cleft nose, a faintly split lip', most: 'A short soft muzzle with a rabbit\'s nose and lip; human eyes, brow and expression' }, endsAs: 'the person\'s own face with a cleft nose and a faintly split lip',
             stages: [
               'The nose twitches with every new smell.',
               'A fine line appears down the centre of the upper lip and the nose tip; fine whiskers start at the cheeks.',
               'The nose is cleft and soft, moving all the time; the upper lip has parted slightly along its line.',
               'The same face, plainly the person\'s own, with something of the rabbit in it, the nose never still, and fine whiskers.'
             ] },
-          { key: 'front_teeth', name: 'Front teeth', weight: 4, endsAs: 'front teeth a little long, kept down by gnawing',
+          { key: 'front_teeth', slot: 'face', name: 'Front teeth', weight: 4, endsAs: 'front teeth a little long, kept down by gnawing',
             stages: [
               'The front teeth ache, and there is an urge to bite on something hard.',
               'The two upper front teeth are a little longer and never stop growing.',
               'Front teeth a little long, kept down by gnawing: wood, roots, a pencil. Without it they ache.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large eyes that see nearly all round',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large eyes that see nearly all round',
             stages: [
               'The edges of sight widen.',
               'The eyes are larger and turning {eye}, set a touch wider.',
@@ -2343,14 +2343,14 @@ window.WINDLASS_WORLDS.sundered = {
               'No rise and fall through the year: a steady warmth in the skin that a touch can stir.',
               'Always a little in season and never overwhelmed by it: warm, quick to rouse, steady.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: { least: 'Feet to mid-thigh, no belly fur', standard: 'Feet to hips, pale belly fur to just under the breasts', most: 'Feet to hips, and over ribs and back; all but the face' }, endsAs: 'Coat from feet to hips',
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: { least: 'Feet to mid-thigh, no belly fur', standard: 'Feet to hips, pale belly fur to just under the breasts', most: 'Feet to hips, and over ribs and back; all but the face' }, endsAs: 'Coat from feet to hips',
             stages: [
               'Leg hair denser, in the coat\'s colour, from the ankle up.',
               'Undercoat on the lower leg, the skin beneath warmer; an itch as it comes in.',
@@ -2358,7 +2358,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through fur arrives slower and warmer, and spreads.',
               'Pelt from the paws up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
+          { key: 'spine_strip', slot: 'coat_back', name: 'Spine strip', weight: 3, endsAs: 'A strip of coat from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
@@ -2366,7 +2366,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         horse: [
-          { key: 'hands', name: 'Hands', weight: 7, range: {
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 7, range: {
               least: 'Two fingers and a thumb, each ending in a small thin hoof',
               standard: 'Two hooved fingers and a hooved thumb',
               most: 'Two strong fingers and a thumb, all hooved to the first joint; still hands that grip and hold'
@@ -2378,14 +2378,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The paired tips close into one and the nail wraps each end in a small hard cap, the start of a hoof. Fine work has to be relearned.',
               'Two thick fingers and a thumb, each ending in a small smooth hoof. Strong and sure, and still hands that hold and write. The skin behind each hoof is soft and very sensitive.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: {
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: {
               least: 'Hooves to mid-thigh',
               standard: 'Hooves to hips, fading out at the navel',
               most: 'Hooves to hips, and over belly, ribs and back, short and fine on the chest; all but the face'
@@ -2397,14 +2397,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
               'Coat from the hooves up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 6, endsAs: 'one round hoof on each foot',
+          { key: 'toes_and_hooves', slot: 'feet', name: 'Toes and hooves', weight: 6, endsAs: 'one round hoof on each foot',
             stages: [
               'Toenails thicker, harder and broader, curving down over the toe ends. Socks and shoes begin to disagree with them.',
               'The outer toes shorten and draw in toward the middle one, which broadens and lengthens.',
               'One broad toe on each foot, its nail spread over it as a single hard shell; the shortened toes have drawn up into the ankle and cannot be found. Shoes fit badly at the front.',
               'A single round hoof on each foot: hard horn around a soft heel pad, tender to the floor. Nothing with a closed toe fits; the hooves ring on hard floors.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 10, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 10, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
             stages: [
               'The arches ache, then tighten; weight moves forward onto the toes.',
               'The heel lifts and resists coming down. The calves lengthen and harden.',
@@ -2412,14 +2412,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Weight is carried on the hoof alone. Balance is narrow; gait, stairs and standing still all have to be relearned, and the hips and back shift to help.',
               'Standing on one hoof per foot, the heel raised, the long foot coated down to the horn. Long in the stride, sure on rough ground, loud on hard floors, quick to turn.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 8, range: { least: 'To mid-thigh, thin and flowing', standard: 'To the knee, long and flowing', most: 'To the ankle, full and flowing' }, endsAs: 'a long flowing tail to the knee',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 8, range: { least: 'To mid-thigh, thin and flowing', standard: 'To the knee, long and flowing', most: 'To the ankle, full and flowing' }, endsAs: 'a long flowing tail to the knee',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of thin, flexible tail, with long coarse hair beginning along it. It flicks by itself, and sitting and waistbands have to allow for it.',
               'Longer, with long hair flowing from the root. It swishes with annoyance and lifts with pleasure before either is known.',
               'A long flowing tail of coarse hair from the root, to the knee. It swishes, flicks and lifts with mood, and the root is sensitive to touch.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 7, range: {
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 7, range: {
               least: 'Small furred ears set high',
               standard: 'Long ears out to the sides, each turning on its own',
               most: 'Very long, wide-set ears'
@@ -2430,7 +2430,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Long and furred, set out to the sides of the crown, each swivelling toward a sound on its own. Anything worn on the head is a problem.',
               'Long, mobile horse ears that prick forward, lie back, swivel apart and droop to rest. Stroked at the base, they loosen the neck and shoulders.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: {
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: {
               least: 'The person\'s own human face; the horse shows in ears and eyes only',
               standard: 'A faint cast: a long straight nose, a firm jaw',
               most: 'A short soft muzzle with a horse\'s wide nostrils; human eyes, brow and expression'
@@ -2441,13 +2441,13 @@ window.WINDLASS_WORLDS.sundered = {
               'The nose is longer and straighter and the jaw sits slightly forward; the lips are firmer and quick to move.',
               'The same face, plainly the person\'s own, with something of the horse in it, and a wide, alert look.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, long-lashed eyes with a wide view',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, long-lashed eyes with a wide view',
             stages: [
               'The eyes run bright, and the lashes grow long.',
               'The eyes are larger and turning {eye}, set a touch wider; the edges of sight reach further round.',
               'Large {eye} eyes under long lashes, seeing a wide arc and catching movement at the edge of sight before it is understood.'
             ] },
-          { key: 'spine_mane', name: 'Mane', weight: 6, range: {
+          { key: 'spine_mane', slot: 'coat_back', name: 'Mane', weight: 6, range: {
               least: 'A short, narrow mane through the hair at the nape',
               standard: 'A long mane growing through the hair, from the crown to between the shoulder blades',
               most: 'A full, flowing mane growing through the hair, from the crown to the small of the back'
@@ -2498,7 +2498,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         donkey: [
-          { key: 'hands', name: 'Hands', weight: 7, range: {
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 7, range: {
               least: 'Two fingers and a thumb, each ending in a small thin hoof',
               standard: 'Two hooved fingers and a hooved thumb',
               most: 'Two strong fingers and a thumb, all hooved to the first joint; still hands that grip and hold'
@@ -2510,14 +2510,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The paired tips close into one and the nail wraps each end in a small hard cap, the start of a hoof. Fine work has to be relearned.',
               'Two thick fingers and a thumb, each ending in a small smooth hoof. Strong and sure, and still hands that hold and write. The skin behind each hoof is soft and very sensitive.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: {
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: {
               least: 'Hooves to mid-thigh',
               standard: 'Hooves to hips, fading out at the navel',
               most: 'Hooves to hips, and over belly, ribs and back, short and fine on the chest; all but the face'
@@ -2529,14 +2529,14 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
               'Coat from the hooves up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'toes_and_hooves', name: 'Toes and hooves', weight: 6, endsAs: 'one narrow hoof on each foot',
+          { key: 'toes_and_hooves', slot: 'feet', name: 'Toes and hooves', weight: 6, endsAs: 'one narrow hoof on each foot',
             stages: [
               'Toenails thicker, harder and broader, curving down over the toe ends. Socks and shoes begin to disagree with them.',
               'The outer toes shorten and draw in toward the middle one, which broadens and lengthens.',
               'One broad toe on each foot, its nail spread over it as a single hard shell; the shortened toes have drawn up into the ankle and cannot be found. Shoes fit badly at the front.',
               'A single narrow hoof on each foot: hard horn around a soft heel pad, small and neat, tender to the floor. Nothing with a closed toe fits; the hooves tap on hard floors.'
             ] },
-          { key: 'feet_and_stance', name: 'Feet and stance', weight: 10, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
+          { key: 'feet_and_stance', slot: 'feet', name: 'Feet and stance', weight: 10, needs: [{ track: 'toes_and_hooves', stage: 2 }], range: { least: 'Heel low on a broad hoof', standard: 'Heel raised, weight on the hooves', most: 'A full hock: long foot, heel high' }, endsAs: 'standing on the hooves, the heel raised',
             stages: [
               'The arches ache, then tighten; weight moves forward onto the toes.',
               'The heel lifts and resists coming down. The calves lengthen and harden.',
@@ -2544,21 +2544,21 @@ window.WINDLASS_WORLDS.sundered = {
               'Weight is carried on the hoof alone. Balance is narrow; gait, stairs and standing still all have to be relearned, and the hips and back shift to help.',
               'Standing on one hoof per foot, the heel raised, the long foot coated down to the horn. Sure on rough ground and steep paths, tapping on hard floors, slow to be moved.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 7, range: { least: 'To mid-thigh, a small tuft', standard: 'To the knee, tufted', most: 'To the ankle, a heavy tuft' }, endsAs: 'a slim tail to the knee, tufted',
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 7, range: { least: 'To mid-thigh, a small tuft', standard: 'To the knee, tufted', most: 'To the ankle, a heavy tuft' }, endsAs: 'a slim tail to the knee, tufted',
             stages: [
               'A bruised ache at the base of the spine, and a small hard lump under the skin there.',
               'A hand\'s length of thin, flexible tail in short coat. It flicks by itself, and sitting and waistbands have to allow for it.',
               'Longer, thin as a rope, with a tuft of long hair starting at the tip. It swishes with annoyance and lifts with pleasure before either is known.',
               'A slim tail ending in a full tuft. It swishes, flicks and curls with mood, and the root is sensitive to touch.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 10, range: { least: 'Small upright furred ears set high', standard: 'Long upright ears', most: 'Very long, narrow upright ears' }, endsAs: 'long upright furred ears',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 10, range: { least: 'Small upright furred ears set high', standard: 'Long upright ears', most: 'Very long, narrow upright ears' }, endsAs: 'long upright furred ears',
             stages: [
               'The ears run warm, and a stiffness rises at the rim. Faint, far sounds carry.',
               'They lengthen straight up and narrow, with fine short hair on the backs.',
               'Tall and furred, standing upright from the crown, turning toward sound on their own and slow to lie down. Anything worn on the head is a problem.',
               'Long upright donkey ears, each moving on its own: pricked to a sound, laid back in annoyance, drooped to rest. Stroked at the base, they loosen the neck and shoulders.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: {
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: {
               least: 'The person\'s own human face; the donkey shows in ears and eyes only',
               standard: 'A faint cast: a broad nose, a soft upper lip',
               most: 'A short soft muzzle with a donkey\'s wide nostrils; human eyes, brow and expression'
@@ -2569,13 +2569,13 @@ window.WINDLASS_WORLDS.sundered = {
               'The nose is broader and the upper lip fuller and quick to move.',
               'The same face, plainly the person\'s own, with something of the donkey in it, and a patient, steady look.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, dark, long-lashed eyes with a patient look',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'large, dark, long-lashed eyes with a patient look',
             stages: [
               'The eyes run bright, and the lashes grow long.',
               'The eyes are larger and turning {eye}, set a touch wider; the edges of sight reach further round.',
               'Large {eye} eyes under long lashes, seeing a wide arc and slow to look away.'
             ] },
-          { key: 'spine_mane', name: 'Mane', weight: 5, range: {
+          { key: 'spine_mane', slot: 'coat_back', name: 'Mane', weight: 5, range: {
               least: 'A short stiff tuft of mane through the hair at the nape',
               standard: 'A short upright mane growing through the hair, from the crown to the nape',
               most: 'A short upright mane growing through the hair, from the crown to between the shoulder blades'
@@ -2625,7 +2625,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         mouse: [
-          { key: 'hands', name: 'Hands', weight: 6, range: {
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 6, range: {
               least: 'Fine hairs on the backs, short fine nails',
               standard: 'Furred backs, short fine claws',
               most: 'Short furred fingers, fine claws and bare fingertips'
@@ -2636,14 +2636,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The nails are short fine claws; the palms and fingertips stay bare and very sensitive.',
               'Five fingers furred on the backs, with short fine claws and bare, sensitive fingertips. Quick, small-boned hands that hold, sort and pick at fine things.'
             ] },
-          { key: 'forearm_coat', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short fine coat from the hands to the elbows',
+          { key: 'forearm_coat', slot: 'coat_arms', name: 'Forearm coat', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'Short fine coat from the hands to the elbows',
             stages: [
               'A prickle across the backs of the wrists and hands, then new hairs pushing through there, denser and coarser, in the coat\'s colour.',
               'A soft undercoat spreading up from the wrist, short and close, the skin beneath it hot and itching as it comes in.',
               'Guard hairs pushing through the undercoat, lying toward the hand, reaching most of the way to where the coat will end. Stroked against the lie it prickles and stands.',
               'A full short coat from the backs of the hands up the arm, ending in a soft uneven line; palm and inner wrist stay bare. Touch through it is felt well past the place touched: with the lie it runs warm up the arm, against it a sharp prickle. Sleeves drag over it.'
             ] },
-          { key: 'leg_and_hip_coat', name: 'Leg and hip coat', weight: 8, range: {
+          { key: 'leg_and_hip_coat', slot: 'coat_legs', name: 'Leg and hip coat', weight: 8, range: {
               least: 'Feet to mid-thigh',
               standard: 'Feet to hips, fading out at the navel',
               most: 'Feet to hips, and over belly, ribs and back, short and fine on the chest; all but the face'
@@ -2655,19 +2655,19 @@ window.WINDLASS_WORLDS.sundered = {
               'Coat over thighs and hips, thicker on the outer thigh, short and fine on the inner. Touch through it arrives slower and warmer, and spreads.',
               'Coat from the feet up, thinning to bare skin in a soft uneven line. Stroked with the lie it is warm; against it, a prickle up the whole leg.'
             ] },
-          { key: 'toes_and_claws', name: 'Toes and claws', weight: 4, endsAs: 'slender toes furred above, each ending in a light claw, the soles bare and soft',
+          { key: 'toes_and_claws', slot: 'feet', name: 'Toes and claws', weight: 4, endsAs: 'slender toes furred above, each ending in a light claw, the soles bare and soft',
             stages: [
               'Toenails thinner and sharper. Socks and shoes begin to disagree with them.',
               'Fine short fur spreads over the tops of the feet, and the soles toughen.',
               'Slender toes furred above, each ending in a light claw, the soles bare and soft. Quiet on a floor, and quick to spread for grip.'
             ] },
-          { key: 'spine_strip', name: 'Spine strip', weight: 3, endsAs: 'a strip of fur from tail to nape',
+          { key: 'spine_strip', slot: 'coat_back', name: 'Spine strip', weight: 3, endsAs: 'a strip of fur from tail to nape',
             stages: [
               'Fine hair along the backbone, starting at the base of the spine.',
               'A narrow strip of short coat climbing the back.',
               'A strip of coat along the spine in the coat\'s colours. A hand run along it is felt down the whole back.'
             ] },
-          { key: 'tail', name: 'Tail', weight: 10, range: {
+          { key: 'tail', slot: 'tail', name: 'Tail', weight: 10, range: {
               least: 'To mid-thigh, thin and nearly bare',
               standard: 'To the knee, long, thin and nearly bare',
               most: 'To the ankle, long, thin and nearly bare'
@@ -2678,7 +2678,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Longer, thin as a cord and nearly bare, with fine rings in the skin and a few short hairs. It curls and lashes with mood before the mood is known.',
               'A long thin tail, nearly bare, with a fine scatter of short hair at the root. It coils, lashes and steadies every quick turn, and the root is sensitive to touch.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 11, range: {
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 11, range: {
               least: 'Smaller rounded ears high on the head, as a rat\'s',
               standard: 'Round ears set high on the head',
               most: 'Large, round ears high up on the head, as a mouse\'s'
@@ -2689,7 +2689,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Round and thin, set high on the head and turning toward sound on their own, veined and warm. Anything worn on the head is a problem.',
               'Round, thin, fine-furred ears high on the head, each moving on its own. They prick, fold flat and swivel with feeling, and stroked at the rim they ease the whole back.'
             ] },
-          { key: 'whiskers_and_face', name: 'Whiskers and face', weight: 7, face: true, range: {
+          { key: 'whiskers_and_face', slot: 'face', name: 'Whiskers and face', weight: 7, face: true, range: {
               least: 'The person\'s own human face; the mouse shows in ears and whiskers',
               standard: 'A faint cast: a small pointed nose, fine whiskers',
               most: 'A short pointed muzzle with a mouse\'s nose and fine whiskers; human eyes, brow and expression'
@@ -2700,13 +2700,13 @@ window.WINDLASS_WORLDS.sundered = {
               'The nose is small and pointed and never quite still, and the whiskers have lengthened, fine as thread, at the cheeks and above the eyes.',
               'The same face, plainly the person\'s own, with a small pointed nose, a quick look, and fine whiskers.'
             ] },
-          { key: 'front_teeth', name: 'Front teeth', weight: 4, endsAs: 'long chisel-edged front teeth, kept down by gnawing',
+          { key: 'front_teeth', slot: 'face', name: 'Front teeth', weight: 4, endsAs: 'long chisel-edged front teeth, kept down by gnawing',
             stages: [
               'The front teeth ache at the root, and there is an urge to bite down on something hard.',
               'The upper and lower front teeth are a little longer and never stop growing.',
               'Long, chisel-edged front teeth, kept down by gnawing: wood, seeds, a pencil. Without it they ache.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'small, bright, dark-set eyes, best in dim light',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'small, bright, dark-set eyes, best in dim light',
             stages: [
               'Dim rooms look clearer than they did.',
               'The eyes are larger and turning {eye}, set a touch to the sides.',
@@ -2752,14 +2752,14 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         harpy: [
-          { key: 'arm_feathers', name: 'Arm feathers', weight: 8, endsAs: 'feathered from shoulder to wrist',
+          { key: 'arm_feathers', slot: 'coat_arms', name: 'Arm feathers', weight: 8, endsAs: 'feathered from shoulder to wrist',
             stages: [
               'A prickling along the outer arms, and rows of small hard points under the skin.',
               'Pin feathers break through from shoulder to wrist, sheathed and itching, and open into soft down.',
               'True feathers overlay the down, lying back along the arm. Sleeves catch and bend them.',
               'The arms are feathered from the shoulder to the wrist, sleek, warm and waterproof. Each feather has feeling at its root, and a hand smoothing them the right way is a deep comfort.'
             ] },
-          { key: 'wings', name: 'Wings', weight: 12, needs: [{ track: 'arm_feathers', stage: 'finished' }], range: { least: 'Feathered arms that glide but do not lift', standard: 'Arms as wings: short flight and long glides', most: 'Arms as great wings: strong sustained flight' }, endsAs: 'the arms as wings',
+          { key: 'wings', slot: 'wings', name: 'Wings', weight: 12, needs: [{ track: 'arm_feathers', stage: 'finished' }], range: { least: 'Feathered arms that glide but do not lift', standard: 'Arms as wings: short flight and long glides', most: 'Arms as great wings: strong sustained flight' }, endsAs: 'the arms as wings',
             stages: [
               'Long quills start along the back edge of the forearm and hand.',
               'The flight feathers lengthen past the fingertips. The forearm grows longer and lighter, and the chest muscles ache.',
@@ -2767,14 +2767,14 @@ window.WINDLASS_WORLDS.sundered = {
               'The breast muscle is deep and strong. A hard downbeat lifts the feet from the ground, and a drop from a height becomes a glide.',
               'The arms are wings: flight in short strong bursts, long glides from any height, and a wing folded round someone as an embrace. Grounded for long, the body pines.'
             ] },
-          { key: 'hands', name: 'Hands', weight: 6, range: { least: 'A thumb and two short clawed fingers', standard: 'A thumb and two clawed fingers', most: 'A thumb and two strong clawed fingers, the claws long and curved' }, endsAs: 'a thumb and two clawed fingers at each wrist',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 6, range: { least: 'A thumb and two short clawed fingers', standard: 'A thumb and two clawed fingers', most: 'A thumb and two strong clawed fingers, the claws long and curved' }, endsAs: 'a thumb and two clawed fingers at each wrist',
             stages: [
               'The ring and little fingers stiffen and lie against the edge of the hand.',
               'They have drawn into the hand\'s edge, which now carries quills. The nails of the thumb and two remaining fingers thicken and hook.',
               'A hand of thumb and two fingers, long and strong, each with a curved claw, set at the bend of the wing.',
               'At each wrist a hand of thumb and two clawed fingers, free of the flight feathers. It grips hard, and manages a pen, a cup and a button with practice.'
             ] },
-          { key: 'talons', name: 'Talons', weight: 8, range: { least: 'Scaled feet with hooked claws, heel down', standard: 'Scaled shanks, three toes forward and one back', most: 'Heavy talons, scaled to above the knee' }, endsAs: 'scaled shanks with three toes forward and one back',
+          { key: 'talons', slot: 'feet', name: 'Talons', weight: 8, range: { least: 'Scaled feet with hooked claws, heel down', standard: 'Scaled shanks, three toes forward and one back', most: 'Heavy talons, scaled to above the knee' }, endsAs: 'scaled shanks with three toes forward and one back',
             stages: [
               'Toenails thicker, darker and hooked. Socks and shoes begin to disagree with them.',
               'The little toe shortens and is lost into the foot. The big toe sets lower and begins to turn.',
@@ -2782,39 +2782,39 @@ window.WINDLASS_WORLDS.sundered = {
               'Scales climb toward the knee, the shin thins and the heel lifts. The foot grips whatever it stands on, by itself.',
               'Scaled shanks and talons, three toes forward and one back. They lock round a perch in sleep, carry a surprising load, and click on hard floors.'
             ] },
-          { key: 'leg_and_hip_feathers', name: 'Leg and hip feathers', weight: 7, range: { least: 'Knee to mid-thigh', standard: 'Knee to hips, fading out at the navel, and down the spine', most: 'Feathers from knee to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'feathers from knee to hips and down the spine',
+          { key: 'leg_and_hip_feathers', slot: 'coat_legs', name: 'Leg and hip feathers', weight: 7, range: { least: 'Knee to mid-thigh', standard: 'Knee to hips, fading out at the navel, and down the spine', most: 'Feathers from knee to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'feathers from knee to hips and down the spine',
             stages: [
               'Prickling above the knees and at the base of the spine.',
               'Down over the thighs; pin feathers at the hips.',
               'Soft body feathers from knee to hip, and a line of them up the spine.',
               'Feathers from the knee to the hips, thinning to bare skin at the navel, and a line of down along the spine. Soft, warm, and sensitive to a smoothing hand.'
             ] },
-          { key: 'tail_fan', name: 'Tail fan', weight: 5, range: { least: 'A few short feathers', standard: 'A fan', most: 'A long sweeping fan' }, endsAs: 'a fan of tail feathers',
+          { key: 'tail_fan', slot: 'tail', name: 'Tail fan', weight: 5, range: { least: 'A few short feathers', standard: 'A fan', most: 'A long sweeping fan' }, endsAs: 'a fan of tail feathers',
             stages: [
               'A bruised ache at the base of the spine, and a row of quills starting there.',
               'Short tail feathers that spread and close with balance and mood.',
               'A fan of tail feathers that steers in the air and flares with feeling. The root is sensitive.'
             ] },
-          { key: 'crest_and_ears', name: 'Crest and ears', weight: 5, range: { least: 'A few feathers in the hair', standard: 'A crest, with tufts over the ears', most: 'A full crest, feathers all through the hair, and tufts where the ears were' }, endsAs: 'a crest through the hair and feather tufts where the ears were',
+          { key: 'crest_and_ears', slot: 'ears', name: 'Crest and ears', weight: 5, range: { least: 'A few feathers in the hair', standard: 'A crest, with tufts over the ears', most: 'A full crest, feathers all through the hair, and tufts where the ears were' }, endsAs: 'a crest through the hair and feather tufts where the ears were',
             stages: [
               'Hard points among the hair at the crown.',
               'Small feathers through the hair, rising with surprise. The outer ears feel thin.',
               'A crest of longer feathers. The outer ears have shrunk back, a tuft of fine feathers growing over each opening.',
               'A crest through the hair that lifts and flattens with every feeling, and feather tufts where the ears were. Hearing is as sharp as ever.'
             ] },
-          { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face; the bird shows in the eyes and the tilt of the head', standard: 'A faint cast: a fine sharp nose, large eyes', most: 'A fine hard-edged nose, feathered brows and cheeks; never a beak' }, endsAs: 'the person\'s own face with a faint avian cast',
+          { key: 'face', slot: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face; the bird shows in the eyes and the tilt of the head', standard: 'A faint cast: a fine sharp nose, large eyes', most: 'A fine hard-edged nose, feathered brows and cheeks; never a beak' }, endsAs: 'the person\'s own face with a faint avian cast',
             stages: [
               'The head tilts to look, one eye and then the other.',
               'The nose is finer and a touch sharper; the eyes seem larger.',
               'The same face, plainly the person\'s own, with something of the bird in it, and quick tilting movements.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'far-sighted, bright eyes',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 4, endsAs: 'far-sighted, bright eyes',
             stages: [
               'Far things are clearer.',
               'The iris turns {eye}. A face can be read from across a quad.',
               '{eye} eyes that pick out a coin from a rooftop and see colours others cannot. Close work tires them.'
             ] },
-          { key: 'light_bones', name: 'Light bones', weight: 7, needs: [{ track: 'chest', stage: 3, from: 3 }], endsAs: 'a light frame, a deep breastbone and small high breasts',
+          { key: 'light_bones', slot: 'chest', name: 'Light bones', weight: 7, needs: [{ track: 'chest', stage: 3, from: 3 }], endsAs: 'a light frame, a deep breastbone and small high breasts',
             stages: [
               'Lighter on the scales without looking thinner.',
               'The frame slims, and the breastbone deepens into a keel. Bruises come more easily.',
@@ -2870,28 +2870,28 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         mer: [
-          { key: 'webbed_hands', name: 'Webbed hands', weight: 5, range: { least: 'To the first joint', standard: 'To the last joint', most: 'Full webs on long fingers and toes' }, endsAs: 'long fingers webbed to the last joint',
+          { key: 'webbed_hands', slot: 'hands', name: 'Webbed hands', weight: 5, range: { least: 'To the first joint', standard: 'To the last joint', most: 'Full webs on long fingers and toes' }, endsAs: 'long fingers webbed to the last joint',
             stages: [
               'The skin between the fingers feels tight when they spread.',
               'A thin fold of skin joins the fingers at the base.',
               'Webbing to the middle joint, translucent; the hands cup water well.',
               'Long webbed fingers, the web folding away when the hand closes. Strong in the water and deft out of it.'
             ] },
-          { key: 'webbed_feet', name: 'Webbed feet', weight: 6, endsAs: 'long webbed feet',
+          { key: 'webbed_feet', slot: 'feet', name: 'Webbed feet', weight: 6, endsAs: 'long webbed feet',
             stages: [
               'The toes feel long and spread in their shoes.',
               'The toes lengthen, and skin joins them at the base. Socks feel strange over them.',
               'Long toes webbed to the tips; the foot is broad as a paddle. Shoes fit badly.',
               'Long webbed feet, flat and flexible, awkward on stairs and powerful in water.'
             ] },
-          { key: 'arm_scales', name: 'Arm scales', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'scales from the hands to the elbows',
+          { key: 'arm_scales', slot: 'coat_arms', name: 'Arm scales', weight: 4, range: { least: 'Hands to mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'scales from the hands to the elbows',
             stages: [
               'The skin of the hands and wrists feels smooth and cool, faintly patterned.',
               'Fine scales on the backs of the hands, lying toward the fingers.',
               'Scales climbing the forearm, slick when wet and dull when dry.',
               'Scales from the backs of the hands up the arm, fading into pearled skin. Stroked with the lie they are silk; against it, a rasp.'
             ] },
-          { key: 'leg_and_hip_scales', name: 'Leg and hip scales', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, fading out at the navel', most: 'Scales from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'scales from feet to hips, fading out at the navel',
+          { key: 'leg_and_hip_scales', slot: 'coat_legs', name: 'Leg and hip scales', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, fading out at the navel', most: 'Scales from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'scales from feet to hips, fading out at the navel',
             stages: [
               'The skin of the feet and ankles is smooth, cool and faintly patterned.',
               'Fine scales over the feet and shins. Dry, they itch.',
@@ -2899,7 +2899,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Scales over thighs and hips, small and fine on the inner thigh, the colours strong when wet.',
               'Scales from the feet up, fading out in a soft uneven line. Cool to the touch, bright in water, and sensitive to a hand moving with the lie.'
             ] },
-          { key: 'water_tail', name: 'Water tail', weight: 10, needs: [{ track: 'leg_and_hip_scales', stage: 'finished' }, { track: 'webbed_feet', stage: 'finished' }], range: { least: 'Legs stay legs, finned and webbed', standard: 'Legs close into a tail and fluke', most: 'The tail holds for an hour after leaving the water' }, endsAs: 'one scaled tail and a fluke, in water',
+          { key: 'water_tail', slot: 'legs', name: 'Water tail', weight: 10, needs: [{ track: 'leg_and_hip_scales', stage: 'finished' }, { track: 'webbed_feet', stage: 'finished' }], range: { least: 'Legs stay legs, finned and webbed', standard: 'Legs close into a tail and fluke', most: 'The tail holds for an hour after leaving the water' }, endsAs: 'one scaled tail and a fluke, in water',
             stages: [
               'In water the legs want to stay together, and kicking as one is stronger.',
               'Underwater the skin of the inner legs clings from thigh to ankle, and parts again slowly in air.',
@@ -2907,38 +2907,38 @@ window.WINDLASS_WORLDS.sundered = {
               'In water there is a full tail with the feet fanned into a fluke. Out of it the tail parts back into legs over a few minutes as the scales dry, leaving them weak for a moment.',
               'Legs on land; in water, one long scaled tail and a broad fluke, changing over in the time of a few breaths. Swimming is flight. The seam along the inner legs is very sensitive.'
             ] },
-          { key: 'gills', name: 'Gills', weight: 8, endsAs: 'three gill slits either side of the ribs',
+          { key: 'gills', slot: 'chest', name: 'Gills', weight: 8, endsAs: 'three gill slits either side of the ribs',
             stages: [
               'An ache along the ribs on both sides, and a wish to hold the breath underwater.',
               'Three fine lines either side of the ribs, tender and closed.',
               'The lines open underwater and draw it through. The first breaths of water are frightening, then easy.',
               'Three gill slits either side of the ribs, sealed flat in air and working in water. Breathes both; the gills are tender to touch and best kept damp.'
             ] },
-          { key: 'finned_ears', name: 'Finned ears', weight: 5, range: { least: 'Small fins', standard: 'Finned ears', most: 'Tall fans' }, endsAs: 'finned, translucent ears',
+          { key: 'finned_ears', slot: 'ears', name: 'Finned ears', weight: 5, range: { least: 'Small fins', standard: 'Finned ears', most: 'Tall fans' }, endsAs: 'finned, translucent ears',
             stages: [
               'The ears thin at the rims.',
               'The tops lengthen into soft spines with skin between them.',
               'Finned, translucent ears that fan and fold with mood and hear well underwater.'
             ] },
-          { key: 'spine_ridge', name: 'Spine ridge', weight: 4, extentWith: 'finned_ears', range: { least: 'Small fins', standard: 'A low ridge', most: 'A high back fin' }, endsAs: 'a low fin-ridge up the spine',
+          { key: 'spine_ridge', slot: 'coat_back', name: 'Spine ridge', weight: 4, extentWith: 'finned_ears', range: { least: 'Small fins', standard: 'A low ridge', most: 'A high back fin' }, endsAs: 'a low fin-ridge up the spine',
             stages: [
               'A line of smooth cool skin down the backbone.',
               'A low ridge of soft spines beginning between the shoulders.',
               'A fin-ridge along the spine, lying flat in air and lifting in water. Sensitive at its base.'
             ] },
-          { key: 'sheen_and_skin', name: 'Sheen and skin', weight: 5, endsAs: 'smooth, cool, pearl-sheened skin',
+          { key: 'sheen_and_skin', slot: 'coat_body', name: 'Sheen and skin', weight: 5, endsAs: 'smooth, cool, pearl-sheened skin',
             stages: [
               'The skin dries out quickly.',
               'A faint pearl lustre on the bare skin, strongest when wet.',
               'Bare skin with a pearl sheen, smooth, cool and hairless below the head, slick as glass in water.'
             ] },
-          { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face', standard: 'A faint cast: a slightly flat nose, wide-set eyes', most: 'A flat nose with closing nostrils, very wide-set eyes, scales at the cheekbones' }, endsAs: 'the person\'s own face with a faint cast of the sea',
+          { key: 'face', slot: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face', standard: 'A faint cast: a slightly flat nose, wide-set eyes', most: 'A flat nose with closing nostrils, very wide-set eyes, scales at the cheekbones' }, endsAs: 'the person\'s own face with a faint cast of the sea',
             stages: [
               'The nose feels flatter at the bridge.',
               'The nostrils narrow and can close; the eyes sit a touch wider.',
               'The same face, plainly the person\'s own, with something of the sea in it, and a mouth made for singing.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'eyes that see clearly underwater',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 4, endsAs: 'eyes that see clearly underwater',
             stages: [
               'Underwater, things are clear without help.',
               'The iris turns {eye}, and a clear inner lid slides across in water.',
@@ -3008,28 +3008,28 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         dryad: [
-          { key: 'hands', name: 'Hands', weight: 5, range: { least: 'Thorn nails on long fingers and toes', standard: 'Twig-jointed fingers; splayed, rooting toes', most: 'Long branching fingers and toes like roots; still hands' }, endsAs: 'long twig-jointed fingers with thorn nails',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 5, range: { least: 'Thorn nails on long fingers and toes', standard: 'Twig-jointed fingers; splayed, rooting toes', most: 'Long branching fingers and toes like roots; still hands' }, endsAs: 'long twig-jointed fingers with thorn nails',
             stages: [
               'The nails harden and narrow to points.',
               'The finger joints stand out like the nodes on a twig, and the fingers lengthen.',
               'Long jointed fingers with thorn nails; the skin over the knuckles is finely ridged.',
               'Long twig-jointed fingers with nails like thorns. Strong, patient and exact, and gentle with anything growing.'
             ] },
-          { key: 'feet_and_roots', name: 'Feet and roots', weight: 7, endsAs: 'splayed thorn-nailed toes and grained soles that root',
+          { key: 'feet_and_roots', slot: 'feet', name: 'Feet and roots', weight: 7, endsAs: 'splayed thorn-nailed toes and grained soles that root',
             stages: [
               'Toenails harden to thorns, and the toes spread in their shoes.',
               'The soles thicken and take a grain like sawn wood. Bare earth feels good underfoot.',
               'Long splayed toes that grip and dig. Standing barefoot in soil, fine rootlets creep from the soles and draw water.',
               'Splayed thorn-nailed toes and grained soles that root lightly in soil at rest and lift free at will. Rooting is rest, food and deep ease, and shoes are a misery.'
             ] },
-          { key: 'arm_bark', name: 'Arm bark', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'bark from the hands to the elbows',
+          { key: 'arm_bark', slot: 'coat_arms', name: 'Arm bark', weight: 4, range: { least: 'To mid-forearm', standard: 'To the elbows', most: 'To the shoulders' }, endsAs: 'bark from the hands to the elbows',
             stages: [
               'The skin of the hands and wrists roughens and dries.',
               'Fine bark on the backs of the hands, thin as paper.',
               'Bark climbing the forearm, ridged along the arm, with smooth skin at the creases of wrist and palm.',
               'Bark from the backs of the hands up the arm, thinning into grained skin. Warm in sun, and a touch on it is felt slowly and deeply.'
             ] },
-          { key: 'leg_and_hip_bark', name: 'Leg and hip bark', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, thinning out at the navel', most: 'Bark from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'bark from feet to hips, thinning out at the navel',
+          { key: 'leg_and_hip_bark', slot: 'coat_legs', name: 'Leg and hip bark', weight: 8, range: { least: 'Feet to mid-thigh', standard: 'Feet to hips, thinning out at the navel', most: 'Bark from feet to hips and over belly, ribs and back; all but the face and chest' }, endsAs: 'bark from feet to hips, thinning out at the navel',
             stages: [
               'The skin of the feet and shins roughens and dries.',
               'Thin bark on the shins.',
@@ -3037,38 +3037,38 @@ window.WINDLASS_WORLDS.sundered = {
               'Bark climbing the thighs and hips, thinner and finer on the inner thigh.',
               'Bark from the feet up, thinning to smooth grained skin in an uneven line. It keeps out cold and thorn, and needs oil or rain to stay supple; dry, it aches.'
             ] },
-          { key: 'spine_ridge', name: 'Spine ridge', weight: 3, endsAs: 'a ridge of bark up the spine',
+          { key: 'spine_ridge', slot: 'coat_back', name: 'Spine ridge', weight: 3, endsAs: 'a ridge of bark up the spine',
             stages: [
               'A line of rough skin down the backbone.',
               'A narrow ridge of bark from the base of the spine upward.',
               'A ridge of bark along the spine, flexing in plates; a hand pressed on it is felt deep and warm.'
             ] },
-          { key: 'grain', name: 'Grain', weight: 5, endsAs: 'skin faintly grained like pale wood',
+          { key: 'grain', slot: 'coat_body', name: 'Grain', weight: 5, endsAs: 'skin faintly grained like pale wood',
             stages: [
               'The skin takes a faint pattern, like wood under varnish.',
               'Grain shows on the bare skin everywhere. A scratch beads with clear sap before blood.',
               'Skin faintly grained like pale wood, cool and smooth, healing clean and slowly. Body hair is gone below the head.'
             ] },
-          { key: 'leaves', name: 'Leaves', weight: 7, range: { least: 'A few leaves in the hair', standard: 'Leaves growing through the hair', most: 'A crown of leaves and fine twigs through the hair' }, endsAs: 'leaves growing through the hair',
+          { key: 'leaves', slot: 'hair', name: 'Leaves', weight: 7, range: { least: 'A few leaves in the hair', standard: 'Leaves growing through the hair', most: 'A crown of leaves and fine twigs through the hair' }, endsAs: 'leaves growing through the hair',
             stages: [
               'The hair thickens and takes a green or brown cast.',
               'Small leaf buds along the hairline and at the nape.',
               'Leaves open among the hair, alive and turning toward light.',
               'Hair as a fall of fine strands with leaves growing through it, in the kind of the dryad\'s tree. They turn to the sun, droop with thirst and rustle with feeling.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 4, range: { least: 'Small points', standard: 'Long leaf-shaped ears', most: 'Long ears with a leaf\'s edge and veins' }, endsAs: 'long leaf-shaped ears',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 4, range: { least: 'Small points', standard: 'Long leaf-shaped ears', most: 'Long ears with a leaf\'s edge and veins' }, endsAs: 'long leaf-shaped ears',
             stages: [
               'The ear tips lengthen.',
               'Long and flat, with a central vein.',
               'Long leaf-shaped ears that turn toward light as well as sound.'
             ] },
-          { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face with a faint grain', standard: 'A faint cast: high cheekbones, faint grain', most: 'Strong grain, with bark at the temples and jaw' }, endsAs: 'the person\'s own face with a faint cast of the wood',
+          { key: 'face', slot: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face with a faint grain', standard: 'A faint cast: high cheekbones, faint grain', most: 'Strong grain, with bark at the temples and jaw' }, endsAs: 'the person\'s own face with a faint cast of the wood',
             stages: [
               'The face looks stiller in the mirror.',
               'The cheekbones stand higher, and the grain shows faintly on the skin.',
               'The same face, plainly the person\'s own, with something of the wood in it, and a calm, still look.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes that read light and growing things',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 3, endsAs: 'eyes that read light and growing things',
             stages: [
               'Light feels good on the face.',
               'The iris turns {eye}, flecked like bark or leaf.',
@@ -3145,7 +3145,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         goblin: [
-          { key: 'green_skin', name: 'Green skin', weight: 12, range: { least: 'Olive-green, darker at the hands and feet', standard: 'Green all over, darkest at the limbs and ears', most: 'Deep green throughout' }, endsAs: 'green all over, darkest at the limbs and ears',
+          { key: 'green_skin', slot: 'coat_body', name: 'Green skin', weight: 12, range: { least: 'Olive-green, darker at the hands and feet', standard: 'Green all over, darkest at the limbs and ears', most: 'Deep green throughout' }, endsAs: 'green all over, darkest at the limbs and ears',
             stages: [
               'The fingertips and nail beds take a green tinge that does not wash off.',
               'Green to the wrists, and at the toes and ear rims, darkest at the tips.',
@@ -3153,7 +3153,7 @@ window.WINDLASS_WORLDS.sundered = {
               'Green all over, darkest at the limbs and ears, the lips and nipples darker still. Body hair below the brows has thinned away.',
               'Green skin from scalp to sole, darkest from hands to elbows, feet to knees and at the ear tips, paling to olive on the belly and chest. Smooth, cool and tougher than it looks.'
             ] },
-          { key: 'height', name: 'Height', weight: 10, range: { least: 'A head shorter than before', standard: 'About four feet', most: 'About three and a half feet' }, endsAs: 'about four feet, adult in proportion',
+          { key: 'height', slot: 'height', name: 'Height', weight: 10, range: { least: 'A head shorter than before', standard: 'About four feet', most: 'About three and a half feet' }, endsAs: 'about four feet, adult in proportion',
             stages: [
               'Clothes hang a little long.',
               'Shorter by a hand; sleeves and hems need turning up. The proportions stay an adult\'s.',
@@ -3161,41 +3161,41 @@ window.WINDLASS_WORLDS.sundered = {
               'Shorter than nearly everyone, with a low centre of weight and a quick short stride. Shoes go loose, then too long.',
               'Grown into the new height, adult in proportion and build, compact and strong for the size. The world is tall, and climbing is the answer.'
             ] },
-          { key: 'hands', name: 'Hands', weight: 7, range: { least: 'Long fingers', standard: 'Long nimble fingers, hard dark nails', most: 'Very long fingers with an extra reach of joint' }, endsAs: 'long nimble fingers with hard dark nails',
+          { key: 'hands', slot: 'hands', name: 'Hands', weight: 7, range: { least: 'Long fingers', standard: 'Long nimble fingers, hard dark nails', most: 'Very long fingers with an extra reach of joint' }, endsAs: 'long nimble fingers with hard dark nails',
             stages: [
               'The fingers feel long; the nails harden and darken.',
               'Fingers longer by a joint\'s width, the knuckles more flexible.',
               'Long, quick fingers that bend back further than a human\'s, with hard dark nails good for prying and picking.',
               'Long nimble hands with hard dark nails, clever with small parts, locks and knots, and never still.'
             ] },
-          { key: 'feet', name: 'Feet', weight: 7, range: { least: 'Broad feet with long toes', standard: 'Wide flat feet, five hooked gripping toes', most: 'Broad feet that grip like hands' }, endsAs: 'wide flat feet with five long gripping toes',
+          { key: 'feet', slot: 'feet', name: 'Feet', weight: 7, range: { least: 'Broad feet with long toes', standard: 'Wide flat feet, five hooked gripping toes', most: 'Broad feet that grip like hands' }, endsAs: 'wide flat feet with five long gripping toes',
             stages: [
               'Toenails harden and hook; the toes spread in their shoes.',
               'The foot widens and flattens, and the toes lengthen.',
               'Wide flat feet with five long toes that curl and grip like fingers. Shoes fit nowhere.',
               'Wide, flat, tough-soled feet with five long hooked toes that grip a ledge, a rope or a dropped coin. Sure on any climb.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 7, range: { least: 'Pointed', standard: 'Long, held sideways', most: 'Very long, drooping at the tips' }, endsAs: 'long pointed ears held sideways',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 7, range: { least: 'Pointed', standard: 'Long, held sideways', most: 'Very long, drooping at the tips' }, endsAs: 'long pointed ears held sideways',
             stages: [
               'The ear tips ache and run warm.',
               'The tops draw to points and lengthen outward.',
               'Long pointed ears held out to the sides, moving with mood and sound.',
               'Long pointed ears, held sideways, drooping with gloom and lifting with interest, sharp of hearing. The tips are sensitive.'
             ] },
-          { key: 'nose_and_face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face, in green', standard: 'A faint cast: a nose a little long, a wide mouth', most: 'A long nose, a very wide mouth and heavy brows' }, endsAs: 'the person\'s own face with a faint goblin cast',
+          { key: 'nose_and_face', slot: 'face', name: 'Nose and face', weight: 5, face: true, range: { least: 'The person\'s own human face, in green', standard: 'A faint cast: a nose a little long, a wide mouth', most: 'A long nose, a very wide mouth and heavy brows' }, endsAs: 'the person\'s own face with a faint goblin cast',
             stages: [
               'The nose feels larger to the fingers.',
               'The nose lengthens a little, and the mouth widens.',
               'The chin sharpens and the cheekbones stand out; the grin reaches further.',
               'The same face, plainly the person\'s own and an adult\'s, with something of the goblin in it, and bright quick eyes.'
             ] },
-          { key: 'teeth', name: 'Teeth', weight: 3, endsAs: 'small sharp teeth',
+          { key: 'teeth', slot: 'face', name: 'Teeth', weight: 3, endsAs: 'small sharp teeth',
             stages: [
               'The teeth ache at the root.',
               'Smaller and sharper, every one.',
               'Small sharp teeth that show in a grin and make short work of gristle and shell.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 6, endsAs: 'large, night-seeing eyes that squint in sun',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 6, endsAs: 'large, night-seeing eyes that squint in sun',
             stages: [
               'Dim rooms are comfortable; bright ones tiring.',
               'The pupils open very wide in the dark and the iris turns {eye}. Sunlight makes them squint.',
@@ -3261,7 +3261,7 @@ window.WINDLASS_WORLDS.sundered = {
             ] }
         ],
         fairy: [
-          { key: 'height', name: 'Height', weight: 12, range: { least: 'About four feet', standard: 'About three feet', most: 'About two feet' }, endsAs: 'about three feet, a grown adult\'s proportions in small',
+          { key: 'height', slot: 'height', name: 'Height', weight: 12, range: { least: 'About four feet', standard: 'About three feet', most: 'About two feet' }, endsAs: 'about three feet, a grown adult\'s proportions in small',
             stages: [
               'Clothes hang a little long.',
               'Shorter by a hand, and lighter. The proportions stay an adult\'s.',
@@ -3269,13 +3269,13 @@ window.WINDLASS_WORLDS.sundered = {
               'Waist-high to most people, slight and quick. A cup needs two hands.',
               'Grown into the new height, a grown adult\'s proportions in small, fine-boned and very light. Most of the world is oversized, and wings are the answer.'
             ] },
-          { key: 'wing_buds', name: 'Wing buds', weight: 5, endsAs: 'four folded buds beside the spine',
+          { key: 'wing_buds', slot: 'wings', name: 'Wing buds', weight: 5, endsAs: 'four folded buds beside the spine',
             stages: [
               'An itch between the shoulder blades that cannot be reached.',
               'Two pairs of tender ridges beside the spine.',
               'Four soft folded buds under thin skin, twitching with feeling. Lying on the back is uncomfortable.'
             ] },
-          { key: 'wings', name: 'Wings', weight: 12, needs: [{ track: 'wing_buds', stage: 'finished' }], range: { least: 'Four small wings: hovering and long floats', standard: 'Four clear wings: true flight in bursts', most: 'Great bright wings and easy sustained flight' }, endsAs: 'four clear veined wings and true flight',
+          { key: 'wings', slot: 'wings', name: 'Wings', weight: 12, needs: [{ track: 'wing_buds', stage: 'finished' }], range: { least: 'Four small wings: hovering and long floats', standard: 'Four clear wings: true flight in bursts', most: 'Great bright wings and easy sustained flight' }, endsAs: 'four clear veined wings and true flight',
             stages: [
               'The buds break the skin, damp and crumpled.',
               'They unfold and dry into four small clear wings, veined like a leaf, too weak to lift anything.',
@@ -3283,32 +3283,32 @@ window.WINDLASS_WORLDS.sundered = {
               'Hovering for moments at a time; the back and chest ache with new muscle. Clothes need a low back.',
               'Four clear veined wings that fold flat down the back. True flight once the body is small enough to carry: darting, hovering, tiring quickly. A fingertip along a wing vein is felt through the whole body.'
             ] },
-          { key: 'sheen', name: 'Sheen', weight: 7, range: { least: 'At the fingertips and toes', standard: 'To the elbows and knees, and along the spine', most: 'Over the whole body' }, endsAs: 'an iridescent sheen at the limbs and spine',
+          { key: 'sheen', slot: 'coat_body', name: 'Sheen', weight: 7, range: { least: 'At the fingertips and toes', standard: 'To the elbows and knees, and along the spine', most: 'Over the whole body' }, endsAs: 'an iridescent sheen at the limbs and spine',
             stages: [
               'The fingernails gleam as if polished.',
               'A faint shimmer on the fingertips and toes, colours moving in it.',
               'Iridescence climbing the forearms and the shins.',
               'Bare skin all over, with a sheen like the inside of a shell from the fingertips and toes up the limbs and along the spine round the wing roots.'
             ] },
-          { key: 'ears', name: 'Ears', weight: 5, range: { least: 'Small points', standard: 'Long pointed ears', most: 'Very long, swept back' }, endsAs: 'long pointed ears',
+          { key: 'ears', slot: 'ears', name: 'Ears', weight: 5, range: { least: 'Small points', standard: 'Long pointed ears', most: 'Very long, swept back' }, endsAs: 'long pointed ears',
             stages: [
               'The ear tips ache.',
               'The tops draw up to points.',
               'Long pointed ears, fine and upright, sensitive at the tips.'
             ] },
-          { key: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face', standard: 'A faint cast: fine features, eyes a little large', most: 'Sharply fey: very large eyes and fine features on a human face' }, endsAs: 'the person\'s own face with a faint fey cast',
+          { key: 'face', slot: 'face', name: 'Face', weight: 4, face: true, range: { least: 'The person\'s own human face', standard: 'A faint cast: fine features, eyes a little large', most: 'Sharply fey: very large eyes and fine features on a human face' }, endsAs: 'the person\'s own face with a faint fey cast',
             stages: [
               'The features look finer in the mirror.',
               'Cheekbones and chin more delicate; the eyes seem larger.',
               'The same face, plainly the person\'s own and an adult\'s, with something of the fey in it.'
             ] },
-          { key: 'eyes', name: 'Eyes', weight: 4, endsAs: 'large, many-toned eyes that see glamour for what it is',
+          { key: 'eyes', slot: 'eyes', name: 'Eyes', weight: 4, endsAs: 'large, many-toned eyes that see glamour for what it is',
             stages: [
               'Colours are richer.',
               'The iris turns {eye}, bright and many-toned.',
               'Large {eye} eyes that see colours others cannot, glamour for what it is, and the glow of other fairies\' moods.'
             ] },
-          { key: 'hands_and_feet', name: 'Hands and feet', weight: 5, endsAs: 'slender hands and narrow feet seldom flat',
+          { key: 'hands_and_feet', slot: 'hands', name: 'Hands and feet', weight: 5, endsAs: 'slender hands and narrow feet seldom flat',
             stages: [
               'The fingers and toes look longer and finer.',
               'Slender hands; narrow feet that prefer the toes.',
@@ -3320,7 +3320,7 @@ window.WINDLASS_WORLDS.sundered = {
               'A breeze is felt as a push, and a jump hangs.',
               'Almost weightless: carried on one palm, blown by a gust, landing without sound.'
             ] },
-          { key: 'glow_and_dust', name: 'Glow and dust', weight: 8, range: { least: 'Only in strong feeling', standard: 'Rising and falling with mood', most: 'Always alight' }, endsAs: 'glowing with mood and shedding dust',
+          { key: 'glow_and_dust', slot: 'coat_body', name: 'Glow and dust', weight: 8, range: { least: 'Only in strong feeling', standard: 'Rising and falling with mood', most: 'Always alight' }, endsAs: 'glowing with mood and shedding dust',
             stages: [
               'The skin seems lit from inside when very happy.',
               'A faint glow that rises and falls with mood. It cannot be hidden in the dark.',
