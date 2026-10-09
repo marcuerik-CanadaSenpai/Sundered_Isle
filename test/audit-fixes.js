@@ -123,6 +123,10 @@ const baseTf = (kind, influence, prog) => ({ influence: { [kind]: influence }, t
 // Every part held where it stands until contact, except the ones named with open: true; { told: 'done' } is a finished part.
 const heldParts = (M, set) => Object.fromEntries(M.map((t) => { const o = set[t.key] || {}, n = t.stages.length, told = o.told === 'done' ? n : o.told || 0; return [t.key, Object.assign({ s: o.s || 8, e: o.e || 30, p: o.p != null ? o.p : stageAt(told, n), told, ext: o.ext || 0, nextAt: o.nextAt || 0 }, o.at != null ? { at: o.at } : {}, o.open || o.told === 'done' ? {} : { eased: 0 })]; }));
 
+// A cow and a rabbit on one body: each kind's parts held where they stand except the ones named with open: true (heldParts), both paths drawn,
+// the cow at 60 and the rabbit at 100 influence.
+const twoKindTf = (W, cowSet, rabSet) => { const TR = W.transformation.tracks.species; return { influence: { cow: 60, rabbit: 100 }, traits: [], rungs: {}, arcs: [], tracks: [], paths: { cow: emptyPath(), rabbit: emptyPath() }, prog: { cow: { lean: 0, face: 15, tracks: heldParts(TR.cow, cowSet) }, rabbit: { lean: 0, face: 15, tracks: heldParts(TR.rabbit, rabSet) } }, last: { cow: 0, rabbit: 0 }, drifted: {} }; };
+
 // A man with a bovine roommate at the unbounded pace, an hour of intimate contact every turn, the path kept a man's (no way over): the
 // waypoints told, one entry per turn that told one, and every turn prompt.
 async function tfGame(turnsToRun, patch, who) {
@@ -7589,6 +7593,77 @@ const S = {
     } finally { h.close(); }
   },
 
+
+  // One kind to a body part. Two kinds on one body: the cow has changed the ears, the feet and the tail, and the rabbit's influence is
+  // full. While the rabbit has a part it can still change on a slot nobody has touched (hands, eyes, face, the coat by region) or a
+  // part that is no part (greens, spring), it changes those; the ears, the feet and the tail, which the cow holds, wait.
+  async slotsUntouchedFirst() {
+    const W = loadWorld(), TR = W.transformation.tracks.species;
+    const { h, id } = await seededTf({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' }, () => twoKindTf(W, { ears: { told: 2 }, toes_and_hooves: { told: 2 }, tail: { told: 1 } }, Object.fromEntries(TR.rabbit.map((t) => [t.key, { open: true }]))), { pace: 'unbounded' });
+    try {
+      patchTurns(h, (r) => { r.time_advance_minutes = 90; r.exposures = []; });
+      for (let i = 0; i < 8; i++) assert(await h.turn('I get on with the day.'));
+      const tf = onlyAdv(h.mock.store).data.state.tf, rab = tf.prog.rabbit.tracks, cow = tf.prog.cow.tracks;
+      assert.deepEqual(['ears', 'toes', 'hind_feet', 'bob_tail'].map((k) => rab[k].told), [0, 0, 0, 0], 'the rabbit leaves the cow\'s ears, feet and tail alone while it has other parts: ' + JSON.stringify(Object.entries(rab).map(([k, r]) => [k, r.told])));
+      assert.deepEqual([cow.ears.told, cow.toes_and_hooves.told, cow.tail.told], [2, 2, 1], 'and the cow\'s parts stand as they were');
+      const free = TR.rabbit.filter((t) => !t.sex && !['ears', 'toes', 'hind_feet', 'bob_tail'].includes(t.key)).reduce((n, t) => n + rab[t.key].told, 0);
+      assert(free >= 5, 'the rabbit changes its untouched parts instead (' + free + ' waypoints): ' + JSON.stringify(Object.entries(rab).filter(([, r]) => r.told).map(([k, r]) => [k, r.told])));
+      assert(!storedTurns(h.mock.store, id).some((t) => t.notes.some((n) => /part taken over/.test(n))), 'no part is taken over while untouched ones are left');
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // The rabbit has nothing untouched left to change (every other part of it is finished), so it takes over the cow's least advanced
+  // held slot, the feet (two waypoints against the ears' three and the tail's three), a waypoint a turn, the cow's hooves easing back
+  // a waypoint with each; the engine note names both forms. The ears and the tail, held further on, are not touched.
+  async slotTakeoverEasesTheHolder() {
+    const W = loadWorld(), TR = W.transformation.tracks.species, open = ['toes', 'hind_feet', 'bob_tail', 'ears'];
+    const cowStage = TR.cow.find((t) => t.key === 'toes_and_hooves').stages[1], rabStage = TR.rabbit.find((t) => t.key === 'toes').stages[0];
+    const { h } = await seededTf({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' }, () => twoKindTf(W, { ears: { told: 3 }, tail: { told: 3 }, toes_and_hooves: { told: 2 } }, Object.fromEntries(TR.rabbit.filter((t) => !t.sex).map((t) => [t.key, open.includes(t.key) ? { open: true } : { told: 'done' }]))), { pace: 'unbounded' });
+    try {
+      patchTurns(h, (r) => { r.time_advance_minutes = 90; r.exposures = []; });
+      const seen = [], prompts = [];
+      for (let i = 0; i < 6; i++) { assert(await h.turn('I get on with the day.')); const tf = onlyAdv(h.mock.store).data.state.tf; seen.push([tf.prog.rabbit.tracks.toes.told, tf.prog.cow.tracks.toes_and_hooves.told]); prompts.push(promptOf(lastTurn(h))); }
+      const tf = onlyAdv(h.mock.store).data.state.tf, rab = tf.prog.rabbit.tracks, cow = tf.prog.cow.tracks;
+      for (const [r, c] of seen) assert.equal(c, Math.max(0, 2 - r), 'the cow\'s hooves ease back a waypoint with each of the rabbit\'s toes: ' + JSON.stringify(seen));
+      assert(rab.toes.told >= 2 && cow.toes_and_hooves.told === 0, 'the rabbit holds the feet and the cow has none left there: ' + JSON.stringify(seen));
+      assert.deepEqual([rab.ears.told, rab.bob_tail.told, cow.ears.told, cow.tail.told], [0, 0, 3, 3], 'the ears and the tail, held further on, are left alone');
+      assert(prompts.some((p) => p.includes('shifting from the bovine mythkin\'s form toward the rabbit mythkin\'s')), 'the note says the part is shifting from one form toward the other');
+      assert(prompts.some((p) => p.includes(cowStage.replace(/\.$/, ''))), 'it gives the cow\'s line for the part: ' + cowStage);
+      assert(prompts.some((p) => p.includes(rabStage.replace(/\.$/, ''))), 'and the rabbit\'s: ' + rabStage);
+      assert(storedTurns(h.mock.store, onlyAdv(h.mock.store).id).some((t) => t.notes.some((n) => /^part taken over: rabbit Toes /.test(n))), 'the turn notes the takeover');
+      assert.deepEqual(tf.takeover, {}, 'and the takeover is over once the cow has nothing left on the feet: ' + JSON.stringify(tf.takeover));
+      clean(h);
+    } finally { h.close(); }
+  },
+
+  // Parts that are no part (senses, appetite, temper) have no slot and run side by side whatever the other kind holds: with the cow
+  // holding every slot the rabbit has a part on and the rabbit's own non-slotted parts open, both kinds' senses, greens and the like
+  // advance and the rabbit's slotted parts stay put. Also the world data: only physical parts have a slot, the by-sex parts none.
+  async unslottedTracksRunSideBySide() {
+    const W = loadWorld(), TR = W.transformation.tracks.species;
+    const SLOTS = ['ears', 'eyes', 'face', 'head', 'hair', 'hands', 'feet', 'legs', 'tail', 'coat_arms', 'coat_back', 'coat_legs', 'coat_body', 'wings', 'chest', 'height'];
+    const NONPART = /^(?:voice|own_scent|senses|smell|hearing_and_nose|appetite\w*|heat_and_strength|movement|pack|moon|herd|guile|lightness|weight_and_strength|balance_and_grace|sleep_and_the_hunt|purr_and_voice|self_and_affection|grooming|greens|spring|watchfulness|warren|stride|steadiness|bond|quickness|nesting|voice_and_song|preening|heights_and_flock|water_need|cool_blood|sun_and_water|stillness|the_year|the_tree|stomach|collecting_and_the_deal|tinkering|heap|wiry_strength|sweet_tooth|warmth|promises|iron)$/;
+    for (const [k, M] of Object.entries(TR)) for (const t of M) {
+      if (t.sex) assert(!t.slot, k + '.' + t.key + ' is a by-sex part and has no slot');
+      else if (NONPART.test(t.key)) assert(!t.slot, k + '.' + t.key + ' is not a part and has no slot');
+      else assert(SLOTS.includes(t.slot), k + '.' + t.key + ' is a physical part and names a body slot, not ' + t.slot);
+    }
+    assert.equal(TR.cow.find((t) => t.key === 'ears').slot, 'ears'); assert.equal(TR.rabbit.find((t) => t.key === 'ears').slot, 'ears');
+    const held = { ears: { told: 'done' }, toes_and_hooves: { told: 'done' }, tail: { told: 'done' }, hands: { told: 'done' }, eyes: { told: 'done' }, nose_and_face: { told: 'done' }, forearm_coat: { told: 'done' }, leg_and_hip_coat: { told: 'done' }, spine_strip: { told: 'done' }, senses: { open: true, s: 6 } };
+    const rab = Object.fromEntries(TR.rabbit.map((t) => [t.key, { open: true, s: 7 }]));
+    const { h } = await seededTf({ rmSpecies: 'cow', rmName: 'Daisy Holm', gender: 'male', name: 'Tom Ashby' }, () => twoKindTf(W, held, rab), { pace: 'unbounded' });
+    try {
+      patchTurns(h, (r) => { r.time_advance_minutes = 90; r.exposures = []; });
+      for (let i = 0; i < 8; i++) assert(await h.turn('I get on with the day.'));
+      const tr = onlyAdv(h.mock.store).data.state.tf.prog, R = tr.rabbit.tracks;
+      assert(tr.cow.tracks.senses.told >= 1, 'the cow\'s senses run: ' + tr.cow.tracks.senses.told);
+      const unslotted = ['greens', 'spring', 'watchfulness', 'warren', 'own_scent'].reduce((n, k) => n + R[k].told, 0);
+      assert(unslotted >= 2, 'the rabbit\'s own non-part tracks run beside them (' + unslotted + ')');
+      assert.deepEqual(['hands', 'eyes', 'nose_and_lip', 'front_teeth', 'forearm_coat', 'leg_and_hip_coat', 'spine_strip', 'toes', 'hind_feet', 'bob_tail', 'ears', 'belly_fur'].map((k) => R[k].told), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'the rabbit\'s parts on slots the cow holds wait while it has others to change: ' + JSON.stringify(Object.entries(R).filter(([, r]) => r.told).map(([k, r]) => [k, r.told])));
+      clean(h);
+    } finally { h.close(); }
+  },
 };
 
 (async () => {

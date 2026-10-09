@@ -181,8 +181,8 @@ async function main() {
       'heat descriptions may be used but should not become a recurring default');
     assert.doesNotMatch(sunderedRules, /never use "radiating heat"/i,
       'sensory variety must not categorically ban heat descriptions');
-    assert.match(sunderedRules, /paths can progress together on one body; they do not compete for a limited number of parts/i,
-      'multiple species paths must coexist without arbitrary replacement');
+    assert.match(sunderedRules, /kinds share the body, but each part shows one kind's form at a time.*untouched first.*takes over a part another kind has already changed only gradually/i,
+      'multiple species paths share the body, one kind per part, with a gradual takeover and no abrupt replacement');
     assert.doesNotMatch(prompts[1], /Each part changes on its own track/,
       'the waypoint rule is sent only once a change has begun');
 
