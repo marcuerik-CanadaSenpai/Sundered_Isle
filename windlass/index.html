@@ -2685,17 +2685,82 @@
   // A finished part whose range row also covers a later part of the kind (a fox's tails, a rabbit's coat to the belly) keeps that
   // extent back until the later part has finished, or is none on this body, so no second tail is told before it grows.
   const extentHeld = (k, pr, t) => { const own = extentText(pr, t).toLowerCase(); return (trackModel(k) || []).some((d) => { if (d.extentWith !== t.key) return false; const de = extentText(pr, d), r = pr.tracks[d.key]; return !!de && !/^none$/i.test(de) && own.includes(de.toLowerCase()) && !(r && r.told >= d.stages.length); }); };
+  // One kind to a body part. Every physical track names the body slot it works on (t.slot: ears, eyes, face, hands, feet, tail, the
+  // coat by region, wings...); the tracks that are not parts (senses, appetites, temper, voice, scent, strength) and the sex-linked
+  // ones have none and run side by side as ever. A kind holds a slot once its track there has told a waypoint; a slot no kind
+  // holds is the body's own. A kind's progress goes to the parts it can still change on slots that are its own or untouched first;
+  // only when none is left may it take over one slot another kind holds (slotPlan), the holder with the least told first, one
+  // waypoint at a time, the holder's track there easing back a waypoint with each (takeOverStep). tf.takeover[slot] is the kind
+  // taking the slot over, kept until the old holder has nothing left on it.
+  const slotKey = (t) => (t.sex ? '' : t.slot || '');
+  function slotHolders(tf, slot, except) {
+    const out = [];
+    for (const k of Object.keys(tf.prog || {})) {
+      if (k === except) continue; const M = trackModel(k), pr = tf.prog[k]; if (!M || !pr || !pr.tracks) continue;
+      let told = 0, pp = 0;
+      for (const t of M) { if (slotKey(t) !== slot) continue; const r = pr.tracks[t.key]; if (r && r.told > 0) { told += r.told; pp += r.p || 0; } }
+      if (told > 0) out.push({ k, told, p: pp });
+    }
+    return out;
+  }
+  // Whether a track can still move: open, not none on this body, not held back, not finished, and either a waypoint reached and
+  // waiting to be told or room under its needs.
+  function canAdvance(tf, k, M, pr, t, p) {
+    const r = pr.tracks[t.key]; if (!r) return false; const n = t.stages.length;
+    if (r.told >= n || !trackOpen(tf, k, t, p) || noneHere(pr, t) || heldBack(tf, k, r)) return false;
+    return stageOf(r.p, n) > r.told || needCap(tf, k, M, t, p) > r.p;
+  }
+  // Which of a kind's tracks may move now. block: the tracks on a slot another kind holds, while the kind has a track it can still
+  // move on a slot of its own or untouched; take: the one held slot it may take over when it has none, the least advanced holder's
+  // first (lowest told, then lowest p), and a slot it has begun taking over before any other.
+  function slotPlan(tf, k, p) {
+    const block = new Set(), M = trackModel(k), pr = tf.prog && tf.prog[k], tk = tf.takeover || {}; let take = null;
+    if (!M || !pr || !pr.tracks) return { block, take };
+    const foreign = (t) => { const s = slotKey(t); return !!s && tk[s] !== k && slotHolders(tf, s, k).length > 0; };
+    const adv = M.filter((t) => canAdvance(tf, k, M, pr, t, p));
+    if (!adv.some((t) => !foreign(t))) {
+      const cands = [...new Set(adv.filter(foreign).map(slotKey))].filter((s) => !tk[s]);
+      const measure = (s) => slotHolders(tf, s, k).reduce((a, h) => [a[0] + h.told, a[1] + h.p], [0, 0]);
+      cands.sort((a, b) => { const x = measure(a), y = measure(b); return x[0] - y[0] || x[1] - y[1] || (a < b ? -1 : a > b ? 1 : 0); });
+      take = cands[0] || null;
+    }
+    for (const t of M) if (foreign(t) && slotKey(t) !== take) block.add(t.key);
+    return { block, take };
+  }
+  // A slot taken over whose new kind has nothing told on it any more (healed or eased back), or whose old holders are gone, is no
+  // takeover now.
+  function tidyTakeover(tf) {
+    for (const s of Object.keys(tf.takeover || {})) { const k = tf.takeover[s]; if (!slotHolders(tf, s).some((h) => h.k === k) || !slotHolders(tf, s, k).length) delete tf.takeover[s]; }
+  }
+  // A takeover waypoint of kind k on a slot another kind holds: the holder with the most told on it eases back a waypoint, on the
+  // part the holder's other parts do not stand on, as the Spa takes one back. Gives the note's words naming both forms ('' when
+  // no other kind holds the slot).
+  function takeOverStep(tf, k, t, j, now) {
+    const slot = slotKey(t), others = slotHolders(tf, slot, k); if (!slot || !others.length) return '';
+    others.sort((a, b) => b.told - a.told); const A = others[0].k, MA = trackModel(A), pr = tf.prog[A];
+    const on = MA.filter((x) => slotKey(x) === slot && pr.tracks[x.key] && pr.tracks[x.key].told > 0);
+    const stoodOn = (c) => MA.some((d) => d !== c && pr.tracks[d.key] && (d.needs || []).some((nd) => nd.track === c.key && pr.tracks[c.key].told - 1 < (nd.stage === 'finished' ? c.stages.length : Number(nd.stage)) && pr.tracks[d.key].told > (nd.from ? nd.from - 1 : 0)));
+    const ta = on.slice().sort((a, b) => (stoodOn(a) ? 1 : 0) - (stoodOn(b) ? 1 : 0) || pr.tracks[b.key].told - pr.tracks[a.key].told)[0];
+    const r = pr.tracks[ta.key], n = ta.stages.length, from = r.told, was = pathFill(tf, A, ta.stages[from - 1]).replace(/\.$/, '');
+    r.told = from - 1; r.p = r.told ? stageAt(r.told, n) : 0; r.eased = now; r.easedAt = (tf.touch && tf.touch[A]) || 0; r.nextAt = Math.max(r.nextAt || 0, now + stepGapMin());
+    if (from === n) tf.traits = (tf.traits || []).filter((x) => !(x.species === A && x.track === ta.key));
+    tf.takeover = tf.takeover || {}; tf.takeover[slot] = k;
+    const T = W.transformation, a = T.species[A].name, b = T.species[k].name;
+    const left = r.told ? pathFill(tf, A, ta.stages[r.told - 1]).replace(/\.$/, '') : '', rest = slotHolders(tf, slot, k).length;
+    return ' This part was already changed by another kind, so it is shifting from the ' + a + '\'s form toward the ' + b + '\'s: the ' + a + ' ' + ta.name.toLowerCase() + ' (' + was + ') ' + (left ? 'gives way a step, now only ' + left : 'is gone, the last of it, and what stands here is the ' + b + '\'s alone') + ', as the ' + b + '\'s comes in (' + pathFill(tf, k, t.stages[j - 1]).replace(/\.$/, '') + '). Show this one part changing from one form to the other, the old fading as the new arrives; ' + (rest ? 'some of the ' + a + '\'s form is still here and stays until a later step; ' : '') + 'no other part is new.';
+  }
   // Moves every track of every kind with influence to where the influence sits in its window (never back), under its needs, only
   // when open, and never past the next waypoint not yet told (the body goes as far as what has been lived through, so the influence
   // may run ahead and the telling catch up at its own pace); the same for the body's sex. Called once per committed turn, after influence has moved.
   function driveTracks(state) {
     const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return;
     const p = adv.player || defaultPlayer();
+    tidyTakeover(tf);
     for (const k of Object.keys(T.species)) {
       const M = trackModel(k), D = tf.influence[k] || 0; if (!M || !(D > 0)) continue;
-      const pr = ensureProg(tf, k);
+      const pr = ensureProg(tf, k), plan = slotPlan(tf, k, p);
       const sx = tf.sexprog; if (sx && sx.species === k && !tf.sex) { const SM = sexModel(sx.to); for (const t of SM) { const r = sx.tracks[t.key]; if (heldBack(tf, k, r)) continue; const cap = needCap(tf, k, SM, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); } }
-      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r) || noneHere(pr, t)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
+      for (const t of M) { const r = pr.tracks[t.key]; if (!trackOpen(tf, k, t, p) || heldBack(tf, k, r) || noneHere(pr, t) || plan.block.has(t.key)) continue; const cap = needCap(tf, k, M, t, p); r.p = Math.max(r.p, Math.min(cap, trackDrive(D, r), stageAt(r.told + 1, t.stages.length))); }
     }
   }
   // A part the body has fought back stays where it eased to until something of its kind touches the player again; one the Spa took
@@ -2801,10 +2866,12 @@
   // track makes the body a woman's or a man's.
   function tellTracks(state, notes) {
     const T = W.transformation, tf = state.tf; if (!T || !T.tracks || !tf) return [];
-    const now = storyMin(state), gap = stepGapMin(), out = [], due = [];
+    const now = storyMin(state), gap = stepGapMin(), out = [], due = [], pl = adv.player || defaultPlayer();
+    tidyTakeover(tf);
     for (const k of Object.keys(tf.prog || {})) {
       const M = trackModel(k), pr = tf.prog[k]; if (!M || !pr) continue;
-      for (const t of M) { const r = pr.tracks[t.key]; if (!r) continue; const st = stageOf(r.p, t.stages.length); if (r.told < st && r.nextAt <= now) due.push({ kind: 'track', k, t, r, j: r.told + 1, at: r.nextAt }); }
+      const plan = slotPlan(tf, k, pl);
+      for (const t of M) { const r = pr.tracks[t.key]; if (!r || plan.block.has(t.key)) continue; const st = stageOf(r.p, t.stages.length); if (r.told < st && r.nextAt <= now) due.push({ kind: 'track', k, t, r, j: r.told + 1, at: r.nextAt }); }
     }
     const sx = tf.sexprog; if (sx && !tf.sex) { const SM = sexModel(sx.to) || []; for (const t of SM) { const r = sx.tracks[t.key]; if (!r) continue; const st = stageOf(r.p, t.stages.length); if (r.told < st && r.nextAt <= now) due.push({ kind: 'sex', k: sx.species, t, r, j: r.told + 1, at: r.nextAt }); } }
     // Stay with a part: a private track held back and now free goes first, then the part told last (focusRun waypoints in a row), and a
@@ -2832,7 +2899,9 @@
       const sp = T.species[d.k], pr = tf.prog[d.k];
       if (d.kind === 'track') {
         const firstEver = !Object.values(pr.tracks).some((r) => r.told > 0);
-        out.push(trackNote(tf, d.k, d.t, d.j, pr, firstEver));
+        const shift = takeOverStep(tf, d.k, d.t, d.j, now);
+        out.push(trackNote(tf, d.k, d.t, d.j, pr, firstEver) + shift);
+        if (shift) notes.push('part taken over: ' + d.k + ' ' + d.t.name + ' waypoint ' + d.j + ' of ' + d.t.stages.length + ' (' + slotKey(d.t) + ')');
         if (firstEver) { if (tf.last[d.k] == null || tf.last[d.k] < now) tf.last[d.k] = now; notes.push('change begins: ' + d.k + ' (' + d.t.name + ')'); }
         d.r.told = d.j; d.r.at = now; d.r.nextAt = now + Math.round(gap * (0.7 + 0.6 * Math.random()));
         if (d.j === d.t.stages.length) { tf.traits.push({ species: d.k, trait: d.t.name + ': ' + (d.t.endsAs || d.t.stages[d.t.stages.length - 1]), day: state.day, settled: true, track: d.t.key }); notes.push('change complete: ' + d.k + ' ' + d.t.name); }
@@ -2877,8 +2946,9 @@
       const recent = new Set(open.slice().sort((a, b) => toldAt(pr.tracks[b.key]) - toldAt(pr.tracks[a.key])).slice(0, 3).map((t) => t.key));
       for (const t of M) {
         const r = pr.tracks[t.key]; if (!r || !r.told) continue; const n = t.stages.length; const done = r.told >= n; const said = noted(t.name + ' (' + T.species[k].name + ', waypoint ' + r.told + ' of ' + n + '): ');
-        if (!done && !said && !recent.has(t.key) && !named(t)) { parts.push(t.name + ' ' + r.told + '/' + n); continue; }
-        parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + ': ' + (said ? 'in the note from the engine' : done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (!said && done && t.range && !extentHeld(k, pr, t) ? ' [' + fill(extentText(pr, t)) + ']' : ''));
+        const tk = (tf.takeover || {})[slotKey(t)], giving = tk ? (tk === k ? ' [taking this part over from another kind]' : ' [giving way to the ' + T.species[tk].name + ']') : '';
+        if (!done && !said && !recent.has(t.key) && !named(t)) { parts.push(t.name + ' ' + r.told + '/' + n + giving); continue; }
+        parts.push(t.name + (done ? ' (finished)' : ' (' + r.told + ' of ' + n + ')') + giving + ': ' + (said ? 'in the note from the engine' : done && compact ? fill(t.endsAs || t.stages[n - 1]).replace(/\.$/, '') : pf(k, t.stages[r.told - 1])) + (!said && done && t.range && !extentHeld(k, pr, t) ? ' [' + fill(extentText(pr, t)) + ']' : ''));
       }
       const drawn = pathDrawn(tf, k);
       if (parts.length) out.push('Body now (' + T.species[k].name + ', ' + kindTotal(tf, k) + ' of 100): ' + parts.join('; ') + '.' + (drawn ? ' Drawn for this body, for when it shows: ' + drawn + '.' : ''));
